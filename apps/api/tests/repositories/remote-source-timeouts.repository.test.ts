@@ -1,8 +1,10 @@
 import { expect, test } from 'bun:test';
+import { DownloadDiagnostics } from '#lib/download-diagnostics.ts';
 import {
   InterruptedSourceError,
   RemoteSourceRepository,
 } from '#repositories/remote-source.repository.ts';
+import { recordingDownloadLogger } from '#tests/support/download-logs.ts';
 
 const RESPONSE_MS = 50;
 const IDLE_MS = 200;
@@ -27,20 +29,59 @@ function resolveLoopbacks() {
 }
 
 test('a stalled address is aborted and the next resolved address serves the binary', async () => {
+  const { logger, records } = recordingDownloadLogger();
   const stalled = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: stall });
   const healthy = Bun.serve({ hostname: '::1', port: stalled.port, fetch: answer });
   const repo = new RemoteSourceRepository({
     mayDial,
     resolveAddresses: resolveLoopbacks,
     timeouts: TIMEOUTS,
+    logger,
   });
   try {
-    const source = await repo.open({ url: `http://releases.example:${stalled.port}/binary` });
+    const source = await repo.open({
+      url: `http://releases.example:${stalled.port}/binary`,
+      diagnostics: new DownloadDiagnostics({ downloadId: 'fallback-test', logger }),
+    });
     expect(source.outcome).toBe('open');
     if (source.outcome === 'open') {
       expect(await new Response(source.body).text()).toBe(BINARY);
     }
     expect(stalled.pendingRequests).toBe(0);
+    expect(records).toContainEqual(
+      expect.objectContaining({
+        phase: 'dns',
+        event: 'completed',
+        addresses: ['127.0.0.1', '::1'],
+      }),
+    );
+    expect(records).toContainEqual(
+      expect.objectContaining({
+        level: 'warn',
+        phase: 'response',
+        event: 'failed',
+        address: '127.0.0.1',
+        errorName: 'TimeoutError',
+        totalDeadlineExceeded: false,
+      }),
+    );
+    expect(records).toContainEqual(
+      expect.objectContaining({
+        phase: 'response',
+        event: 'completed',
+        address: '::1',
+        status: 200,
+      }),
+    );
+    expect(records).toContainEqual(
+      expect.objectContaining({
+        phase: 'body',
+        event: 'completed',
+        bytesReceived: BINARY.length,
+        readWaitMs: expect.any(Number),
+      }),
+    );
+    expect(records.every((record) => record.downloadId === 'fallback-test')).toBe(true);
   } finally {
     stalled.stop(true);
     healthy.stop(true);
@@ -54,7 +95,11 @@ test('a hostname with only stalled addresses is unreachable before the transfer 
     return stall();
   }
   const stalled = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: stalledRequest });
-  const repo = new RemoteSourceRepository({ mayDial, timeouts: TIMEOUTS });
+  const repo = new RemoteSourceRepository({
+    mayDial,
+    timeouts: TIMEOUTS,
+    logger: recordingDownloadLogger().logger,
+  });
   try {
     expect(await repo.open({ url: stalled.url.toString() })).toEqual({ outcome: 'unreachable' });
     await disconnected.promise;
@@ -64,13 +109,22 @@ test('a hostname with only stalled addresses is unreachable before the transfer 
 });
 
 test('an unresponsive DNS lookup is bounded too', async () => {
+  const { logger, records } = recordingDownloadLogger();
   function resolveAddresses(): Promise<string[]> {
     return new Promise(() => undefined);
   }
-  const repo = new RemoteSourceRepository({ resolveAddresses, timeouts: TIMEOUTS });
+  const repo = new RemoteSourceRepository({ resolveAddresses, timeouts: TIMEOUTS, logger });
   expect(await repo.open({ url: 'https://releases.example/binary' })).toEqual({
     outcome: 'unreachable',
   });
+  expect(records).toContainEqual(
+    expect.objectContaining({
+      phase: 'dns',
+      event: 'failed',
+      errorName: 'TimeoutError',
+      totalDeadlineExceeded: false,
+    }),
+  );
 });
 
 test('every resolved address is validated before a fallback can be dialled', async () => {
@@ -80,6 +134,7 @@ test('every resolved address is validated before a fallback can be dialled', asy
   const repo = new RemoteSourceRepository({
     resolveAddresses,
     timeouts: TIMEOUTS,
+    logger: recordingDownloadLogger().logger,
   });
   expect(await repo.open({ url: 'https://releases.example/binary' })).toEqual({
     outcome: 'private-address',
@@ -101,7 +156,11 @@ test('a successful response can keep downloading after its address timeout', asy
     );
   }
   const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: delayedBody });
-  const repo = new RemoteSourceRepository({ mayDial, timeouts: TIMEOUTS });
+  const repo = new RemoteSourceRepository({
+    mayDial,
+    timeouts: TIMEOUTS,
+    logger: recordingDownloadLogger().logger,
+  });
   try {
     const source = await repo.open({ url: server.url.toString() });
     expect(source.outcome).toBe('open');
@@ -114,6 +173,7 @@ test('a successful response can keep downloading after its address timeout', asy
 });
 
 test('a response body that stops sending fails and releases its connection', async () => {
+  const { logger, records } = recordingDownloadLogger();
   const disconnected = Promise.withResolvers<void>();
   function stalledBody() {
     return new Response(
@@ -128,13 +188,22 @@ test('a response body that stops sending fails and releases its connection', asy
     );
   }
   const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: stalledBody });
-  const repo = new RemoteSourceRepository({ mayDial, timeouts: TIMEOUTS });
+  const repo = new RemoteSourceRepository({ mayDial, timeouts: TIMEOUTS, logger });
   try {
     const source = await repo.open({ url: server.url.toString() });
     expect(source.outcome).toBe('open');
     if (source.outcome === 'open') {
       await expect(new Response(source.body).text()).rejects.toBeInstanceOf(InterruptedSourceError);
       await disconnected.promise;
+      expect(records).toContainEqual(
+        expect.objectContaining({
+          phase: 'body',
+          event: 'failed',
+          bytesReceived: 'incomplete'.length,
+          errorName: 'TimeoutError',
+          totalDeadlineExceeded: false,
+        }),
+      );
     }
   } finally {
     server.stop(true);
@@ -142,6 +211,7 @@ test('a response body that stops sending fails and releases its connection', asy
 });
 
 test('the total deadline stops retries before the next address is dialled', async () => {
+  const { logger, records } = recordingDownloadLogger();
   let fallbackRequests = 0;
   function fallback() {
     fallbackRequests += 1;
@@ -153,12 +223,20 @@ test('the total deadline stops retries before the next address is dialled', asyn
     mayDial,
     resolveAddresses: resolveLoopbacks,
     timeouts: { ...TIMEOUTS, totalMs: RESPONSE_MS / 2 },
+    logger,
   });
   try {
     expect(await repo.open({ url: `http://releases.example:${stalled.port}/binary` })).toEqual({
       outcome: 'unreachable',
     });
     expect(fallbackRequests).toBe(0);
+    expect(records).toContainEqual(
+      expect.objectContaining({
+        phase: 'response',
+        event: 'failed',
+        totalDeadlineExceeded: true,
+      }),
+    );
   } finally {
     stalled.stop(true);
     healthy.stop(true);

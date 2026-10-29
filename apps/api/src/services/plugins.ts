@@ -100,7 +100,7 @@ const importStorageRepository = new ArtifactStorageRepository({
   signer: uploadSigner,
   bucket: env.IMPORTS_BUCKET,
 });
-const remoteSourceRepository = new RemoteSourceRepository();
+const remoteSourceRepository = new RemoteSourceRepository({ logger: createLogger('Downloader') });
 const cachedBinariesRepository = new CachedBinariesRepository(sql);
 const releaseDigestRepository = new ReleaseDigestRepository();
 const exportsRepository = new ExportsRepository(sql);

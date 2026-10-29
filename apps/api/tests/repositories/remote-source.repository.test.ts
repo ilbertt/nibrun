@@ -6,6 +6,7 @@ import {
   type RemoteSource,
   RemoteSourceRepository,
 } from '#repositories/remote-source.repository.ts';
+import { recordingDownloadLogger } from '#tests/support/download-logs.ts';
 
 const BINARY = 'a binary, as far as a source is concerned';
 // A chunked body sizes each chunk in hex, which is the one part of writing one out by hand.
@@ -23,12 +24,16 @@ let byHand: TCPSocketListener;
  * address policy exists to refuse — so the transport tests say so outright, and the policy has a
  * describe of its own where it is left at its default.
  */
-const repo = new RemoteSourceRepository({ mayDial: () => true });
-const guarded = new RemoteSourceRepository();
+const repo = new RemoteSourceRepository({
+  mayDial: () => true,
+  logger: recordingDownloadLogger().logger,
+});
+const guarded = new RemoteSourceRepository({ logger: recordingDownloadLogger().logger });
 // The default policy loosened by exactly this machine, so a test about which *hop* is judged is
 // not answered by the first one being on the wrong side of the rule.
 const fromHere = new RemoteSourceRepository({
   mayDial: (address) => LOOPBACK.has(address) || isPublicAddress(address),
+  logger: recordingDownloadLogger().logger,
 });
 const LOOPBACK = new Set(['127.0.0.1', '::1']);
 

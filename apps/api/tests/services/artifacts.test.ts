@@ -22,12 +22,14 @@ import {
 } from '#lib/api/identifiers.ts';
 import { MAX_EXPANSION } from '#lib/archive/walk.ts';
 import { DEPLOYMENT_GRANT_LIFETIME_MS } from '#lib/deployment-grant-policy.ts';
+import type { DownloadDiagnostics } from '#lib/download-diagnostics.ts';
 import {
   BadRequestError,
   ForbiddenError,
   NotFoundError,
   TooManyRequestsError,
 } from '#lib/errors.ts';
+import { createLogger } from '#lib/logger.ts';
 import {
   MAX_CONCURRENT_FETCHES,
   MAX_CONCURRENT_FETCHES_PER_OWNER,
@@ -66,6 +68,7 @@ import {
 } from '#services/artifacts.service.ts';
 import { APP_ID, OTHER_OWNER_ID, OWNER_ID } from '#tests/services/support/fixtures.ts';
 import { archiveOf } from '#tests/support/archives.ts';
+import { recordingDownloadLogger } from '#tests/support/download-logs.ts';
 import { expandsTooFar, incompressible } from '#tests/support/downloads.ts';
 import { gzippedTarballOf } from '#tests/support/tarballs.ts';
 
@@ -387,12 +390,20 @@ function ownersFillingTheCeiling(): OwnerId[] {
 /** The url as whatever it answers with, so what a fetch runs into is set by the test asking. */
 class FakeRemoteSource implements RemoteSourceRepositoryContract {
   readonly opened: string[] = [];
+  readonly downloadIds: (string | undefined)[] = [];
   private answer: RemoteSource = { outcome: 'unreachable' };
   private gate: PromiseWithResolvers<void> | undefined;
   private letGo = false;
 
-  async open({ url }: { url: string }): Promise<RemoteSource> {
+  async open({
+    url,
+    diagnostics,
+  }: {
+    url: string;
+    diagnostics?: DownloadDiagnostics;
+  }): Promise<RemoteSource> {
     this.opened.push(url);
+    this.downloadIds.push(diagnostics?.downloadId);
     await this.gate?.promise;
     return this.answer;
   }
@@ -553,6 +564,14 @@ class FakeReleaseDigests implements ReleaseDigestRepositoryContract {
   }
 }
 
+class RecordingArtifactsService extends ArtifactsService {
+  readonly downloadLogs = recordingDownloadLogger();
+  protected override readonly logger = {
+    ...createLogger('ArtifactsService'),
+    ...this.downloadLogs.logger,
+  };
+}
+
 function build({
   storageRepo = new FakeStorage(),
   ownership = appsRepo,
@@ -570,7 +589,7 @@ function build({
     sourceRepo,
     cachedRepo,
     releaseRepo,
-    service: new ArtifactsService({
+    service: new RecordingArtifactsService({
       artifactsRepo,
       storageRepo,
       sourceRepo,
@@ -2249,5 +2268,72 @@ describe('GitHub deployment uploads', function deploymentUploads() {
     ).rejects.toBeInstanceOf(ForbiddenError);
     expect(artifactsRepo.rows.size).toBe(0);
     expect(sourceRepo.opened).toEqual([]);
+  });
+});
+
+describe('download diagnostics', () => {
+  test('the app, remote fetch and storage phases share one identifier without logging URL tokens', async () => {
+    const { service, sourceRepo } = build();
+    const secret = 'private-download-token';
+    sourceRepo.serves({ text: BINARY_TEXT });
+    const artifact = await service.createFromUrl({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      isAnonymous: false,
+      deploymentGrant: null,
+      filename: undefined,
+      url: `${BINARY_URL}?signature=${secret}`,
+      sha256: Value.Parse(Sha256DigestSchema, BINARY_DIGEST),
+    });
+    const records = service.downloadLogs.records;
+    const downloadId = sourceRepo.downloadIds[0];
+    expect(downloadId).toEqual(expect.any(String));
+    expect(
+      records.every((record) => record.downloadId === downloadId && record.appId === APP_ID),
+    ).toBe(true);
+    const completed = records
+      .filter((record) => record.event === 'completed')
+      .map((record) => record.phase);
+    expect(completed).toEqual(
+      expect.arrayContaining([
+        'ownership',
+        'checksum-lookup',
+        'cache-lookup',
+        'source',
+        'unpack',
+        'pending-artifact',
+        'storage-upload',
+        'source-checksum',
+        'artifact-object-head',
+        'storage-copy',
+        'artifact-register',
+        'staging-cleanup',
+        'artifact',
+      ]),
+    );
+    expect(records.at(-1)).toMatchObject({
+      phase: 'artifact',
+      event: 'completed',
+      artifactId: artifact.id,
+    });
+    expect(JSON.stringify(records)).not.toContain(secret);
+  });
+
+  test('a storage failure identifies the failing phase and the unsuccessful overall fetch', async () => {
+    const { service, sourceRepo } = build({ storageRepo: new RefusingStorage() });
+    sourceRepo.serves({ text: BINARY_TEXT });
+    await expect(
+      service.createFromUrl({
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+        isAnonymous: false,
+        deploymentGrant: null,
+        filename: undefined,
+        url: BINARY_URL,
+      }),
+    ).rejects.toThrow(BUCKET_REFUSED);
+    const failures = service.downloadLogs.records.filter((record) => record.event === 'failed');
+    expect(failures.map((record) => record.phase)).toEqual(['storage-copy', 'artifact']);
+    expect(failures.every((record) => record.downloadId === sourceRepo.downloadIds[0])).toBe(true);
   });
 });
