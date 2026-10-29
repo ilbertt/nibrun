@@ -15,7 +15,8 @@ export interface ISelectHostForIdentityResult {
 
 /** Result of query `SelectUnplacedDeployment`. */
 export interface ISelectUnplacedDeploymentResult {
-    id: IDeploymentsColumns["id"];
+    /** The latest requested execution for this app. */
+    deployment_id: IDeploymentsColumns["id"];
 }
 
 /** Result of query `ObserveHostReport`. */
@@ -2063,6 +2064,24 @@ export interface IImportsTable {
     constraints: keyof (typeof schema)["imports"]["_constraints"];
 }
 
+/** Columns of `latest_app_deployments`. */
+export interface ILatestAppDeploymentsColumns {
+    /** The app that requested this execution. */
+    app_id: import("@repo/protocol").AppId;
+    /** The latest requested execution for this app. */
+    deployment_id: import("@repo/protocol").DeploymentId;
+    /** The host assigned to this execution. Null until an existing deployment is adopted or a new one is placed. */
+    host_id: import("@repo/protocol").HostId | null;
+}
+
+/** Schema of `latest_app_deployments`. */
+export interface ILatestAppDeploymentsTable {
+    columns: ILatestAppDeploymentsColumns;
+    relationType: (typeof schema)["latest_app_deployments"]["_relationType"];
+    indexes: keyof (typeof schema)["latest_app_deployments"]["_indexes"];
+    constraints: keyof (typeof schema)["latest_app_deployments"]["_constraints"];
+}
+
 /** Columns of `live_apps`. */
 export interface ILiveAppsColumns {
     id: import("@repo/protocol").AppId | null;
@@ -2793,6 +2812,17 @@ export const schema = {
             imports_pkey: { _constraintName: "imports_pkey" }
         }
     },
+    latest_app_deployments: {
+        _relationName: "latest_app_deployments",
+        _relationType: "view",
+        _columns: {
+            app_id: { _columnName: "app_id", _foreignKeys: {} },
+            deployment_id: { _columnName: "deployment_id", _foreignKeys: {} },
+            host_id: { _columnName: "host_id", _foreignKeys: {} }
+        },
+        _indexes: {},
+        _constraints: {}
+    },
     live_apps: {
         _relationName: "live_apps",
         _relationType: "view",
@@ -2955,6 +2985,7 @@ export interface Tables {
     github_trusted_deployment_workflows: IGithubTrustedDeploymentWorkflowsTable;
     hosts: IHostsTable;
     imports: IImportsTable;
+    latest_app_deployments: ILatestAppDeploymentsTable;
     live_apps: ILiveAppsTable;
     paid_requests: IPaidRequestsTable;
     profiles: IProfilesTable;
