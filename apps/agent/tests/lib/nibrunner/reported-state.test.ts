@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { HostReportedStateSchema, isValidMessage } from '@repo/protocol';
 import { Effect } from 'effect';
+import type { HostReportedState as NibrunnerReport } from '#lib/nibrunner/reported.gen.ts';
 import { nibrunnerReportedState } from '#lib/nibrunner/reported-state.ts';
 import { ARTIFACT_DIGEST } from '#tests/support/artifacts.ts';
 import {
@@ -17,7 +18,7 @@ import { runScoped } from '#tests/support/run.ts';
 const REPORT_MAX_AGE_MS = 30_000;
 const NOW_MS = Date.parse(OBSERVED_AT);
 
-function engineReport() {
+function engineReport(): NibrunnerReport {
   return {
     hostId: HOST_ID,
     reportedAt: OBSERVED_AT,
@@ -46,7 +47,7 @@ function engineReport() {
   };
 }
 
-function context(value: unknown) {
+function context(value: NibrunnerReport) {
   return {
     hostId: HOST_ID,
     desiredDigest: ARTIFACT_DIGEST,
@@ -125,8 +126,23 @@ test('missing layers do not invent an artifact and multiple layers are refused',
   );
 });
 
+test('nullable engine fields are absent in the API report', async () => {
+  const raw = engineReport();
+  raw.instances[0]!.hostPort = null;
+  raw.instances[0]!.message = null;
+  raw.instances[0]!.startedAt = null;
+  raw.volumes[0]!.storagePrefix = null;
+  const report = await runScoped(nibrunnerReportedState(context(raw)));
+  expect(report.instances[0]).not.toHaveProperty('hostPort');
+  expect(report.instances[0]).not.toHaveProperty('message');
+  expect(report.instances[0]).not.toHaveProperty('startedAt');
+  expect(report.volumes[0]).not.toHaveProperty('storagePrefix');
+});
+
 test('invalid observations fail validation without including offending values', async () => {
-  const raw = { ...engineReport(), capacity: { memoryMib: 'tenant-secret-value' } };
+  const raw = JSON.parse(
+    JSON.stringify({ ...engineReport(), capacity: { memoryMib: 'tenant-secret-value' } }),
+  );
   const error = await runScoped(Effect.flip(nibrunnerReportedState(context(raw))));
   expect(error._tag).toBe('ProtocolMismatch');
   expect(JSON.stringify(error.issues)).not.toContain('tenant-secret-value');
