@@ -9,7 +9,7 @@
   "scripts": {
     "build": "bun run scripts/build.ts",
     "test": "bun test",
-    "check:types": "bun run --bun tsc"
+    "check:types": "bun run --filter @repo/internal-scripts generate-nibrunner-types --check && bun run --bun tsc"
   },
   "dependencies": {
     "@effect/platform": "0.97.1",
@@ -22,6 +22,7 @@
   },
   "devDependencies": {
     "@repo/app-operations": "workspace:*",
+    "@repo/internal-scripts": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "typescript": "catalog:"
   }

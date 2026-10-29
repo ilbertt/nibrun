@@ -6,6 +6,7 @@ import {
   RUNTIME_VALUES,
 } from '@repo/protocol/runtime-values';
 import { Value } from '@sinclair/typebox/value';
+import type { DesiredInstance as NibrunnerInstance } from '#lib/nibrunner/desired.gen.ts';
 import { UnsupportedNibrunnerFeature } from '#lib/nibrunner/failure.ts';
 import {
   NIBRUNNER_APP_DIRECTORY,
@@ -13,7 +14,9 @@ import {
   NIBRUNNER_EXECUTABLE_PATH,
 } from '#lib/nibrunner/paths.ts';
 
-function environmentFor(instance: DesiredInstance): TenantEnvironment {
+function environmentFor(
+  instance: DesiredInstance,
+): NibrunnerInstance['config']['command']['environment'] {
   const environment: TenantEnvironment = Object.fromEntries(
     Object.entries(instance.config.environment).flatMap(function translateEntry([name, value]) {
       if (namesExtraPublicPortValues(value)) {
@@ -46,7 +49,7 @@ function environmentFor(instance: DesiredInstance): TenantEnvironment {
   };
 }
 
-export function nibrunnerInstance(instance: DesiredInstance) {
+export function nibrunnerInstance(instance: DesiredInstance): NibrunnerInstance {
   if (instance.config.hasExtraPublicPort) {
     throw new UnsupportedNibrunnerFeature({ feature: 'public ports' });
   }
@@ -59,7 +62,7 @@ export function nibrunnerInstance(instance: DesiredInstance) {
     ...(instance.idleTimeoutMs === undefined ? {} : { idleTimeoutMs: instance.idleTimeoutMs }),
     layers: [
       {
-        kind: 'executable' as const,
+        kind: 'executable',
         destinationPath: NIBRUNNER_EXECUTABLE_PATH,
         digest: instance.artifact.digest,
         objectKey: instance.artifact.digest,
@@ -75,12 +78,10 @@ export function nibrunnerInstance(instance: DesiredInstance) {
       },
       resources: instance.config.resources,
       healthCheck:
-        path === undefined
-          ? { kind: 'tcp' as const, ...probe }
-          : { kind: 'http' as const, path, ...probe },
+        path === undefined ? { kind: 'tcp', ...probe } : { kind: 'http', path, ...probe },
       restartPolicy: instance.config.restartPolicy,
     },
     hostnames: instance.hostnames,
-    access: { kind: 'public' as const },
+    access: { kind: 'public' },
   };
 }
