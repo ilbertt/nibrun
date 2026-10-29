@@ -1,0 +1,65 @@
+{
+  "hostId": "nibrunner-commissioning",
+  "revision": "canary-{{RUN_ID}}",
+  "volumes": [
+    {
+      "volumeId": "canary-volume-{{RUN_ID}}",
+      "appId": "canary-{{RUN_ID}}",
+      "sizeBytes": 1073741824,
+      "desiredState": "present"
+    }
+  ],
+  "instances": [
+    {
+      "appId": "canary-{{RUN_ID}}",
+      "deploymentId": "canary-deployment-{{RUN_ID}}",
+      "volumeId": "canary-volume-{{RUN_ID}}",
+      "desiredState": "on-request",
+      "idleTimeoutMs": 60000,
+      "layers": [
+        {
+          "kind": "executable",
+          "destinationPath": "/app/busybox",
+          "digest": "{{BINARY_SHA256}}",
+          "objectKey": "canary-{{RUN_ID}}"
+        }
+      ],
+      "config": {
+        "httpPort": 3000,
+        "command": {
+          "program": "/app/busybox",
+          "args": [
+            "sh",
+            "-c",
+            "set -eu; /app/busybox mkdir -p data; count=0; if [ -f data/boots ]; then read -r count < data/boots; fi; printf '%s\\n' \"$((count + 1))\" > data/boots; if [ ! -f data/marker ]; then printf nibrunner-canary > data/marker; fi; exec /app/busybox httpd -f -p 0.0.0.0:3000 -h /app/data"
+          ],
+          "workingDirectory": "/app",
+          "environment": {}
+        },
+        "resources": { "vcpuCount": 2, "memoryMib": 512 },
+        "healthCheck": {
+          "kind": "http",
+          "path": "/marker",
+          "intervalMs": 1000,
+          "timeoutMs": 1000,
+          "gracePeriodMs": 30000,
+          "healthyThreshold": 1,
+          "unhealthyThreshold": 3
+        },
+        "restartPolicy": {
+          "maxRestarts": 0,
+          "initialBackoffMs": 500,
+          "maxBackoffMs": 30000,
+          "backoffFactor": 2,
+          "resetAfterMs": 60000
+        }
+      },
+      "hostnames": [
+        { "hostname": "canary.nibrunner.invalid", "kind": "platform" }
+      ],
+      "access": { "kind": "public" }
+    }
+  ],
+  "checkpoints": [],
+  "exports": []
+}

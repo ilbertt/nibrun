@@ -23,6 +23,32 @@ export const exportLine = (env: Record<string, string>) =>
     .map(([name, value]) => `${name}=${quote(value)}`)
     .join(' ');
 
+export function writeRemoteFile({ name, content }: { name: string; content: string }) {
+  return `printf '%s' ${quote(Buffer.from(content).toString('base64'))} | base64 --decode > ${quote(name)}`;
+}
+
+export async function runCommand({
+  instanceId,
+  script,
+  comment,
+}: {
+  instanceId: string;
+  script: string;
+  comment: string;
+}) {
+  if (!(await waitForSsmRegistration({ instanceId }))) {
+    throw new Error(`Instance ${instanceId} did not register with SSM`);
+  }
+  const commandId = await sendCommand({ instanceIds: [instanceId], script, comment });
+  console.log(`[${instanceId}] SSM command: ${commandId}`);
+  const invocation = await waitForInvocation({ commandId, instanceId });
+  console.log(invocation?.StandardOutputContent ?? 'No command output');
+  if (invocation?.Status !== 'Success') {
+    console.error(invocation?.StandardErrorContent ?? 'No command error output');
+    throw new Error(`SSM command ${commandId}: ${invocation?.Status ?? 'Unknown'}`);
+  }
+}
+
 export async function findInstanceIds({ deployGroup }: { deployGroup: string }) {
   const output = await aws([
     'ec2',

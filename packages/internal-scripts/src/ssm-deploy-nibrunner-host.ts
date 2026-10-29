@@ -1,13 +1,7 @@
 import { join } from 'node:path';
 import { requiredEnv } from '#shared/env.ts';
 import { repoRoot } from '#shared/paths.ts';
-import {
-  exportLine,
-  quote,
-  sendCommand,
-  waitForInvocation,
-  waitForSsmRegistration,
-} from '#shared/ssm.ts';
+import { exportLine, runCommand, writeRemoteFile } from '#shared/ssm.ts';
 
 const instanceId = requiredEnv('NIBRUNNER_HOST_INSTANCE_ID');
 const hostDirectory = join(repoRoot, 'infra/nibrunner-host');
@@ -20,10 +14,6 @@ const configuration = (await Bun.file(join(hostDirectory, 'config.toml.template'
   .replaceAll('{{VPC_IPV4_CIDR_BLOCK}}', requiredEnv('VPC_IPV4_CIDR_BLOCK'))
   .replaceAll('{{VPC_IPV6_CIDR_BLOCK}}', requiredEnv('VPC_IPV6_CIDR_BLOCK'));
 const installer = await Bun.file(join(hostDirectory, 'deploy/on_box_deploy.sh')).text();
-
-function writeRemoteFile({ name, content }: { name: string; content: string }) {
-  return `printf '%s' ${quote(Buffer.from(content).toString('base64'))} | base64 --decode > ${quote(name)}`;
-}
 
 const script = [
   "bash -se <<'NIBRUNNER_DEPLOY'",
@@ -43,19 +33,8 @@ const script = [
   'NIBRUNNER_DEPLOY',
 ].join('\n');
 
-if (!(await waitForSsmRegistration({ instanceId }))) {
-  throw new Error(`Nibrunner host ${instanceId} did not register with SSM`);
-}
-
-const commandId = await sendCommand({
-  instanceIds: [instanceId],
+await runCommand({
+  instanceId,
   script,
   comment: `Install nibrunner ${versions.version}`,
 });
-console.log(`[${instanceId}] SSM command: ${commandId}`);
-const invocation = await waitForInvocation({ commandId, instanceId });
-console.log(invocation?.StandardOutputContent ?? 'No command output');
-if (invocation?.Status !== 'Success') {
-  console.error(invocation?.StandardErrorContent ?? 'No command error output');
-  throw new Error(`Nibrunner installation ${commandId}: ${invocation?.Status ?? 'Unknown'}`);
-}
