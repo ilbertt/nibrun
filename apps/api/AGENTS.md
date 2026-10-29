@@ -14,6 +14,8 @@ Moving an app creates a new deployment; its volume survives the execution it bel
 Keep host ownership on deployments rather than duplicating it on apps or placements.
 `nibrun.app_hosts` derives each app's current host from its latest deployment, including
 failed and stopped executions. Desired-state queries share one repeatable-read snapshot.
+Directory reads authorize the requested deployment but target the app's current execution,
+because its filesystem outlives a release. Coalesce only within that execution and host.
 
 Bun + Elysia service.
 

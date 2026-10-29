@@ -5,6 +5,7 @@ import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
 import { sealSecret } from '#lib/tenant-secrets.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
+import { DeploymentHostsRepository } from '#repositories/deployment-hosts.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { createDeployedApp } from '#tests/support/deployed-app.ts';
 import { registerHost } from '#tests/support/hosts.ts';
@@ -91,6 +92,17 @@ test('a standby host receives no apps, volumes or exports', async () => {
     checkpoints: [],
     exports: [],
   });
+});
+
+test('current execution lookup is scoped to the app owner', async () => {
+  const hosts = new DeploymentHostsRepository(withTypes<Queries>(sql));
+  expect(await hosts.currentForApp({ appId: source.appId, ownerId: source.ownerId })).toEqual({
+    deployment_id: source.deploymentId,
+    host_id: SOURCE_HOST,
+  });
+  expect(
+    await hosts.currentForApp({ appId: source.appId, ownerId: destination.ownerId }),
+  ).toBeNull();
 });
 
 test('an unplaced execution is not offered to whichever host asks first', async () => {

@@ -24,7 +24,9 @@ export interface IObserveHostReportResult {
 
 /** Result of query `SelectDesiredDeployments`. */
 export interface ISelectDesiredDeploymentsResult {
+    /** The latest execution, including while its app is stopped or failed. */
     id: IDeploymentsColumns["id"];
+    /** The app whose latest execution owns the assignment. */
     app_id: IDeploymentsColumns["app_id"];
     state: IAppsColumns["state"];
     /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
@@ -61,6 +63,7 @@ export interface ISelectDesiredDeploymentsResult {
 
 /** Result of query `SelectDesiredVolumes`. */
 export interface ISelectDesiredVolumesResult {
+    /** The app whose latest execution owns the assignment. */
     app_id: IAppsColumns["id"];
     state: IAppsColumns["state"];
     /** Absent until the api has hashed the uploaded object; its presence is what makes the row usable. */
@@ -87,6 +90,7 @@ export interface ISelectDesiredVolumesResult {
 
 /** Result of query `SelectDesiredHostnames`. */
 export interface ISelectDesiredHostnamesResult {
+    /** The app whose latest execution owns the assignment. */
     app_id: IAppHostnamesColumns["app_id"];
     hostname: IAppHostnamesColumns["hostname"];
     kind: IAppHostnamesColumns["kind"];
@@ -94,6 +98,7 @@ export interface ISelectDesiredHostnamesResult {
 
 /** Result of query `SelectDesiredEnvironment`. */
 export interface ISelectDesiredEnvironmentResult {
+    /** The latest execution, including while its app is stopped or failed. */
     deployment_id: IDeploymentsColumns["id"];
     name: IAppConfigEnvironmentColumns["name"];
     /** Sealed by the api before it arrives. Never written or read in the clear. */
@@ -103,6 +108,7 @@ export interface ISelectDesiredEnvironmentResult {
 /** Result of query `SelectDesiredExports`. */
 export interface ISelectDesiredExportsResult {
     id: IExportsColumns["id"];
+    /** The app whose latest execution owns the assignment. */
     app_id: IExportsColumns["app_id"];
     /** Where the host writes the bundle and the api signs its download URL. */
     object_key: IExportsColumns["object_key"];
@@ -723,6 +729,14 @@ export interface ISelectCachedBinaryResult {
     object_key: ICachedBinariesColumns["object_key"];
     /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: ICachedBinariesColumns["original_file_name"];
+}
+
+/** Result of query `SelectCurrentAppExecution`. */
+export interface ISelectCurrentAppExecutionResult {
+    /** The latest execution, including while its app is stopped or failed. */
+    deployment_id: IDeploymentsColumns["id"];
+    /** An app keeps its last execution host while stopped, failed or awaiting volume deletion. */
+    host_id: NonNullable<IDeploymentsColumns["host_id"]>;
 }
 
 /** Result of query `SelectDeployableArtifact`. */
@@ -1350,6 +1364,7 @@ export interface Queries {
     SelectArtifactsByApp: ISelectArtifactsByAppResult;
     SelectArtifactById: ISelectArtifactByIdResult;
     SelectCachedBinary: ISelectCachedBinaryResult;
+    SelectCurrentAppExecution: ISelectCurrentAppExecutionResult;
     SelectDeployableArtifact: ISelectDeployableArtifactResult;
     InsertDeployment: IInsertDeploymentResult;
     SelectPreviousDeploymentHost: ISelectPreviousDeploymentHostResult;
@@ -1551,8 +1566,10 @@ export interface IAppHostnamesTable {
 
 /** Columns of `app_hosts`. */
 export interface IAppHostsColumns {
-    app_id: import("@repo/protocol").AppId | null;
-    deployment_id: import("@repo/protocol").DeploymentId | null;
+    /** The app whose latest execution owns the assignment. */
+    app_id: import("@repo/protocol").AppId;
+    /** The latest execution, including while its app is stopped or failed. */
+    deployment_id: import("@repo/protocol").DeploymentId;
     /** An app keeps its last execution host while stopped, failed or awaiting volume deletion. */
     host_id: import("@repo/protocol").HostId;
 }

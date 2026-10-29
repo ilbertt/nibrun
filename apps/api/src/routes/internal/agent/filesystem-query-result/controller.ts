@@ -18,9 +18,9 @@ export const AgentFilesystemQueryResultController = new Elysia()
     agentRoutePath(AGENT_ROUTES.filesystemQueryResult),
     async ({ agentService, filesystemService, body, headers, status }) => {
       assertProtocolVersion(headers);
-      await agentService.hostForSession({ sessionToken: sessionTokenFrom(headers) });
+      const hostId = await agentService.hostForSession({ sessionToken: sessionTokenFrom(headers) });
 
-      filesystemService.acceptResult(body);
+      filesystemService.acceptResult({ ...body, hostId });
       return status(StatusMap['No Content'], undefined);
     },
     {
