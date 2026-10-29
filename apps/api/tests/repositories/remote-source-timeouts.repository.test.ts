@@ -95,7 +95,11 @@ test('a hostname with only stalled addresses is unreachable before the transfer 
     return stall();
   }
   const stalled = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: stalledRequest });
-  const repo = new RemoteSourceRepository({ mayDial, timeouts: TIMEOUTS });
+  const repo = new RemoteSourceRepository({
+    mayDial,
+    timeouts: TIMEOUTS,
+    logger: recordingDownloadLogger().logger,
+  });
   try {
     expect(await repo.open({ url: stalled.url.toString() })).toEqual({ outcome: 'unreachable' });
     await disconnected.promise;
@@ -130,6 +134,7 @@ test('every resolved address is validated before a fallback can be dialled', asy
   const repo = new RemoteSourceRepository({
     resolveAddresses,
     timeouts: TIMEOUTS,
+    logger: recordingDownloadLogger().logger,
   });
   expect(await repo.open({ url: 'https://releases.example/binary' })).toEqual({
     outcome: 'private-address',
@@ -151,7 +156,11 @@ test('a successful response can keep downloading after its address timeout', asy
     );
   }
   const server = Bun.serve({ hostname: '127.0.0.1', port: 0, fetch: delayedBody });
-  const repo = new RemoteSourceRepository({ mayDial, timeouts: TIMEOUTS });
+  const repo = new RemoteSourceRepository({
+    mayDial,
+    timeouts: TIMEOUTS,
+    logger: recordingDownloadLogger().logger,
+  });
   try {
     const source = await repo.open({ url: server.url.toString() });
     expect(source.outcome).toBe('open');

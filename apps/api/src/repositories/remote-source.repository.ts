@@ -3,7 +3,6 @@ import { isIP } from 'node:net';
 import {
   DownloadDiagnostics,
   type DownloadLogger,
-  defaultDownloadLogger,
   downloadOrigin,
 } from '#lib/download-diagnostics.ts';
 import { hostnameOf, IP_V6, isPublicAddress } from '#lib/public-address.ts';
@@ -81,13 +80,13 @@ export class RemoteSourceRepository implements RemoteSourceRepositoryContract {
     mayDial = isPublicAddress,
     resolveAddresses = addressesOf,
     timeouts,
-    logger = defaultDownloadLogger,
+    logger,
   }: {
     mayDial?: AddressPolicy;
     resolveAddresses?: ResolveAddresses;
     timeouts?: Partial<Timeouts>;
-    logger?: DownloadLogger;
-  } = {}) {
+    logger: DownloadLogger;
+  }) {
     this.mayDial = mayDial;
     this.resolveAddresses = resolveAddresses;
     this.timeouts = { ...DEFAULT_TIMEOUTS, ...timeouts };
