@@ -1,6 +1,7 @@
 import { createLogger } from '#lib/logger.ts';
 
 export type DownloadLogger = Pick<ReturnType<typeof createLogger>, 'info' | 'warn'>;
+export const defaultDownloadLogger: DownloadLogger = createLogger('Downloader');
 type Fields = Record<string, unknown>;
 const ERROR_TOKEN = /^[\w.-]{1,80}$/;
 
@@ -39,7 +40,7 @@ export class DownloadDiagnostics {
 
   constructor({
     downloadId = crypto.randomUUID(),
-    logger = createLogger('Downloader'),
+    logger = defaultDownloadLogger,
     fields = {},
   }: {
     downloadId?: string;

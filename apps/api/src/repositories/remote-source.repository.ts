@@ -3,6 +3,7 @@ import { isIP } from 'node:net';
 import {
   DownloadDiagnostics,
   type DownloadLogger,
+  defaultDownloadLogger,
   downloadOrigin,
 } from '#lib/download-diagnostics.ts';
 import { hostnameOf, IP_V6, isPublicAddress } from '#lib/public-address.ts';
@@ -69,7 +70,7 @@ export class RemoteSourceRepository implements RemoteSourceRepositoryContract {
   private readonly mayDial: AddressPolicy;
   private readonly resolveAddresses: ResolveAddresses;
   private readonly timeouts: Timeouts;
-  private readonly logger: DownloadLogger | undefined;
+  private readonly logger: DownloadLogger;
 
   /**
    * Which addresses this will dial, defaulting to the only answer production has any business
@@ -80,7 +81,7 @@ export class RemoteSourceRepository implements RemoteSourceRepositoryContract {
     mayDial = isPublicAddress,
     resolveAddresses = addressesOf,
     timeouts,
-    logger,
+    logger = defaultDownloadLogger,
   }: {
     mayDial?: AddressPolicy;
     resolveAddresses?: ResolveAddresses;
