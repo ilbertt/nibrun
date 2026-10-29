@@ -2,15 +2,17 @@ import { expect, test } from 'bun:test';
 import { FileSystem } from '@effect/platform';
 import { AgentSessionRequestSchema, AgentSessionSchema, HostVersionsSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { Effect } from 'effect';
-import { InvalidHostIdentity, openSession } from '#lib/control/session.ts';
-import { ControlPlane } from '#services/control-plane.service.ts';
-import { agentConfig } from '#tests/support/config.ts';
+import { Effect, TestClock, TestContext } from 'effect';
+import { ControlPlaneError, makeControlPlaneClient } from '#lib/control/client.ts';
+import { UNREGISTERED_POLL_SETTINGS } from '#lib/control/poll-settings.ts';
+import { InvalidHostIdentity, makeSessionHolder, openSession } from '#lib/control/session.ts';
 import { POLL_SETTINGS_FIXTURE } from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 import { HTTP_UNAVAILABLE, serving } from '#tests/support/server.ts';
 
 const run = provided(platform);
+const VALID_SESSION_REMAINING_MS = 120_000;
+const RENEWED_SESSION_REQUESTS = 3;
 const SESSION = Value.Parse(AgentSessionSchema, {
   hostId: Bun.randomUUIDv7(),
   sessionToken: 'session-token',
@@ -39,14 +41,12 @@ function sessionEndpoint({ hostIdFile, failFirst }: { hostIdFile: string; failFi
         ? new Response(null, { status: HTTP_UNAVAILABLE })
         : Response.json(SESSION);
     });
-    const config = agentConfig({ hostIdFile, controlPlaneUrl: baseUrl });
+    const control = makeControlPlaneClient({ baseUrl });
     return {
       requests,
       persisted,
-      open: openSession(INPUT).pipe(
-        Effect.provide(ControlPlane.DefaultWithoutDependencies),
-        Effect.provide(config),
-      ),
+      control,
+      open: openSession({ ...INPUT, hostIdFile, control }),
     };
   });
 }
@@ -63,6 +63,42 @@ test('the first request carries an identity already persisted and reused on rene
       expect(endpoint.requests).toEqual([originId, originId]);
       expect(endpoint.persisted).toEqual([originId, originId]);
     }),
+  );
+});
+
+test('concurrent loops share a session and a 401 renews the same persisted identity', async () => {
+  await run(
+    Effect.gen(function* () {
+      yield* TestClock.setTime(Date.parse(SESSION.expiresAt) - VALID_SESSION_REMAINING_MS);
+      const hostIdFile = `${yield* temporaryDirectory}/host-id`;
+      const endpoint = yield* sessionEndpoint({ hostIdFile, failFirst: false });
+      const holder = yield* makeSessionHolder({
+        control: endpoint.control,
+        hostIdFile,
+        versions: INPUT.versions,
+        capacity: Effect.succeed(INPUT.capacity),
+      });
+      expect(yield* holder.pollSettings).toEqual(UNREGISTERED_POLL_SETTINGS);
+      const sessions = yield* Effect.all(
+        Array.from({ length: 10 }, () => holder.current),
+        {
+          concurrency: 'unbounded',
+        },
+      );
+      expect(sessions).toEqual(Array.from({ length: 10 }, () => SESSION));
+      expect(endpoint.requests).toHaveLength(1);
+      expect(yield* holder.pollSettings).toEqual(SESSION.poll);
+      yield* holder.onExpired(new ControlPlaneError({ status: 503, route: 'test', body: '' }));
+      yield* holder.current;
+      expect(endpoint.requests).toHaveLength(1);
+      yield* holder.onExpired(new ControlPlaneError({ status: 401, route: 'test', body: '' }));
+      yield* holder.current;
+      expect(endpoint.requests).toEqual([endpoint.persisted[0]!, endpoint.persisted[0]!]);
+      yield* TestClock.adjust('60 seconds');
+      yield* holder.current;
+      expect(endpoint.requests).toHaveLength(RENEWED_SESSION_REQUESTS);
+      expect(new Set(endpoint.requests).size).toBe(1);
+    }).pipe(Effect.provide(TestContext.TestContext)),
   );
 });
 
