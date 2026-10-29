@@ -1,4 +1,4 @@
-import type { TypedSQL } from '@ilbertt/bun-sqlgen';
+import type { TypedSQL, TypedTransactionSQL } from '@ilbertt/bun-sqlgen';
 import type {
   HostDesiredState,
   HostId,
@@ -31,6 +31,8 @@ export type HostObservation = {
 };
 
 export abstract class AgentRepositoryContract {
+  abstract registerHost(input: { originId: string }): Promise<HostId>;
+  abstract hostForIdentity(input: { identity: string }): Promise<HostId | undefined>;
   abstract saveSession(input: {
     sessionToken: SecretString;
     hostId: HostId;
@@ -52,6 +54,33 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
     this.#secretsKey = secretsKey;
   }
 
+  async registerHost({ originId }: { originId: string }): Promise<HostId> {
+    const existing = await this.hostForIdentity({ identity: originId });
+    if (existing !== undefined) {
+      return existing;
+    }
+    const [registered] = await this.sql.RegisterHost`
+      INSERT INTO nibrun.hosts (origin_id) VALUES (${originId})
+      ON CONFLICT (origin_id) DO UPDATE SET origin_id = EXCLUDED.origin_id
+      RETURNING id
+    `;
+    if (registered === undefined) {
+      throw new Error('Host registration returned no identity.');
+    }
+    return registered.id;
+  }
+
+  async hostForIdentity({ identity }: { identity: string }): Promise<HostId | undefined> {
+    // Existing agents persist the returned id and present it instead of their original identity.
+    const [host] = await this.sql.SelectHostForIdentity`
+      SELECT id FROM nibrun.hosts
+      WHERE id::text = ${identity} OR origin_id = ${identity}
+      ORDER BY (id::text = ${identity}) DESC
+      LIMIT 1
+    `;
+    return host?.id;
+  }
+
   saveSession({
     sessionToken,
     hostId,
@@ -69,34 +98,37 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
     return Promise.resolve(this.#sessions.hostFor({ sessionToken, now: new Date() }));
   }
 
-  /**
-   * In memory and only in memory. A restarted api has heard from no host yet, which is the truth
-   * — the last report was made to a process that is gone, and the next one is a poll away.
-   *
-   * One host, like `desiredState`: the newest report wins, and a second host would need this to
-   * become a map keyed on the id it already carries.
-   */
-  observeReport({ reported }: { reported: HostReportedState }): Promise<void> {
+  async observeReport({ reported }: { reported: HostReportedState }): Promise<void> {
     this.#lastObservation = {
       hostId: reported.hostId,
       reportedAt: reported.reportedAt,
       state: reported.state,
     };
-    return Promise.resolve();
+    await this.sql.ObserveHostReport`
+      UPDATE nibrun.hosts
+      SET reported_state = ${reported.state}, last_seen_at = now()
+      WHERE id = ${reported.hostId}
+    `;
   }
 
   lastObservation(): Promise<HostObservation | undefined> {
     return Promise.resolve(this.#lastObservation);
   }
 
-  /**
-   * The same state for whichever host asks. Hosts are not modelled and there is one, so the id
-   * here is the one the agent registered under rather than one this end assigned.
-   *
-   * `checkpoints` is empty until it has a table to be requested through: it is per-request work,
-   * so a host can only be told to do one once something has recorded that someone asked.
-   */
-  async desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
+  desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
+    // A handoff must not split one desired document across two host assignments.
+    return this.sql.begin('ISOLATION LEVEL REPEATABLE READ, READ ONLY', (sql) =>
+      this.selectDesiredState({ sql, hostId }),
+    );
+  }
+
+  private async selectDesiredState({
+    sql,
+    hostId,
+  }: {
+    sql: TypedTransactionSQL<Queries>;
+    hostId: HostId;
+  }): Promise<HostDesiredState> {
     // An artifact still awaiting its upload cannot be deployed or exported — the deployment
     // that would name it is refused — so what reaches a host here always has its bytes.
     //
@@ -104,7 +136,7 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
     // runs on every poll of every host.
     const [deployments, volumes, hostnameRows, environmentRows, exports, exportEnvironmentRows] =
       await Promise.all([
-        this.sql.SelectDesiredDeployments`
+        sql.SelectDesiredDeployments`
           /* @notNull digest */
           /* @notNull size_bytes */
           /* @notNull object_key */
@@ -118,8 +150,9 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
                  restart_backoff_factor, restart_reset_after_ms, config_id,
                  activation, idle_timeout_ms, deployment_state
           FROM nibrun.desired_deployments
+          WHERE id IN (SELECT deployment_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
         `,
-        this.sql.SelectDesiredVolumes`
+        sql.SelectDesiredVolumes`
           SELECT v.app_id, v.state,
                  v.seed_digest, v.seed_size_bytes, v.seed_object_key, v.seed_original_file_name,
                  s.volume_storage_endpoint, s.volume_storage_bucket, s.volume_storage_prefix,
@@ -138,23 +171,32 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
             ORDER BY d.id DESC
             LIMIT 1
           ) s ON true
+          WHERE v.app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
         `,
-        this.sql.SelectDesiredHostnames`
+        sql.SelectDesiredHostnames`
           SELECT app_id, hostname, kind FROM nibrun.desired_hostnames
+          WHERE app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
         `,
-        this.sql.SelectDesiredEnvironment`
+        sql.SelectDesiredEnvironment`
           SELECT deployment_id, name, value FROM nibrun.desired_environment
+          WHERE deployment_id IN (SELECT deployment_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
         `,
-        this.sql.SelectDesiredExports`
+        sql.SelectDesiredExports`
           /* @notNull artifact_object_key */
           /* @notNull digest */
           /* @notNull size_bytes */
           SELECT id, app_id, object_key, state,
                  digest, size_bytes, artifact_object_key, original_file_name, config_id
           FROM nibrun.desired_exports
+          WHERE app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
         `,
-        this.sql.SelectDesiredExportEnvironment`
+        sql.SelectDesiredExportEnvironment`
           SELECT export_id, name, value FROM nibrun.desired_export_environment
+          WHERE export_id IN (
+            SELECT e.id FROM nibrun.exports e
+            JOIN nibrun.app_hosts h ON h.app_id = e.app_id
+            WHERE h.host_id = ${hostId}
+          )
         `,
       ]);
 

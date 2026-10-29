@@ -2,6 +2,7 @@ import { AGENT_ROUTES, HostReportedStateSchema } from '@repo/protocol';
 import { Elysia, StatusMap, t } from 'elysia';
 import { assertProtocolVersion } from '#lib/agent/protocol-version.ts';
 import { agentRoutePath } from '#lib/agent/routes.ts';
+import { sessionTokenFrom } from '#lib/agent/session-token.ts';
 import { ProtocolHeadersSchema } from '#routes/internal/agent/model.ts';
 import { AgentServicePlugin, loggerPlugin } from '#services/plugins.ts';
 
@@ -15,7 +16,8 @@ export const AgentReportedStateController = new Elysia()
     agentRoutePath(AGENT_ROUTES.reportedState),
     async ({ agentService, body, headers, status }) => {
       assertProtocolVersion(headers);
-      await agentService.acceptReport({ reported: body });
+      const hostId = await agentService.hostForSession({ sessionToken: sessionTokenFrom(headers) });
+      await agentService.acceptReport({ reported: body, hostId });
       return status(StatusMap['No Content'], undefined);
     },
     {

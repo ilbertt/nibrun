@@ -15,7 +15,7 @@ function open(pending: PendingSqliteQueries) {
     ...SQLITE_DEPLOYMENT,
     sessionId: SQLITE_SESSION_ID,
     operation: { type: 'pipeline', body: SQLITE_PIPELINE },
-    targetHostId: undefined,
+    targetHostId: SQLITE_HOST_ID,
     signal: new AbortController().signal,
   });
 }
@@ -96,7 +96,7 @@ describe('live SQLite exchanges', function suite() {
         type: 'open',
         path: Value.Parse((await import('@repo/protocol')).GuestPathSchema, '/app.db'),
       },
-      targetHostId: undefined,
+      targetHostId: SQLITE_HOST_ID,
       signal: abort.signal,
     });
     const rejected = read.answered.catch(function caught(error) {

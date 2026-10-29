@@ -1,10 +1,12 @@
 import {
   type AppId,
+  type DeploymentId,
   type FilesystemQuery,
   type FilesystemQueryId,
   FilesystemQueryIdSchema,
   type FilesystemQueryResult,
   type GuestPath,
+  type HostId,
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 
@@ -12,14 +14,18 @@ type Outcome = FilesystemQueryResult['outcome'];
 
 type Waiter = (outcome: Outcome) => void;
 
+type ReadTarget = { readonly hostId: HostId; readonly deploymentId: DeploymentId };
+
 type Read = {
   readonly query: FilesystemQuery;
+  readonly target: ReadTarget;
   readonly waiting: Set<Waiter>;
-  claimed: boolean;
+  claimedBy: HostId | undefined;
 };
 
 /** A host holding a poll open with nothing in it yet, and the apps it said it can read. */
 type ParkedHost = {
+  readonly hostId: HostId;
   readonly servedAppIds: readonly AppId[];
   readonly hand: (query: FilesystemQuery) => void;
 };
@@ -59,12 +65,14 @@ export class PendingFilesystemQueries {
     appId,
     path,
     signal,
+    target,
   }: {
     appId: AppId;
     path: GuestPath;
     signal: AbortSignal;
+    target: ReadTarget;
   }): PendingRead {
-    const read = this.#readOf({ appId, path });
+    const read = this.#readOf({ appId, path, target });
     const { promise, resolve, reject } = Promise.withResolvers<Outcome>();
     const reads = this.#reads;
 
@@ -106,18 +114,20 @@ export class PendingFilesystemQueries {
   claim({
     servedAppIds,
     signal,
+    hostId,
   }: {
     servedAppIds: readonly AppId[];
     signal: AbortSignal;
+    hostId: HostId;
   }): Promise<FilesystemQuery | undefined> {
-    const standing = this.#standingFor(servedAppIds);
+    const standing = this.#standingFor({ servedAppIds, hostId });
     if (standing) {
-      standing.claimed = true;
+      standing.claimedBy = hostId;
       return Promise.resolve(standing.query);
     }
 
     const { promise, resolve } = Promise.withResolvers<FilesystemQuery | undefined>();
-    const host: ParkedHost = { servedAppIds, hand: resolve };
+    const host: ParkedHost = { servedAppIds, hostId, hand: resolve };
     const parked = this.#parked;
 
     function leave() {
@@ -135,9 +145,9 @@ export class PendingFilesystemQueries {
   }
 
   /** Whether anyone was still waiting — a host that answered after they left is not an error. */
-  answer({ queryId, outcome }: FilesystemQueryResult): boolean {
+  answer({ queryId, outcome, hostId }: FilesystemQueryResult & { hostId: HostId }): boolean {
     const read = this.#reads.get(queryId);
-    if (!read) {
+    if (!read || read.claimedBy !== hostId) {
       return false;
     }
     this.#reads.delete(queryId);
@@ -156,22 +166,29 @@ export class PendingFilesystemQueries {
    * past this, which is what keeps a claim a claim.
    */
   #offer(read: Read): void {
-    if (read.claimed) {
+    if (read.claimedBy) {
       return;
     }
     for (const host of this.#parked) {
-      if (host.servedAppIds.includes(read.query.appId)) {
+      if (host.hostId === read.target.hostId && host.servedAppIds.includes(read.query.appId)) {
         this.#parked.delete(host);
-        read.claimed = true;
+        read.claimedBy = host.hostId;
         host.hand(read.query);
         return;
       }
     }
   }
 
-  #standingFor(servedAppIds: readonly AppId[]): Read | undefined {
+  #standingFor({
+    servedAppIds,
+    hostId,
+  }: Pick<ParkedHost, 'servedAppIds' | 'hostId'>): Read | undefined {
     for (const read of this.#reads.values()) {
-      if (!read.claimed && servedAppIds.includes(read.query.appId)) {
+      if (
+        !read.claimedBy &&
+        read.target.hostId === hostId &&
+        servedAppIds.includes(read.query.appId)
+      ) {
         return read;
       }
     }
@@ -183,9 +200,14 @@ export class PendingFilesystemQueries {
    * looked at right now, which is people rather than files — and a second map to keep true across
    * every join, abort and answer is where this would go wrong long before the scan is felt.
    */
-  #readOf({ appId, path }: { appId: AppId; path: GuestPath }): Read {
+  #readOf({ appId, path, target }: { appId: AppId; path: GuestPath; target: ReadTarget }): Read {
     for (const read of this.#reads.values()) {
-      if (read.query.appId === appId && read.query.path === path) {
+      if (
+        read.query.appId === appId &&
+        read.query.path === path &&
+        read.target.hostId === target.hostId &&
+        read.target.deploymentId === target.deploymentId
+      ) {
         return read;
       }
     }
@@ -194,7 +216,7 @@ export class PendingFilesystemQueries {
       appId,
       path,
     };
-    const read: Read = { query, waiting: new Set(), claimed: false };
+    const read: Read = { query, target, waiting: new Set(), claimedBy: undefined };
     this.#reads.set(query.queryId, read);
     return read;
   }

@@ -101,6 +101,7 @@ export class ExportsService extends Service {
       return;
     }
     await this.exportsRepo.applyReport({
+      hostId: reported.hostId,
       reported: reported.exports.map((bundle) => ({
         exportId: bundle.exportId,
         checkpointId: bundle.checkpointId ?? null,

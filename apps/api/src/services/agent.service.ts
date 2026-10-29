@@ -3,14 +3,13 @@ import {
   type AgentSessionRequest,
   type HostDesiredState,
   type HostId,
-  HostIdSchema,
   type HostReportedState,
   SecretStringSchema,
   TimestampSchema,
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { DEFAULT_AGENT_POLL_SETTINGS } from '#lib/agent-poll-settings.ts';
-import { UnauthorizedError } from '#lib/errors.ts';
+import { ForbiddenError, UnauthorizedError } from '#lib/errors.ts';
 import type { AgentRepositoryContract } from '#repositories/agent.repository.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { ArtifactsService } from '#services/artifacts.service.ts';
@@ -87,9 +86,9 @@ export class AgentService extends Service {
    * defending against from the ones it was admitting.
    */
   async openSession(request: AgentSessionRequest): Promise<AgentSession> {
-    // The agent persists what it is given and presents it next time, so a host keeps its
-    // identity across a reinstall. Nothing allocates one yet, so its own is honoured.
-    const hostId = request.hostId ?? Value.Parse(HostIdSchema, crypto.randomUUID());
+    const hostId = await this.agentRepo.registerHost({
+      originId: request.hostId,
+    });
     const sessionToken = Value.Parse(SecretStringSchema, crypto.randomUUID());
     const expiresAt = new Date(Date.now() + SESSION_LIFETIME_MS);
     await this.agentRepo.saveSession({ sessionToken, hostId, expiresAt });
@@ -128,12 +127,17 @@ export class AgentService extends Service {
    * Read by the things that own what it talks about: the releases running on the host, the apps
    * whose filesystems it is holding or has just let go of, and the bundles it was told to write.
    *
-   * The rest is dropped. Capacity and versions have no table to land in while hosts are not
-   * modelled, and holding them in this process would be a second source of truth to unpick once
-   * they do. The host's own state is kept, but only as the passing observation liveness reads —
-   * see `observeReport`.
    */
-  async acceptReport({ reported }: { reported: HostReportedState }): Promise<void> {
+  async acceptReport({
+    reported,
+    hostId,
+  }: {
+    reported: HostReportedState;
+    hostId: HostId;
+  }): Promise<void> {
+    if (reported.hostId !== hostId) {
+      throw new ForbiddenError('The report does not belong to this host session.');
+    }
     this.logger.info('host reported', {
       hostId: reported.hostId,
       state: reported.state,
@@ -145,14 +149,14 @@ export class AgentService extends Service {
     // still arrived — which is the whole of what liveness asks.
     await this.agentRepo.observeReport({ reported });
     await this.deploymentsService.applyHostReport({ reported });
-    await this.appsService.recordVolumeUsage({ volumes: reported.volumes });
+    await this.appsService.recordVolumeUsage({ volumes: reported.volumes, hostId });
     // Before the deletions below, which read the same list for `deleted`: a filesystem that is
     // ready and one that is gone are different volumes, so the order between them carries nothing
     // — but a stamp is what stops the next deployment offering to create data that already exists,
     // and the sooner it lands the smaller that window is.
-    await this.appsService.recordDataInitialized({ volumes: reported.volumes });
-    await this.appsService.recordComputeUsage({ instances: reported.instances });
-    await this.appsService.completeDeletions({ volumes: reported.volumes });
+    await this.appsService.recordDataInitialized({ volumes: reported.volumes, hostId });
+    await this.appsService.recordComputeUsage({ instances: reported.instances, hostId });
+    await this.appsService.completeDeletions({ volumes: reported.volumes, hostId });
     await this.exportsService.applyHostReport({ reported });
     // Nothing to do with this report: an app whose time is up is found by the clock, and the
     // report is the clock. Before the two below, so one that never had a filesystem is finished

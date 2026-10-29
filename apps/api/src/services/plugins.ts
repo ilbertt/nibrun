@@ -20,6 +20,7 @@ import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
 import { AssetsRepository } from '#repositories/assets.repository.ts';
 import { CachedBinariesRepository } from '#repositories/cached-binaries.repository.ts';
 import { CustomHostnamesRepository } from '#repositories/custom-hostnames.repository.ts';
+import { DeploymentHostsRepository } from '#repositories/deployment-hosts.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { DnsRepository } from '#repositories/dns.repository.ts';
 import { ExportStorageRepository } from '#repositories/export-storage.repository.ts';
@@ -88,6 +89,7 @@ const appsRepository = new AppsRepository(sql);
 const appHostnamesRepository = new AppHostnamesRepository(sql);
 const artifactsRepository = new ArtifactsRepository(sql);
 const deploymentsRepository = new DeploymentsRepository(sql);
+const deploymentHostsRepository = new DeploymentHostsRepository(sql);
 const artifactStorageRepository = new ArtifactStorageRepository({
   client: artifactsS3,
   signer: uploadSigner,
@@ -98,7 +100,7 @@ const importStorageRepository = new ArtifactStorageRepository({
   signer: uploadSigner,
   bucket: env.IMPORTS_BUCKET,
 });
-const remoteSourceRepository = new RemoteSourceRepository();
+const remoteSourceRepository = new RemoteSourceRepository({ logger: createLogger('Downloader') });
 const cachedBinariesRepository = new CachedBinariesRepository(sql);
 const releaseDigestRepository = new ReleaseDigestRepository();
 const exportsRepository = new ExportsRepository(sql);
@@ -171,9 +173,17 @@ const healthService = new HealthService({
   healthRepo: healthRepository,
   agentRepo: agentRepository,
 });
-const filesystemService = new FilesystemService({ deploymentsRepo: deploymentsRepository });
-const cronsService = new CronsService({ deploymentsRepo: deploymentsRepository });
-const sqliteRelayService = new SqliteRelayService();
+const filesystemService = new FilesystemService({
+  deploymentsRepo: deploymentsRepository,
+  deploymentHostsRepo: deploymentHostsRepository,
+});
+const cronsService = new CronsService({
+  deploymentsRepo: deploymentsRepository,
+  deploymentHostsRepo: deploymentHostsRepository,
+});
+const sqliteRelayService = new SqliteRelayService({
+  deploymentHostsRepo: deploymentHostsRepository,
+});
 const sqliteService = new SqliteService({
   connectionsRepo: new SqliteConnectionsRepository(sql),
   deploymentsRepo: deploymentsRepository,

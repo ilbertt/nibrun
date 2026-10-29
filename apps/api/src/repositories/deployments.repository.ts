@@ -1,5 +1,12 @@
 import type { TypedSQL } from '@ilbertt/bun-sqlgen';
-import type { AppId, DeploymentId, HostPort, InstanceState, Ipv4Address } from '@repo/protocol';
+import type {
+  AppId,
+  DeploymentId,
+  HostId,
+  HostPort,
+  InstanceState,
+  Ipv4Address,
+} from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import type { Deployment, DeploymentState } from '#lib/api/deployment.ts';
 import type {
@@ -9,6 +16,7 @@ import type {
   OAuthClientId,
   OwnerId,
 } from '#lib/api/identifiers.ts';
+import { HOST_REPORT_MAX_AGE_MS } from '#lib/host-readiness.ts';
 import { lockAppForMutation } from '#repositories/apps.repository.ts';
 import { Repository } from '#repositories/repository.ts';
 
@@ -40,6 +48,7 @@ export type CreatedDeployment =
   | { outcome: 'no-artifact' }
   | { outcome: 'no-grant' }
   | { outcome: 'no-import' }
+  | { outcome: 'no-host' }
   | { outcome: 'data-exists' }
   | { outcome: 'held' };
 
@@ -100,10 +109,18 @@ export abstract class DeploymentsRepositoryContract {
   abstract insertRollback(input: RollbackDeploymentInput): Promise<DeploymentRow | null>;
   abstract listByApp(input: DeploymentsByAppInput): Promise<DeploymentRow[]>;
   abstract findById(input: DeploymentByIdInput): Promise<DeploymentRow | null>;
-  abstract listLive(): Promise<LiveDeploymentRow[]>;
-  abstract applyReport(input: { reported: ReportedDeployment[] }): Promise<void>;
-  abstract stampActivation(input: { deploymentId: DeploymentId; at: Date }): Promise<void>;
-  abstract fail(input: { deploymentId: DeploymentId; message: string }): Promise<void>;
+  abstract listLive(input: { hostId: HostId }): Promise<LiveDeploymentRow[]>;
+  abstract applyReport(input: { reported: ReportedDeployment[]; hostId: HostId }): Promise<void>;
+  abstract stampActivation(input: {
+    deploymentId: DeploymentId;
+    at: Date;
+    hostId: HostId;
+  }): Promise<void>;
+  abstract fail(input: {
+    deploymentId: DeploymentId;
+    message: string;
+    hostId: HostId;
+  }): Promise<void>;
 }
 
 /**
@@ -189,25 +206,23 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       if (!(await validDeploymentGrant({ tx, appId, ownerId, deploymentGrantId }))) {
         return { outcome: 'no-grant' };
       }
-      const refusal =
-        initialDataFrom === null
-          ? undefined
-          : await seedRefusal({ tx, appId, ownerId, initialDataFrom });
+      const refusal = await this.creationRefusal({ tx, appId, ownerId, initialDataFrom, onlyOne });
       if (refusal) {
         return refusal;
       }
-      if (onlyOne && (await alreadyDeployed({ tx, appId, ownerId }))) {
-        return { outcome: 'held' };
-      }
       await lockAppForMutation({ tx, appId, ownerId });
+      const hostId = await this.hostForDeployment({ tx, appId, ownerId });
+      if (hostId === undefined) {
+        return { outcome: 'no-host' };
+      }
       await supersedeLiveDeployment({ tx, appId, ownerId });
 
       // INSERT … SELECT rather than VALUES, so the predicate that decides ownership is the one
       // the row is written through rather than one checked beside it.
       const [inserted] = await tx.InsertDeployment`
         INSERT INTO nibrun.deployments
-          (app_id, artifact_id, config_id, initial_data_import_id, github_deployment_grant_id, mcp_client_id, mcp_chat_id)
-        SELECT a.id, ar.id, c.id, ${initialDataFrom}, ${deploymentGrantId}, ${mcpClientId}, ${mcpChatId}
+          (app_id, artifact_id, config_id, initial_data_import_id, github_deployment_grant_id, mcp_client_id, mcp_chat_id, host_id)
+        SELECT a.id, ar.id, c.id, ${initialDataFrom}, ${deploymentGrantId}, ${mcpClientId}, ${mcpChatId}, ${hostId}
         FROM nibrun.live_apps a
         JOIN nibrun.artifacts ar ON ar.app_id = a.id
         JOIN LATERAL (
@@ -224,6 +239,51 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       const row = await this.selectDeployment({ tx, deploymentId: inserted.id });
       return row ? { outcome: 'created', row } : { outcome: 'no-artifact' };
     });
+  }
+
+  private async creationRefusal({
+    tx,
+    appId,
+    ownerId,
+    initialDataFrom,
+    onlyOne,
+  }: Pick<CreateDeploymentInput, 'appId' | 'ownerId' | 'initialDataFrom' | 'onlyOne'> & {
+    tx: Transaction;
+  }): Promise<CreatedDeployment | undefined> {
+    if (initialDataFrom !== null) {
+      const refusal = await seedRefusal({ tx, appId, ownerId, initialDataFrom });
+      if (refusal !== undefined) {
+        return refusal;
+      }
+    }
+    return onlyOne && (await alreadyDeployed({ tx, appId, ownerId }))
+      ? { outcome: 'held' }
+      : undefined;
+  }
+
+  private async hostForDeployment({
+    tx,
+    appId,
+    ownerId,
+  }: OwnedApp & { tx: Transaction }): Promise<HostId | undefined> {
+    const [previous] = await tx.SelectPreviousDeploymentHost`
+      SELECT d.host_id FROM nibrun.deployments d
+      JOIN nibrun.live_apps a ON a.id = d.app_id
+      WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+      ORDER BY d.id DESC LIMIT 1
+    `;
+    if (previous !== undefined) {
+      return previous.host_id;
+    }
+    const [host] = await tx.SelectReadyDeploymentHost`
+      SELECT id FROM nibrun.hosts
+      WHERE reported_state = 'ready'
+        AND last_seen_at >= now() - ${HOST_REPORT_MAX_AGE_MS} * interval '1 millisecond'
+      ORDER BY last_seen_at DESC, id
+      LIMIT 1
+      FOR SHARE
+    `;
+    return host?.id;
   }
 
   /**
@@ -255,11 +315,11 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       const [inserted] = await tx.InsertReplayedDeployment`
         WITH replay_source AS (
           SELECT src.id, src.app_id, src.artifact_id, src.config_id,
-                 latest.config_id AS storage_config_id
+                 latest.config_id AS storage_config_id, latest.host_id
           FROM nibrun.deployments src
           JOIN nibrun.live_apps a ON a.id = src.app_id
           JOIN LATERAL (
-            SELECT d.config_id FROM nibrun.deployments d
+            SELECT d.config_id, d.host_id FROM nibrun.deployments d
             WHERE d.app_id = a.id ORDER BY d.id DESC LIMIT 1
           ) latest ON true
           WHERE src.id = ${rollbackOf} AND src.app_id = ${appId} AND a.owner_id = ${ownerId}
@@ -312,8 +372,8 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
           JOIN nibrun.app_config_environment e ON e.config_id = source.config_id
         )
         INSERT INTO nibrun.deployments
-          (app_id, artifact_id, config_id, rollback_of_deployment_id)
-        SELECT source.app_id, source.artifact_id, COALESCE(config.id, source.config_id), source.id
+          (app_id, artifact_id, config_id, rollback_of_deployment_id, host_id)
+        SELECT source.app_id, source.artifact_id, COALESCE(config.id, source.config_id), source.id, source.host_id
         FROM replay_source source
         LEFT JOIN rollback_config config ON true
         RETURNING id
@@ -379,7 +439,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
    * told about every app it runs. `desired_running` is the app's own state read as the question
    * the deployment's clock asks — a suspended app's deployment is not late for anything.
    */
-  listLive(): Promise<LiveDeploymentRow[]> {
+  listLive({ hostId }: { hostId: HostId }): Promise<LiveDeploymentRow[]> {
     return this.sql.SelectLiveDeployments`
       /* @notNull desired_running */
       SELECT d.id, d.app_id, d.state, d.created_at, a.updated_at AS state_changed_at,
@@ -387,6 +447,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       FROM nibrun.deployments d
       JOIN nibrun.apps a ON a.id = d.app_id
       WHERE d.state NOT IN ('superseded', 'failed')
+        AND d.host_id = ${hostId}
     `;
   }
 
@@ -401,7 +462,13 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
    * Every column here is whatever the host last said. The one that is not — when the release
    * began serving — is written by `stampActivation` instead.
    */
-  applyReport({ reported }: { reported: ReportedDeployment[] }): Promise<void> {
+  applyReport({
+    reported,
+    hostId,
+  }: {
+    reported: ReportedDeployment[];
+    hostId: HostId;
+  }): Promise<void> {
     return this.sql.begin(async (tx) => {
       for (const instance of reported) {
         await tx.ApplyReportedDeployment`
@@ -417,6 +484,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
             started_at = ${instance.startedAt},
             last_healthy_at = ${instance.lastHealthyAt}
           WHERE id = ${instance.deploymentId} AND state NOT IN ('superseded', 'failed')
+            AND host_id = ${hostId}
         `;
       }
     });
@@ -433,26 +501,33 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
   async stampActivation({
     deploymentId,
     at,
+    hostId,
   }: {
     deploymentId: DeploymentId;
     at: Date;
+    hostId: HostId;
   }): Promise<void> {
     await this.sql.StampDeploymentActivation`
       UPDATE nibrun.deployments SET activated_at = ${at}
       WHERE id = ${deploymentId} AND activated_at IS NULL
+        AND state NOT IN ('superseded', 'failed')
+        AND host_id = ${hostId}
     `;
   }
 
   async fail({
     deploymentId,
     message,
+    hostId,
   }: {
     deploymentId: DeploymentId;
     message: string;
+    hostId: HostId;
   }): Promise<void> {
     await this.sql.FailDeployment`
       UPDATE nibrun.deployments SET state = 'failed', message = ${message}
       WHERE id = ${deploymentId} AND state NOT IN ('superseded', 'failed')
+        AND host_id = ${hostId}
     `;
   }
 

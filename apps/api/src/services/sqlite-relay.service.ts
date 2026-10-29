@@ -1,10 +1,17 @@
 import type { HostId, SqliteQuery, SqliteQueryRequest, SqliteQueryResult } from '@repo/protocol';
-import { GatewayTimeoutError } from '#lib/errors.ts';
+import { ConflictError, GatewayTimeoutError } from '#lib/errors.ts';
 import { PendingSqliteQueries } from '#lib/sqlite/pending-queries.ts';
+import type { DeploymentHostsRepositoryContract } from '#repositories/deployment-hosts.repository.ts';
 import { Service } from '#services/service.ts';
 
 export class SqliteRelayService extends Service {
   private readonly pending = new PendingSqliteQueries();
+  private readonly deploymentHostsRepo: DeploymentHostsRepositoryContract;
+
+  constructor({ deploymentHostsRepo }: { deploymentHostsRepo: DeploymentHostsRepositoryContract }) {
+    super();
+    this.deploymentHostsRepo = deploymentHostsRepo;
+  }
 
   async execute(
     input: Omit<SqliteQuery, 'queryId'> & {
@@ -12,7 +19,12 @@ export class SqliteRelayService extends Service {
       signal: AbortSignal;
     },
   ) {
-    const { answered } = this.pending.open(input);
+    const targetHostId =
+      input.targetHostId ?? (await this.deploymentHostsRepo.hostForExecution(input));
+    if (targetHostId === undefined) {
+      throw new ConflictError('This deployment has no assigned execution host.');
+    }
+    const { answered } = this.pending.open({ ...input, targetHostId });
     return await answered.catch(function unanswered() {
       throw new GatewayTimeoutError('The database host did not answer in time.');
     });

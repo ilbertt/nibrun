@@ -30,14 +30,14 @@ export type AgentPollSettings = typeof AgentPollSettingsSchema.static;
  * on every host, so anything positioned to abuse the endpoint could read it, and rotating it
  * meant redeploying the fleet and the control plane together.
  *
- * What nothing here does yet is tell one host from another — `hostId` is honoured as presented.
+ * What nothing here does yet is authenticate one host against another — either persisted
+ * identity is accepted as presented.
  * That wants a claim a file cannot be copied into, such as an instance identity document, and
  * a shared secret every host already holds was never going to be it.
  */
 export const AgentSessionRequestSchema = Type.Object({
-  // Absent on a host's very first registration; the control plane assigns one and the agent
-  // persists it, so a reinstalled agent rejoins as the same host rather than as a new one.
-  hostId: Type.Optional(HostIdSchema),
+  // Persisted before the first request. Legacy agents may present a saved canonical id instead.
+  hostId: HostIdSchema,
   versions: HostVersionsSchema,
   capacity: HostCapacitySchema,
 });

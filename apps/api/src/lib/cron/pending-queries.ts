@@ -13,6 +13,7 @@ type Outcome = CronQueryResult['outcome'];
 type Waiter = (outcome: Outcome) => void;
 type Read = {
   readonly query: CronQuery;
+  readonly targetHostId: HostId;
   readonly waiting: Set<Waiter>;
   claimedBy: HostId | undefined;
 };
@@ -26,7 +27,7 @@ export class PendingCronQueries {
   readonly #reads = new Map<CronQueryId, Read>();
   readonly #parked = new Set<ParkedHost>();
 
-  open({ signal, ...deployment }: Deployment & { signal: AbortSignal }) {
+  open({ signal, ...deployment }: Deployment & { signal: AbortSignal; targetHostId: HostId }) {
     const read = this.#readOf(deployment);
     const { promise, resolve, reject } = Promise.withResolvers<Outcome>();
     const reads = this.#reads;
@@ -61,6 +62,7 @@ export class PendingCronQueries {
     for (const read of this.#reads.values()) {
       if (
         !read.claimedBy &&
+        read.targetHostId === input.hostId &&
         input.servedDeployments.some((deployment) => matches({ query: read.query, deployment }))
       ) {
         read.claimedBy = input.hostId;
@@ -113,7 +115,10 @@ export class PendingCronQueries {
       return;
     }
     for (const host of this.#parked) {
-      if (host.servedDeployments.some((deployment) => matches({ query: read.query, deployment }))) {
+      if (
+        host.hostId === read.targetHostId &&
+        host.servedDeployments.some((deployment) => matches({ query: read.query, deployment }))
+      ) {
         this.#parked.delete(host);
         read.claimedBy = host.hostId;
         host.hand(read.query);
@@ -122,14 +127,14 @@ export class PendingCronQueries {
     }
   }
 
-  #readOf(deployment: Deployment): Read {
+  #readOf({ targetHostId, ...deployment }: Deployment & { targetHostId: HostId }): Read {
     for (const read of this.#reads.values()) {
-      if (matches({ query: read.query, deployment })) {
+      if (read.targetHostId === targetHostId && matches({ query: read.query, deployment })) {
         return read;
       }
     }
     const query = { ...deployment, queryId: Value.Parse(CronQueryIdSchema, crypto.randomUUID()) };
-    const read: Read = { query, waiting: new Set(), claimedBy: undefined };
+    const read: Read = { query, targetHostId, waiting: new Set(), claimedBy: undefined };
     this.#reads.set(query.queryId, read);
     return read;
   }

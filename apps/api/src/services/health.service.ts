@@ -1,5 +1,5 @@
 import type { HostState } from '@repo/protocol';
-import { DEFAULT_AGENT_POLL_SETTINGS } from '#lib/agent-poll-settings.ts';
+import { HOST_REPORT_MAX_AGE_MS } from '#lib/host-readiness.ts';
 import type { AgentRepositoryContract, HostObservation } from '#repositories/agent.repository.ts';
 import type { HealthRepositoryContract } from '#repositories/health.repository.ts';
 import { Service } from '#services/service.ts';
@@ -10,13 +10,6 @@ import { Service } from '#services/service.ts';
  * completes, and a reader is told the api is unreachable when it is the one thing that is not.
  */
 const PROBE_TIMEOUT_MS = 2_000;
-
-/**
- * Reports arrive on a fixed cadence, so silence is only meaningful in multiples of it. Three
- * gives a host a missed report and a slow one before it is called gone.
- */
-const REPORTS_BEFORE_SILENT = 3;
-const SILENT_AFTER_MS = DEFAULT_AGENT_POLL_SETTINGS.reportIntervalMs * REPORTS_BEFORE_SILENT;
 
 const MS_PER_SECOND = 1_000;
 
@@ -147,8 +140,8 @@ function agentComponent(silence: number | undefined): Component {
   if (silence === undefined) {
     return { status: 'down', detail: 'no host has reported to this api yet' };
   }
-  return silence > SILENT_AFTER_MS
-    ? { status: 'down', detail: `no report in the last ${SILENT_AFTER_MS / MS_PER_SECOND}s` }
+  return silence > HOST_REPORT_MAX_AGE_MS
+    ? { status: 'down', detail: `no report in the last ${HOST_REPORT_MAX_AGE_MS / MS_PER_SECOND}s` }
     : { status: 'up' };
 }
 
@@ -162,7 +155,7 @@ function appHostComponent({
   if (observation === undefined || silence === undefined) {
     return { status: 'unknown', detail: 'nothing has reported a host' };
   }
-  if (silence > SILENT_AFTER_MS) {
+  if (silence > HOST_REPORT_MAX_AGE_MS) {
     return { status: 'unknown', detail: 'the agent has stopped reporting it' };
   }
   const status = HOST_STATE_STATUS[observation.state];

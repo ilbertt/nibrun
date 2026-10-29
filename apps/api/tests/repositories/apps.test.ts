@@ -4,7 +4,9 @@ import {
   type AppId,
   AppIdSchema,
   type ComputeUsage,
+  DeploymentIdSchema,
   FilenameSchema,
+  type HostId,
   HostnameSchema,
   ObjectKeySchema,
   Sha256DigestSchema,
@@ -15,7 +17,7 @@ import {
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
-import type { Queries } from '#db/queries.gen.ts';
+import type { Queries, Tables } from '#db/queries.gen.ts';
 import { AppNameSchema, OWNED_APP_STATES } from '#lib/api/app.ts';
 import { DnsLabelSchema } from '#lib/api/dns-label.ts';
 import { type ArtifactId, type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
@@ -30,12 +32,14 @@ import {
 import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
+import { registerHost } from '#tests/support/hosts.ts';
 import { refusedBy } from '#tests/support/postgres.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
 
 const OWNER_ID = Value.Parse(OwnerIdSchema, 'owner');
+let HOST_ID: HostId;
 const STRANGER_ID = Value.Parse(OwnerIdSchema, 'stranger');
 const APP_SLUG = Value.Parse(DnsLabelSchema, 'pocketbase');
 const PLATFORM = Value.Parse(HostnameSchema, 'pocketbase.apps.example.com');
@@ -53,6 +57,7 @@ let repo: AppsRepository;
 // Long enough to pull the image, which the first run on a fresh machine does inside this hook.
 beforeAll(async () => {
   sql = await startTestDatabase();
+  HOST_ID = await registerHost({ sql, originId: 'reporting-host' });
   for (const id of [OWNER_ID, STRANGER_ID]) {
     await sql.unsafe(
       `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
@@ -109,6 +114,43 @@ async function createApp(slug: string): Promise<AppId> {
     }),
   );
   return created.app.id;
+}
+
+async function createHostedUsageApp(slug: string): Promise<AppId> {
+  const appId = await createApp(slug);
+  const [artifact] = await sql.unsafe(
+    `INSERT INTO nibrun.artifacts (app_id, digest, size_bytes, object_key, original_file_name)
+     VALUES ($1, repeat('a', 64), 1, $2, 'app') RETURNING id`,
+    [appId, `artifacts/${appId}`],
+  );
+  await sql.unsafe(
+    `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, host_id)
+     SELECT app_id, $2, id, $3 FROM nibrun.app_configs
+     WHERE app_id = $1 ORDER BY id DESC LIMIT 1`,
+    [appId, artifact.id, HOST_ID],
+  );
+  return appId;
+}
+
+async function recordComputeUsageForApps({
+  readings,
+}: {
+  readings: ReadonlyMap<AppId, ComputeUsage>;
+}) {
+  const rows = (await sql`
+    SELECT app_id, deployment_id FROM nibrun.app_hosts
+    WHERE app_id = ANY(${sql.array([...readings.keys()], 'TEXT')}::uuid[])
+  `) as Pick<Tables['app_hosts']['columns'], 'app_id' | 'deployment_id'>[];
+  const executions = new Map(rows.map((row) => [String(row.app_id), String(row.deployment_id)]));
+  await repo.recordComputeUsage({
+    hostId: HOST_ID,
+    readings: new Map(
+      [...readings].map(([appId, usage]) => [
+        Value.Parse(DeploymentIdSchema, executions.get(appId) ?? appId),
+        usage,
+      ]),
+    ),
+  });
 }
 
 async function storedState(appId: AppId): Promise<string | undefined> {
@@ -328,7 +370,7 @@ describe('what a host measured of a filesystem is kept against the app that owns
   }
 
   test('an app nothing has measured reads back with no reading rather than a zero', async () => {
-    const app = await readBack(await createApp('unmeasured'));
+    const app = await readBack(await createHostedUsageApp('unmeasured'));
 
     expect(app.volume_total_bytes).toBeNull();
     expect(app.volume_used_bytes).toBeNull();
@@ -339,9 +381,10 @@ describe('what a host measured of a filesystem is kept against the app that owns
   });
 
   test('a reading is written and read back beside the app', async () => {
-    const appId = await createApp('measured');
+    const appId = await createHostedUsageApp('measured');
 
     await repo.recordVolumeUsage({
+      hostId: HOST_ID,
       readings: new Map([[appId, reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER })]]),
     });
     const app = await readBack(appId);
@@ -354,12 +397,14 @@ describe('what a host measured of a filesystem is kept against the app that owns
   // A host reports the same volume every fifteen seconds and measures it every minute, so this
   // is the ordinary case rather than the exception.
   test('a later reading replaces the one before it', async () => {
-    const appId = await createApp('refilled');
+    const appId = await createHostedUsageApp('refilled');
 
     await repo.recordVolumeUsage({
+      hostId: HOST_ID,
       readings: new Map([[appId, reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER })]]),
     });
     await repo.recordVolumeUsage({
+      hostId: HOST_ID,
       readings: new Map([[appId, reading({ usedBytes: EMPTIED_BYTES, measuredAt: LATER })]]),
     });
 
@@ -368,12 +413,14 @@ describe('what a host measured of a filesystem is kept against the app that owns
 
   // Two reports can arrive out of order; the older one must not put the older number back.
   test('an older reading arriving late leaves the newer one standing', async () => {
-    const appId = await createApp('reordered');
+    const appId = await createHostedUsageApp('reordered');
 
     await repo.recordVolumeUsage({
+      hostId: HOST_ID,
       readings: new Map([[appId, reading({ usedBytes: EMPTIED_BYTES, measuredAt: LATER })]]),
     });
     await repo.recordVolumeUsage({
+      hostId: HOST_ID,
       readings: new Map([[appId, reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER })]]),
     });
 
@@ -383,10 +430,11 @@ describe('what a host measured of a filesystem is kept against the app that owns
   // One statement for the whole report is the point of taking a map: a host holding many apps
   // must not cost the report one round trip each.
   test('every reading in one report is written by one statement', async () => {
-    const first = await createApp('batched-one');
-    const second = await createApp('batched-two');
+    const first = await createHostedUsageApp('batched-one');
+    const second = await createHostedUsageApp('batched-two');
 
     await repo.recordVolumeUsage({
+      hostId: HOST_ID,
       readings: new Map([
         [first, reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER })],
         [second, reading({ usedBytes: EMPTIED_BYTES, measuredAt: EARLIER })],
@@ -399,10 +447,11 @@ describe('what a host measured of a filesystem is kept against the app that owns
 
   // The whole statement must not fail because one of the apps it names has gone.
   test('a batch naming a purged app still writes the readings beside it', async () => {
-    const surviving = await createApp('survivor');
+    const surviving = await createHostedUsageApp('survivor');
     const stranger = Value.Parse(AppIdSchema, '01930000-0000-7000-8000-00000000ffff');
 
     await repo.recordVolumeUsage({
+      hostId: HOST_ID,
       readings: new Map([
         [stranger, reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER })],
         [surviving, reading({ usedBytes: EMPTIED_BYTES, measuredAt: EARLIER })],
@@ -418,6 +467,7 @@ describe('what a host measured of a filesystem is kept against the app that owns
     const stranger = Value.Parse(AppIdSchema, '01930000-0000-7000-8000-000000000000');
 
     await repo.recordVolumeUsage({
+      hostId: HOST_ID,
       readings: new Map([[stranger, reading({ usedBytes: FILLED_BYTES, measuredAt: EARLIER })]]),
     });
 
@@ -464,9 +514,9 @@ describe('what a host measured of a guest is kept beside how full its filesystem
   }
 
   test('a reading is written and read back beside the app', async () => {
-    const appId = await createApp('spending');
+    const appId = await createHostedUsageApp('spending');
 
-    await repo.recordComputeUsage({
+    await recordComputeUsageForApps({
       readings: new Map([
         [
           appId,
@@ -488,9 +538,9 @@ describe('what a host measured of a guest is kept beside how full its filesystem
    * beside it is not, which is the one place the two families differ in shape.
    */
   test('a reading with no share yet writes no share rather than none spent', async () => {
-    const appId = await createApp('unrated');
+    const appId = await createHostedUsageApp('unrated');
 
-    await repo.recordComputeUsage({
+    await recordComputeUsageForApps({
       readings: new Map([[appId, spending({ memoryUsedBytes: BUSY_BYTES, measuredAt: EARLIER })]]),
     });
     const app = await readBack(appId);
@@ -500,9 +550,9 @@ describe('what a host measured of a guest is kept beside how full its filesystem
   });
 
   test('a later reading replaces the one before it', async () => {
-    const appId = await createApp('quietened');
+    const appId = await createHostedUsageApp('quietened');
 
-    await repo.recordComputeUsage({
+    await recordComputeUsageForApps({
       readings: new Map([
         [
           appId,
@@ -510,7 +560,7 @@ describe('what a host measured of a guest is kept beside how full its filesystem
         ],
       ]),
     });
-    await repo.recordComputeUsage({
+    await recordComputeUsageForApps({
       readings: new Map([
         [appId, spending({ memoryUsedBytes: IDLE_BYTES, cpuShare: IDLE_SHARE, measuredAt: LATER })],
       ]),
@@ -520,14 +570,14 @@ describe('what a host measured of a guest is kept beside how full its filesystem
   });
 
   test('an older reading arriving late leaves the newer one standing', async () => {
-    const appId = await createApp('reordered-compute');
+    const appId = await createHostedUsageApp('reordered-compute');
 
-    await repo.recordComputeUsage({
+    await recordComputeUsageForApps({
       readings: new Map([
         [appId, spending({ memoryUsedBytes: IDLE_BYTES, cpuShare: IDLE_SHARE, measuredAt: LATER })],
       ]),
     });
-    await repo.recordComputeUsage({
+    await recordComputeUsageForApps({
       readings: new Map([
         [
           appId,
@@ -546,9 +596,9 @@ describe('what a host measured of a guest is kept beside how full its filesystem
    * protect rather than as a reading no newer one can beat.
    */
   test('either family alone makes the row, and the other lands on it afterwards', async () => {
-    const appId = await createApp('half-measured');
+    const appId = await createHostedUsageApp('half-measured');
 
-    await repo.recordComputeUsage({
+    await recordComputeUsageForApps({
       readings: new Map([
         [
           appId,
@@ -560,6 +610,7 @@ describe('what a host measured of a guest is kept beside how full its filesystem
     expect(compute.volume_measured_at).toBeNull();
 
     await repo.recordVolumeUsage({
+      hostId: HOST_ID,
       readings: new Map([
         [
           appId,
@@ -647,10 +698,10 @@ describe('what a host measured of a guest is kept beside how full its filesystem
   });
 
   test('every reading in one report is written by one statement', async () => {
-    const first = await createApp('batched-compute-one');
-    const second = await createApp('batched-compute-two');
+    const first = await createHostedUsageApp('batched-compute-one');
+    const second = await createHostedUsageApp('batched-compute-two');
 
-    await repo.recordComputeUsage({
+    await recordComputeUsageForApps({
       readings: new Map([
         [
           first,

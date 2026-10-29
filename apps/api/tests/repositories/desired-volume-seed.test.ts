@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import type { SQL } from 'bun';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
+import { TEST_HOST_ID } from '#tests/support/hosts.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
 
@@ -123,13 +124,13 @@ async function seedApp(sql: SQL): Promise<void> {
     [APP_SLUG],
   );
   await sql.unsafe(
-    `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, state)
-     SELECT a.id, ar.id, c.id, 'running'
+    `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, state, host_id)
+     SELECT a.id, ar.id, c.id, 'running', $2
      FROM nibrun.apps a
      JOIN nibrun.artifacts ar ON ar.app_id = a.id
      JOIN nibrun.app_configs c ON c.app_id = a.id
      WHERE a.slug = $1`,
-    [APP_SLUG],
+    [APP_SLUG, TEST_HOST_ID],
   );
 }
 

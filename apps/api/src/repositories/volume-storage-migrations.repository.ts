@@ -306,9 +306,13 @@ export class VolumeStorageMigrationsRepository
   }: TransactionInput & { configId: string; artifactId: ArtifactId }): Promise<DeploymentId> {
     await supersedeLiveDeployment({ tx, appId, ownerId });
     const [inserted] = await tx.InsertVolumeStorageMigrationDeployment`
-      INSERT INTO nibrun.deployments (app_id, artifact_id, config_id)
-      SELECT a.id, ${artifactId}, ${configId}
+      INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, host_id)
+      SELECT a.id, ${artifactId}, ${configId}, previous.host_id
       FROM nibrun.apps a
+      LEFT JOIN LATERAL (
+        SELECT d.host_id FROM nibrun.deployments d
+        WHERE d.app_id = a.id ORDER BY d.id DESC LIMIT 1
+      ) previous ON true
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND a.state IN ('active', 'suspended')
       RETURNING id
     `;

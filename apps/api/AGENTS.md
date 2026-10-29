@@ -6,6 +6,22 @@ socket. Compiles to a single binary that also serves `@repo/dashboard`.
 Owns the Postgres schema. Never connects to hosts — it pushes work down the
 agent socket (see `@repo/protocol`).
 
+A deployment's `host_id` names its execution host and cannot change after assignment.
+It references `hosts.id`, a UUIDv7 assigned before the agent receives a session.
+`hosts.origin_id` uniquely retains the agent's persisted registration identity. Every session
+request must carry it. Legacy agents may present a saved canonical id; both resolve to the same host.
+Moving an app creates a new deployment; its volume survives the execution it belonged to.
+Keep host ownership on deployments rather than duplicating it on apps or placements.
+`nibrun.app_hosts` derives each app's current host from its latest deployment, including
+failed and stopped executions. Desired-state queries share one repeatable-read snapshot.
+`nibrun.latest_app_deployments` owns that latest-execution selection. `deployments.host_id` is
+not nullable: assign a host in the transaction that creates the deployment. Backfill existing
+assignments before applying the constraint or enabling host-scoped reads.
+Directory reads authorize the requested deployment but target the app's current execution,
+because its filesystem outlives a release. Coalesce only within that execution and host.
+Cron queries and new SQLite sessions target the current deployment's assigned host.
+Established SQLite sessions retain their original host for cleanup after a handoff.
+
 Bun + Elysia service.
 
 `src/lib/api/` contains public resource schemas and their derived types. API-only defaults,

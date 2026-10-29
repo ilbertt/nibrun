@@ -1,4 +1,4 @@
-import type { AppId, CheckpointId, ExportId, ExportState } from '@repo/protocol';
+import type { AppId, CheckpointId, ExportId, ExportState, HostId } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import type { OwnerId } from '#lib/api/identifiers.ts';
 import { lockAppForMutation } from '#repositories/apps.repository.ts';
@@ -37,7 +37,7 @@ export abstract class ExportsRepositoryContract {
   abstract request(input: RequestExportInput): Promise<ExportRow | null>;
   abstract listByApp(input: ExportsByAppInput): Promise<ExportRow[]>;
   abstract findById(input: ExportByIdInput): Promise<ExportRow | null>;
-  abstract applyReport(input: { reported: ReportedExportRow[] }): Promise<void>;
+  abstract applyReport(input: { reported: ReportedExportRow[]; hostId: HostId }): Promise<void>;
   abstract failInFlight(input: { appId: AppId; message: string }): Promise<void>;
 }
 
@@ -108,7 +108,13 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
    * A row that has already gone terminal is left alone, which is what stops a report assembled
    * before the host was told to forget an export from reopening it.
    */
-  applyReport({ reported }: { reported: ReportedExportRow[] }): Promise<void> {
+  applyReport({
+    reported,
+    hostId,
+  }: {
+    reported: ReportedExportRow[];
+    hostId: HostId;
+  }): Promise<void> {
     return this.sql.begin(async (tx) => {
       for (const bundle of reported) {
         await tx.ApplyReportedExport`
@@ -119,6 +125,7 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
             ready_at = ${bundle.readyAt},
             message = ${bundle.message}
           WHERE id = ${bundle.exportId} AND state IN ('pending', 'preparing')
+            AND app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
         `;
       }
     });

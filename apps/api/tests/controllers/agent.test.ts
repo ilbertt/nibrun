@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, mock, test } from 'bun:test';
 import {
   AGENT_API_PREFIX,
   AGENT_ROUTES,
@@ -16,6 +16,10 @@ import {
 import { Value } from '@sinclair/typebox/value';
 import { StatusMap } from 'elysia';
 import { ORIGIN, sendJson } from '#tests/controllers/support/api.ts';
+import { stubHostRegistration } from '#tests/controllers/support/hosts.ts';
+
+beforeEach(stubHostRegistration);
+afterEach(() => mock.restore());
 
 const A_SERVED_APP_ID = Value.Parse(AppIdSchema, 'app-pocketbase');
 
@@ -71,7 +75,7 @@ async function readFilesystemQuery(response: Response) {
 function openSession(overrides: Partial<AgentSessionRequest> = {}) {
   return post({
     route: AGENT_ROUTES.session,
-    body: { versions, capacity, ...overrides },
+    body: { hostId: 'agent-origin', versions, capacity, ...overrides },
   });
 }
 
@@ -108,7 +112,53 @@ function answerFilesystem({ sessionToken, queryId }: { sessionToken?: string; qu
   });
 }
 
+function report(hostId: string) {
+  return {
+    hostId,
+    reportedAt: new Date().toISOString(),
+    state: 'ready',
+    capacity,
+    allocatable: capacity,
+    versions,
+    instances: [],
+    volumes: [],
+    checkpoints: [],
+    exports: [],
+  };
+}
+
+describe('a host report belongs to its session', () => {
+  test('a report without a session is refused before it reaches storage', async () => {
+    const response = await post({ route: AGENT_ROUTES.reportedState, body: report('host-1') });
+    expect(response.status).toBe(StatusMap.Unauthorized);
+  });
+
+  test('a report with an unknown session is refused', async () => {
+    const response = await post({
+      route: AGENT_ROUTES.reportedState,
+      body: report('host-1'),
+      sessionToken: 'unknown-session',
+    });
+    expect(response.status).toBe(StatusMap.Unauthorized);
+  });
+
+  test('a session cannot submit a report for another host', async () => {
+    const session = await startSession();
+    const response = await post({
+      route: AGENT_ROUTES.reportedState,
+      body: report('a-different-host'),
+      sessionToken: session.sessionToken,
+    });
+    expect(response.status).toBe(StatusMap.Forbidden);
+  });
+});
+
 describe('an agent can register and be told what to run', () => {
+  test('registration without an identity is refused before it reaches storage', async () => {
+    const response = await post({ route: AGENT_ROUTES.session, body: { versions, capacity } });
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  });
+
   test('a session names the host and how often to come back', async () => {
     const session = await startSession();
 

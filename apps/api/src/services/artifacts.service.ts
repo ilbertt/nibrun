@@ -26,6 +26,7 @@ import {
   inspectingPassThrough,
   RefusedArtifactError,
 } from '#lib/artifact-digest.ts';
+import { DownloadDiagnostics, downloadOrigin } from '#lib/download-diagnostics.ts';
 import { describeMachine } from '#lib/elf.ts';
 import { BadRequestError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import { type RemoteFetchSlots, sourceRefusal } from '#lib/remote-fetch.ts';
@@ -55,6 +56,16 @@ import {
 import { Service } from '#services/service.ts';
 
 export type ArtifactUploadGrant = Pick<GitHubDeploymentGrantRow, 'expires_at'>;
+
+type FetchArtifactInput = {
+  appId: AppId;
+  ownerId: OwnerId;
+  deploymentGrant: ArtifactUploadGrant | null;
+  isAnonymous: boolean;
+  url: string;
+  filename: Filename | undefined;
+  sha256?: Sha256Digest | undefined;
+};
 
 // An app the caller does not own has to be indistinguishable from one that does not exist: a
 // 403 confirms the app to a stranger.
@@ -372,7 +383,19 @@ export class ArtifactsService extends Service {
    * the bytes are read, so a url serving something else costs the fetch; what it does not cost is
    * a deploy of whatever turned up.
    */
-  async createFromUrl({
+  async createFromUrl(input: FetchArtifactInput): Promise<Artifact> {
+    const diagnostics = new DownloadDiagnostics({
+      logger: this.logger,
+      fields: { appId: input.appId, origin: downloadOrigin(input.url) },
+    });
+    return await diagnostics.phase({
+      phase: 'artifact',
+      run: () => this.fetchFromUrl({ ...input, diagnostics }),
+      result: (artifact) => ({ artifactId: artifact.id, sizeBytes: artifact.sizeBytes }),
+    });
+  }
+
+  private async fetchFromUrl({
     appId,
     ownerId,
     deploymentGrant,
@@ -380,19 +403,17 @@ export class ArtifactsService extends Service {
     url,
     filename: providedFilename,
     sha256,
-  }: {
-    appId: AppId;
-    ownerId: OwnerId;
-    deploymentGrant: ArtifactUploadGrant | null;
-    isAnonymous: boolean;
-    url: string;
-    filename: Filename | undefined;
-    sha256?: Sha256Digest | undefined;
-  }): Promise<Artifact> {
+    diagnostics,
+  }: FetchArtifactInput & { diagnostics: DownloadDiagnostics }): Promise<Artifact> {
     if (deploymentGrant !== null) {
       throw new ForbiddenError('Deployment grants can only upload binaries.');
     }
-    if (!(await this.appsRepo.isOwnedBy({ appId, ownerId }))) {
+    if (
+      !(await diagnostics.phase({
+        phase: 'ownership',
+        run: () => this.appsRepo.isOwnedBy({ appId, ownerId }),
+      }))
+    ) {
       throw new NotFoundError(NO_SUCH_APP);
     }
 
@@ -402,14 +423,25 @@ export class ArtifactsService extends Service {
       throw new BadRequestError(UNNAMED_BINARY);
     }
     const said = withoutCredentials(url);
-    const expected = await this.expected({ url, sha256 });
+    const expected = await diagnostics.phase({
+      phase: 'checksum-lookup',
+      run: () => this.expected({ url, sha256 }),
+      result: (expectation) => ({ source: expectation?.saidBy ?? 'unknown' }),
+    });
     // Written down only where the bytes are this api's to hand on. A download reached with a
     // password is the caller's own, and a digest is all anybody would need to ask for it by.
     const sourceDigest =
       expected !== undefined && !carriesCredentials(url) ? expected.digest : null;
 
     const onlyOne = isAnonymous;
-    const reused = await this.reuse({ appId, ownerId, onlyOne, url: said, sourceDigest });
+    const reused = await this.reuse({
+      appId,
+      ownerId,
+      onlyOne,
+      url: said,
+      sourceDigest,
+      diagnostics,
+    });
     if (reused) {
       return reused;
     }
@@ -428,6 +460,7 @@ export class ArtifactsService extends Service {
         filename,
         expected,
         sourceDigest,
+        diagnostics,
       });
     } finally {
       this.fetchSlots.release(ownerId);
@@ -478,12 +511,14 @@ export class ArtifactsService extends Service {
     if (published.outcome === 'rate-limited') {
       this.logger.warn(
         'the release api is rate limiting nibrun, so binaries fetched from it go unverified and are not reused. A GitHub token raises the quota from 60 an hour to 5000.',
-        { url, until: published.until },
+        { origin: downloadOrigin(url), until: published.until },
       );
       return;
     }
     if (published.outcome === 'unavailable') {
-      this.logger.info('the release api said nothing about this url', { url });
+      this.logger.info('the release api said nothing about this url', {
+        origin: downloadOrigin(url),
+      });
     }
   }
 
@@ -506,23 +541,38 @@ export class ArtifactsService extends Service {
     onlyOne,
     url,
     sourceDigest,
+    diagnostics,
   }: {
     appId: AppId;
     ownerId: OwnerId;
     onlyOne: boolean;
     url: string;
     sourceDigest: Sha256Digest | null;
+    diagnostics: DownloadDiagnostics;
   }): Promise<Artifact | undefined> {
     if (sourceDigest === null) {
       return undefined;
     }
-    const cached = await this.cachedRepo.findBySourceDigest({ sourceDigest });
-    if (!cached || !(await this.storageRepo.exists({ objectKey: cached.object_key }))) {
+    const cached = await diagnostics.phase({
+      phase: 'cache-lookup',
+      run: () => this.cachedRepo.findBySourceDigest({ sourceDigest }),
+      result: (row) => ({ hit: row !== null }),
+    });
+    if (
+      !cached ||
+      !(await diagnostics.phase({
+        phase: 'cache-object-head',
+        run: () => this.storageRepo.exists({ objectKey: cached.object_key }),
+        result: (exists) => ({ exists }),
+      }))
+    ) {
       return undefined;
     }
 
-    this.logger.info('a url was served from what nibrun already holds', { url, sourceDigest });
-    return await this.stored({ appId, ownerId, onlyOne, url, cached });
+    return await diagnostics.phase({
+      phase: 'cache-register',
+      run: () => this.stored({ appId, ownerId, onlyOne, url, cached }),
+    });
   }
 
   /**
@@ -587,6 +637,7 @@ export class ArtifactsService extends Service {
     filename,
     expected,
     sourceDigest,
+    diagnostics,
   }: {
     appId: AppId;
     ownerId: OwnerId;
@@ -596,8 +647,13 @@ export class ArtifactsService extends Service {
     filename: Filename;
     expected: Expectation | undefined;
     sourceDigest: Sha256Digest | null;
+    diagnostics: DownloadDiagnostics;
   }): Promise<Artifact> {
-    const source = await this.sourceRepo.open({ url });
+    const source = await diagnostics.phase({
+      phase: 'source',
+      run: () => this.sourceRepo.open({ url, diagnostics }),
+      result: (opened) => ({ outcome: opened.outcome }),
+    });
     if (source.outcome !== 'open') {
       throw new BadRequestError(sourceRefusal({ url: said, source }));
     }
@@ -614,15 +670,23 @@ export class ArtifactsService extends Service {
     // on what the url sent rather than on what it came to, which for an archive is not the same.
     const bounded = boundedTo({ source: source.body, maxSizeBytes: MAX_ARTIFACT_SIZE_BYTES });
     const { body: fetched, check } = checking({ source: bounded, expected });
-    const held = await unwrapped({ source: fetched, named: filename, url: said });
+    const held = await diagnostics.phase({
+      phase: 'unpack',
+      run: () => unwrapped({ source: fetched, named: filename, url: said }),
+    });
 
-    const inserted = await this.artifactsRepo.insertPending({
-      appId,
-      ownerId,
-      originalFileName: held.filename,
-      originalFileUrl: said,
-      sourceDigest,
-      onlyOne,
+    const inserted = await diagnostics.phase({
+      phase: 'pending-artifact',
+      run: () =>
+        this.artifactsRepo.insertPending({
+          appId,
+          ownerId,
+          originalFileName: held.filename,
+          originalFileUrl: said,
+          sourceDigest,
+          onlyOne,
+        }),
+      result: (pending) => ({ outcome: pending.outcome }),
     });
     if (inserted.outcome !== 'created') {
       await release(held.body);
@@ -638,9 +702,17 @@ export class ArtifactsService extends Service {
       body: held.body,
       url: said,
       check,
+      diagnostics,
     });
 
-    return await this.promote({ appId, artifactId: pending.id, ownerId, staged, inspection });
+    return await this.promote({
+      appId,
+      artifactId: pending.id,
+      ownerId,
+      staged,
+      inspection,
+      diagnostics,
+    });
   }
 
   /**
@@ -658,6 +730,7 @@ export class ArtifactsService extends Service {
     body,
     url,
     check,
+    diagnostics,
   }: {
     appId: AppId;
     artifactId: ArtifactId;
@@ -666,13 +739,21 @@ export class ArtifactsService extends Service {
     body: ReadableStream<Uint8Array>;
     url: string;
     check: DigestCheck | undefined;
+    diagnostics: DownloadDiagnostics;
   }): Promise<ArtifactInspection> {
     try {
-      const inspection = await this.stage({ staged, body });
-      await heldToDigest(check);
+      const inspection = await diagnostics.phase({
+        phase: 'storage-upload',
+        run: () => this.stage({ staged, body }),
+        result: (inspected) => ({ outcome: inspected.outcome }),
+      });
+      await diagnostics.phase({ phase: 'source-checksum', run: () => heldToDigest(check) });
       return inspection;
     } catch (failure) {
-      await this.abandon({ appId, artifactId, ownerId });
+      await diagnostics.phase({
+        phase: 'abandon',
+        run: () => this.abandon({ appId, artifactId, ownerId }),
+      });
       if (failure instanceof InterruptedSourceError) {
         throw new BadRequestError(interruptedSource(url));
       }
@@ -738,12 +819,14 @@ export class ArtifactsService extends Service {
     ownerId,
     staged,
     inspection,
+    diagnostics = new DownloadDiagnostics({ logger: this.logger, fields: { appId, artifactId } }),
   }: {
     appId: AppId;
     artifactId: ArtifactId;
     ownerId: OwnerId;
     staged: ObjectKey;
     inspection: ArtifactInspection;
+    diagnostics?: DownloadDiagnostics;
   }): Promise<Artifact> {
     if (inspection.outcome !== 'stored') {
       await this.abandon({ appId, artifactId, ownerId });
@@ -751,20 +834,36 @@ export class ArtifactsService extends Service {
     }
 
     const { digest, sizeBytes, objectKey } = inspection;
-    if (!(await this.storageRepo.exists({ objectKey }))) {
-      await this.storageRepo.copy({ from: staged, to: objectKey });
+    if (
+      !(await diagnostics.phase({
+        phase: 'artifact-object-head',
+        run: () => this.storageRepo.exists({ objectKey }),
+        result: (exists) => ({ exists }),
+      }))
+    ) {
+      await diagnostics.phase({
+        phase: 'storage-copy',
+        run: () => this.storageRepo.copy({ from: staged, to: objectKey }),
+      });
     }
 
-    const stored = await this.artifactsRepo.complete({
-      appId,
-      artifactId,
-      ownerId,
-      digest,
-      sizeBytes,
-      objectKey,
+    const stored = await diagnostics.phase({
+      phase: 'artifact-register',
+      run: () =>
+        this.artifactsRepo.complete({
+          appId,
+          artifactId,
+          ownerId,
+          digest,
+          sizeBytes,
+          objectKey,
+        }),
     });
 
-    await this.discard({ objectKey: staged });
+    await diagnostics.phase({
+      phase: 'staging-cleanup',
+      run: () => this.discard({ objectKey: staged }),
+    });
 
     // The write is what settles a race between two completions of the same row: the one whose
     // update matched nothing is looking at the other's artifact, not at a missing one.

@@ -5,10 +5,12 @@ import type {
   FilesystemQuery,
   FilesystemQueryResult,
   GuestPath,
+  HostId,
 } from '@repo/protocol';
 import type { OwnerId } from '#lib/api/identifiers.ts';
-import { BadGatewayError, GatewayTimeoutError, NotFoundError } from '#lib/errors.ts';
+import { BadGatewayError, ConflictError, GatewayTimeoutError, NotFoundError } from '#lib/errors.ts';
 import { PendingFilesystemQueries } from '#lib/filesystem/pending-queries.ts';
+import type { DeploymentHostsRepositoryContract } from '#repositories/deployment-hosts.repository.ts';
 import type { DeploymentLookupRepositoryContract } from '#repositories/deployments.repository.ts';
 import { Service } from '#services/service.ts';
 
@@ -36,11 +38,19 @@ export type DirectoryReadRequest = {
 
 export class FilesystemService extends Service {
   private readonly deploymentsRepo: DeploymentLookupRepositoryContract;
+  private readonly deploymentHostsRepo: DeploymentHostsRepositoryContract;
   private readonly pending = new PendingFilesystemQueries();
 
-  constructor({ deploymentsRepo }: { deploymentsRepo: DeploymentLookupRepositoryContract }) {
+  constructor({
+    deploymentsRepo,
+    deploymentHostsRepo,
+  }: {
+    deploymentsRepo: DeploymentLookupRepositoryContract;
+    deploymentHostsRepo: DeploymentHostsRepositoryContract;
+  }) {
     super();
     this.deploymentsRepo = deploymentsRepo;
+    this.deploymentHostsRepo = deploymentHostsRepo;
   }
 
   /**
@@ -64,7 +74,16 @@ export class FilesystemService extends Service {
       throw new NotFoundError(NO_SUCH_DEPLOYMENT);
     }
 
-    const { queryId, answered } = this.pending.open({ appId, path, signal });
+    const execution = await this.deploymentHostsRepo.currentForApp({ appId, ownerId });
+    if (execution === null) {
+      throw new ConflictError('This app has no assigned execution host.');
+    }
+    const { queryId, answered } = this.pending.open({
+      appId,
+      path,
+      signal,
+      target: { hostId: execution.host_id, deploymentId: execution.deployment_id },
+    });
     const outcome = await answered.catch(() => {
       this.logger.warn('no host answered a directory read', { queryId, appId });
       throw new GatewayTimeoutError(UNANSWERED);
@@ -81,25 +100,19 @@ export class FilesystemService extends Service {
     return outcome.listing;
   }
 
-  /**
-   * Offered only to a host that says it serves the app. The claim is the host's, restated on each
-   * poll: it is the only party that knows what it has attached, and a control plane deciding this
-   * from its own records would keep sending reads to a host that no longer holds the volume.
-   *
-   * Answered when there is something to answer with rather than at once — `signal` is the host's
-   * own request, and holding it is what takes the poll interval out of what a reader waits.
-   */
   pendingQuery({
     servedAppIds,
     signal,
+    hostId,
   }: {
     servedAppIds: readonly AppId[];
     signal: AbortSignal;
+    hostId: HostId;
   }): Promise<FilesystemQuery | undefined> {
-    return this.pending.claim({ servedAppIds, signal });
+    return this.pending.claim({ servedAppIds, signal, hostId });
   }
 
-  acceptResult(result: FilesystemQueryResult): void {
+  acceptResult(result: FilesystemQueryResult & { hostId: HostId }): void {
     if (!this.pending.answer(result)) {
       this.logger.info('a directory was read for a request that had already ended', {
         queryId: result.queryId,
