@@ -1,11 +1,11 @@
-data "aws_ssm_parameter" "ubuntu_2404_ami" {
-  name = "/aws/service/canonical/ubuntu/server/24.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
+data "aws_ssm_parameter" "ubuntu_2604_ami" {
+  name = "/aws/service/canonical/ubuntu/server/26.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
 }
 
 # Commission separately: the legacy deploy starts the shared ZeroFS writer, and
 # a second writer against that prefix fences the machine serving existing apps.
 resource "aws_instance" "nibrunner_host" {
-  ami                    = data.aws_ssm_parameter.ubuntu_2404_ami.value
+  ami                    = data.aws_ssm_parameter.ubuntu_2604_ami.value
   instance_type          = "r8id.xlarge"
   subnet_id              = aws_subnet.app.id
   vpc_security_group_ids = [aws_security_group.nibrunner_host.id]
