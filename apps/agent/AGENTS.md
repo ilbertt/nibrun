@@ -9,6 +9,11 @@ Persist the registration identity before the first session request and reuse it 
 Keep it unchanged when the API returns its canonical host id. A corrupt identity refuses
 registration; silently replacing it would abandon the host's deployment ownership.
 
+Nibrunner desired-state types are generated from its release schema using the version in
+`infra/nibrunner-host/versions.json`. Run
+`bun run --filter @repo/internal-scripts generate-nibrunner-types` after changing that pin.
+The agent's type check rejects stale generated types; do not edit `desired.gen.ts` by hand.
+
 Besides converging, it answers directory reads through `lib/agent/filesystem.ts` and cron
 listings through `lib/agent/cron-query.ts`, each on routes of its own.
 Directory reads wake idle apps through `AppWaker` and hold `GuestActivity` through the wake

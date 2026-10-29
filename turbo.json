@@ -1,6 +1,13 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "tasks": {
+    "@repo/agent#check:types": {
+      "dependsOn": ["^check:types"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/infra/nibrunner-host/versions.json"
+      ]
+    },
     "build": {
       "dependsOn": [],
       "outputs": ["dist/**"]
