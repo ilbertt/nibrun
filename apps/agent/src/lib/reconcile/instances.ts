@@ -30,7 +30,8 @@ import {
   afterVmFailure,
   afterVmHealth,
   beginVmRetry,
-  VM_RECOVERY_POLICY,
+  vmRecoveryAlert,
+  vmRecoveryPolicy,
 } from '#lib/vm/recovery.ts';
 import * as Systemd from '#lib/vm/systemd.ts';
 import { UNKNOWN_UNIT, type UnitStatus } from '#lib/vm/unit-status.ts';
@@ -663,6 +664,8 @@ function recordVmFailure({
   return Effect.gen(function* () {
     const recovery = afterVmFailure({ recovery: record.recovery, failure, nowMs });
     const retry = recovery.nextAttemptAtMs !== undefined;
+    const policy = vmRecoveryPolicy(failure);
+    const alert = vmRecoveryAlert(recovery);
     let applied = false;
     yield* AgentState.modify((current) => {
       const latest = current.records.get(record.appId);
@@ -688,7 +691,7 @@ function recordVmFailure({
           lastExitCode: record.lastExitCode,
           state: retry ? 'starting' : 'failed',
           message: retry
-            ? `${failure.message}; retrying the microVM (${recovery.attempts + 1} of ${VM_RECOVERY_POLICY.maxRetries})`
+            ? `${failure.message}; retrying the microVM (${recovery.attempts + 1} of ${policy.maxRetries})`
             : failure.message,
         }),
       };
@@ -697,17 +700,18 @@ function recordVmFailure({
       return;
     }
     yield* (
-      retry
+      retry && !alert
         ? Effect.logWarning('microVM recovery scheduled')
-        : Effect.logError('microVM recovery stopped')
+        : Effect.logError(retry ? 'microVM recovery cooldown started' : 'microVM recovery stopped')
     ).pipe(
       Effect.annotateLogs({
         appId: record.appId,
+        alert,
         deploymentId: record.deploymentId,
         failureKind: failure.kind,
         failureReason: failure.message,
         retryAttempts: recovery.attempts,
-        maxRetries: VM_RECOVERY_POLICY.maxRetries,
+        maxRetries: policy.maxRetries,
         nextAttemptAtMs: recovery.nextAttemptAtMs,
         exitCode: record.lastExitCode,
         kvmReason: failure.kvmReason,

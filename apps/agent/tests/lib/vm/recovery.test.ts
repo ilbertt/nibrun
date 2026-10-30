@@ -6,8 +6,10 @@ import {
   afterVmFailure,
   afterVmHealth,
   beginVmRetry,
+  KVM_RECOVERY_POLICY,
   VM_RECOVERY_POLICY,
   type VmRecovery,
+  vmRecoveryAlert,
 } from '#lib/vm/recovery.ts';
 import { instanceRecord } from '#tests/support/fixtures.ts';
 
@@ -16,10 +18,25 @@ const FAILURE: VmFailure = {
   message: 'the microVM stopped',
   retryable: true,
 };
+const RETRYABLE_KVM_FAILURE: VmFailure = { ...FAILURE, kind: 'kvm' };
 const FIRST_RETRY_DELAY_MS = 1_000;
 const SECOND_RETRY_DELAY_MS = 2_000;
 const THIRD_RETRY_DELAY_MS = 4_000;
 const RETRY_DELAYS_MS = [FIRST_RETRY_DELAY_MS, SECOND_RETRY_DELAY_MS, THIRD_RETRY_DELAY_MS];
+const FIRST_KVM_COOLDOWN_MS = 30_000;
+const SECOND_KVM_COOLDOWN_MS = 60_000;
+const MAX_KVM_COOLDOWN_MS = 120_000;
+const KVM_RETRY_DELAYS_MS = [
+  ...RETRY_DELAYS_MS,
+  FIRST_KVM_COOLDOWN_MS,
+  SECOND_KVM_COOLDOWN_MS,
+  MAX_KVM_COOLDOWN_MS,
+  MAX_KVM_COOLDOWN_MS,
+  MAX_KVM_COOLDOWN_MS,
+  MAX_KVM_COOLDOWN_MS,
+  MAX_KVM_COOLDOWN_MS,
+];
+const FAILED_AGAIN_AT_MS = 100_000;
 const EXHAUSTED_ATTEMPTS = 3;
 const TENANT_FAILURE =
   '[nibrun] the tenant used its 5 restarts without staying up; shutting the guest down';
@@ -63,6 +80,61 @@ describe('VM failure diagnostics', () => {
 });
 
 describe('bounded VM recovery', () => {
+  test('KVM failures receive three fast retries followed by a bounded cooldown', () => {
+    let recovery: VmRecovery | undefined;
+    let nowMs = 0;
+    for (const [attempt, delayMs] of KVM_RETRY_DELAYS_MS.entries()) {
+      recovery = afterVmFailure({ recovery, failure: RETRYABLE_KVM_FAILURE, nowMs });
+      expect(recovery.nextAttemptAtMs).toBe(nowMs + delayMs);
+      expect(vmRecoveryAlert(recovery)).toBe(
+        attempt === VM_RECOVERY_POLICY.maxRetries ? 'kvm-recovery-cooldown' : undefined,
+      );
+      nowMs += delayMs;
+      recovery = beginVmRetry(recovery);
+    }
+    recovery = afterVmFailure({ recovery, failure: RETRYABLE_KVM_FAILURE, nowMs });
+    expect(recovery.attempts).toBe(KVM_RECOVERY_POLICY.maxRetries);
+    expect(recovery.nextAttemptAtMs).toBeUndefined();
+    expect(vmRecoveryAlert(recovery)).toBe('kvm-recovery-exhausted');
+  });
+
+  test('a persisted KVM cooldown keeps its deadline and consumed attempts', () => {
+    const recovery = afterVmFailure({
+      recovery: { attempts: VM_RECOVERY_POLICY.maxRetries },
+      failure: RETRYABLE_KVM_FAILURE,
+      nowMs: 1_000,
+    });
+    const restored = readInstanceRecords(
+      JSON.parse(JSON.stringify([instanceRecord({ state: 'starting', recovery })])),
+    )[0];
+    expect(restored?.recovery).toEqual(recovery);
+    expect(beginVmRetry(restored?.recovery ?? { attempts: 0 }).attempts).toBe(
+      VM_RECOVERY_POLICY.maxRetries + 1,
+    );
+  });
+
+  test('a tenant crash loop remains terminal after KVM cooldown retries', () => {
+    const failure: VmFailure = { kind: 'guest', message: TENANT_FAILURE, retryable: false };
+    const recovery = afterVmFailure({
+      recovery: { attempts: 5, failure: RETRYABLE_KVM_FAILURE },
+      failure,
+      nowMs: 1_000,
+    });
+    expect(recovery.nextAttemptAtMs).toBeUndefined();
+    expect(vmRecoveryAlert(recovery)).toBeUndefined();
+    expect(recovery.failure).toEqual(failure);
+  });
+
+  test('KVM cooldown does not extend a subsequent boot failure budget', () => {
+    const recovery = afterVmFailure({
+      recovery: { attempts: 5, failure: RETRYABLE_KVM_FAILURE },
+      failure: { ...FAILURE, kind: 'boot' },
+      nowMs: 1_000,
+    });
+    expect(recovery.nextAttemptAtMs).toBeUndefined();
+    expect(vmRecoveryAlert(recovery)).toBeUndefined();
+  });
+
   test('three retries follow increasing backoff, then the original failure is retained', () => {
     let recovery: VmRecovery | undefined;
     for (const [attempt, delayMs] of RETRY_DELAYS_MS.entries()) {
@@ -97,6 +169,24 @@ describe('bounded VM recovery', () => {
       EXHAUSTED_ATTEMPTS,
     );
     expect(afterVmHealth({ recovery, healthy: true, nowMs: 120_001 })).toBeUndefined();
+  });
+
+  test('a continuously healthy KVM recovery resets its cooldown budget', () => {
+    const recovery = afterVmHealth({
+      recovery: { attempts: 5, failure: RETRYABLE_KVM_FAILURE },
+      healthy: true,
+      nowMs: 0,
+    });
+    const reset = afterVmHealth({
+      recovery,
+      healthy: true,
+      nowMs: KVM_RECOVERY_POLICY.healthyResetMs,
+    });
+    expect(reset).toBeUndefined();
+    expect(
+      afterVmFailure({ recovery: reset, failure: RETRYABLE_KVM_FAILURE, nowMs: FAILED_AGAIN_AT_MS })
+        .nextAttemptAtMs,
+    ).toBe(FAILED_AGAIN_AT_MS + FIRST_RETRY_DELAY_MS);
   });
 
   test('a known tenant crash loop never receives a VM retry', () => {
