@@ -1,0 +1,21 @@
+[Unit]
+Description=nibrun control-plane bridge for nibrunner
+After=network-online.target nibrunnerd.service
+Wants=network-online.target nibrunnerd.service
+
+[Service]
+Type=exec
+ExecStart=/opt/nibrun/nibrunner-host/bridge/current/nibrun-agent
+EnvironmentFile=/etc/nibrunner/bridge.env
+Restart=always
+RestartSec=5s
+UMask=0077
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/nibrunner
+LogExtraFields=SOURCE=nibrunner-bridge
+
+[Install]
+WantedBy=multi-user.target
