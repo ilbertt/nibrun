@@ -1,6 +1,8 @@
 import { FileSystem, type Path } from '@effect/platform';
 import type { DesiredArtifact, Sha256Digest } from '@repo/protocol';
 import { Data, Effect, Ref, Stream } from 'effect';
+import { ArtifactTransferError } from '#lib/artifacts/store.ts';
+import { ArtifactStore } from '#services/artifact-store.service.ts';
 
 const DIGEST_ALGORITHM = 'sha256';
 const HEX_ENCODING = 'hex';
@@ -25,8 +27,6 @@ export class ArtifactSizeMismatch extends Data.TaggedError('ArtifactSizeMismatch
     return `the artifact is ${this.actual} bytes, not the ${this.expected} its manifest declares`;
   }
 }
-
-import { ArtifactStore, ArtifactTransferError } from '#services/artifact-store.service.ts';
 
 /** Content-addressed, so a redeploy of a known digest costs nothing and two apps share one image. */
 export const artifactImagePath = ({
