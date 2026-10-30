@@ -126,3 +126,13 @@ output "nibrunner_host_public_ip" {
   description = "Temporary origin address for testing nibrunner before the production cutover."
   value       = aws_instance.nibrunner_host.public_ip
 }
+
+output "nibrunner_tls_cert_parameter" {
+  description = "Parameter Store name of the app-domain TLS certificate."
+  value       = aws_ssm_parameter.app_host_caddy_tls_cert.name
+}
+
+output "nibrunner_tls_key_parameter" {
+  description = "Parameter Store name of the app-domain TLS private key."
+  value       = aws_ssm_parameter.app_host_caddy_tls_key.name
+}
