@@ -13,6 +13,8 @@ fi
 modprobe kvm_intel
 test -c /dev/kvm
 
+bash install_tls.sh
+
 install -d -m 0700 /etc/nibrunner
 if ! cmp -s config.toml /etc/nibrunner/config.toml; then
   install -m 0600 config.toml /etc/nibrunner/config.toml

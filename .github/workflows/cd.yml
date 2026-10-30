@@ -236,6 +236,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NIBRUNNER_HOST_INSTANCE_ID: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_host_instance_id }}
+      NIBRUNNER_TLS_CERT_PARAMETER: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_tls_cert_parameter }}
+      NIBRUNNER_TLS_KEY_PARAMETER: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_tls_key_parameter }}
       VPC_IPV4_CIDR_BLOCK: ${{ fromJSON(needs.terraform.outputs.values).vpc_ipv4_cidr_block }}
       VPC_IPV6_CIDR_BLOCK: ${{ fromJSON(needs.terraform.outputs.values).vpc_ipv6_cidr_block }}
       AGENT_URL: ${{ needs.publish-agent.outputs.url }}
