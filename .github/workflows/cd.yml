@@ -165,8 +165,33 @@ jobs:
           BUNDLE_URL: ${{ steps.bundle.outputs.url }}
         run: bun run --filter @repo/internal-scripts ssm-deploy
 
-  deploy-app-hosts:
+  publish-agent:
     needs: terraform
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).deploy_bucket }}
+    outputs:
+      url: ${{ steps.agent_binary.outputs.url }}
+      sha256: ${{ steps.agent_binary.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: ./.github/actions/prepare
+
+      - uses: ./.github/actions/aws-credentials
+        with:
+          role-to-assume: ${{ fromJSON(needs.terraform.outputs.values).github_deploy_role_arn }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build the agent
+        run: bun run --filter @repo/agent build
+
+      - name: Publish the agent binary
+        id: agent_binary
+        run: bun run --filter @repo/internal-scripts publish-agent-binary
+
+  deploy-app-hosts:
+    needs: [terraform, publish-agent]
     runs-on: ubuntu-latest
     env:
       DEPLOY_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).deploy_bucket }}
@@ -195,13 +220,6 @@ jobs:
           role-to-assume: ${{ fromJSON(needs.terraform.outputs.values).github_deploy_role_arn }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Build the agent
-        run: bun run --filter @repo/agent build
-
-      - name: Publish the agent binary
-        id: agent_binary
-        run: bun run --filter @repo/internal-scripts publish-agent-binary
-
       - name: Publish the app host bundle
         id: bundle
         run: bun run --filter @repo/internal-scripts publish-app-host-bundle
@@ -210,16 +228,21 @@ jobs:
         timeout-minutes: 20
         env:
           BUNDLE_URL: ${{ steps.bundle.outputs.url }}
-          AGENT_URL: ${{ steps.agent_binary.outputs.url }}
+          AGENT_URL: ${{ needs.publish-agent.outputs.url }}
         run: bun run --filter @repo/internal-scripts ssm-deploy-app-hosts
 
   deploy-nibrunner-host:
-    needs: terraform
+    needs: [terraform, publish-agent]
     runs-on: ubuntu-latest
     env:
       NIBRUNNER_HOST_INSTANCE_ID: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_host_instance_id }}
       VPC_IPV4_CIDR_BLOCK: ${{ fromJSON(needs.terraform.outputs.values).vpc_ipv4_cidr_block }}
       VPC_IPV6_CIDR_BLOCK: ${{ fromJSON(needs.terraform.outputs.values).vpc_ipv6_cidr_block }}
+      AGENT_URL: ${{ needs.publish-agent.outputs.url }}
+      AGENT_SHA256: ${{ needs.publish-agent.outputs.sha256 }}
+      AGENT_CONTROL_PLANE_URL: ${{ fromJSON(needs.terraform.outputs.values).control_plane_internal_url }}
+      AGENT_ARTIFACT_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).artifacts_bucket }}
+      AGENT_IMPORT_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).imports_bucket }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
@@ -230,8 +253,10 @@ jobs:
           role-to-assume: ${{ fromJSON(needs.terraform.outputs.values).github_deploy_role_arn }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Install nibrunner via SSM
+      - name: Deploy nibrunner and its bridge via SSM
         timeout-minutes: 20
+        env:
+          AGENT_AWS_REGION: ${{ env.AWS_REGION }}
         run: bun run --filter @repo/internal-scripts ssm-deploy-nibrunner-host
 
   # Nothing may depend on this job. Publishing is not adopting, so no deploy

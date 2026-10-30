@@ -14,6 +14,21 @@ const configuration = (await Bun.file(join(hostDirectory, 'config.toml.template'
   .replaceAll('{{VPC_IPV4_CIDR_BLOCK}}', requiredEnv('VPC_IPV4_CIDR_BLOCK'))
   .replaceAll('{{VPC_IPV6_CIDR_BLOCK}}', requiredEnv('VPC_IPV6_CIDR_BLOCK'));
 const installer = await Bun.file(join(hostDirectory, 'deploy/on_box_deploy.sh')).text();
+const bridgeInstaller = await Bun.file(join(hostDirectory, 'deploy/install_bridge.sh')).text();
+const bridgeUnit = await Bun.file(
+  join(hostDirectory, 'systemd/nibrun-nibrunner-bridge.service'),
+).text();
+const bridgeEnvironment = {
+  AGENT_ENGINE: 'nibrunner',
+  AGENT_CONTROL_PLANE_URL: requiredEnv('AGENT_CONTROL_PLANE_URL'),
+  AGENT_ARTIFACT_BUCKET: requiredEnv('AGENT_ARTIFACT_BUCKET'),
+  AGENT_IMPORT_BUCKET: requiredEnv('AGENT_IMPORT_BUCKET'),
+  AGENT_AWS_REGION: requiredEnv('AGENT_AWS_REGION'),
+};
+const environmentFile = Object.entries(bridgeEnvironment)
+  .map(([name, value]) => `${name}=${JSON.stringify(value)}`)
+  .join('\n');
+const agentVersion = requiredEnv('GITHUB_SHA');
 
 const script = [
   "bash -se <<'NIBRUNNER_DEPLOY'",
@@ -24,17 +39,25 @@ const script = [
   'umask 077',
   writeRemoteFile({ name: 'config.toml', content: configuration }),
   writeRemoteFile({ name: 'on_box_deploy.sh', content: installer }),
+  writeRemoteFile({ name: 'install_bridge.sh', content: bridgeInstaller }),
+  writeRemoteFile({ name: 'nibrun-nibrunner-bridge.service', content: bridgeUnit }),
+  writeRemoteFile({ name: 'bridge.env', content: `${environmentFile}\n` }),
   `export ${exportLine({
     NIBRUNNER_VERSION: versions.version,
     NIBRUNNER_INSTALLER_SHA256: versions.installerSha256,
     NIBRUNNER_BINARY_SHA256: versions.binarySha256,
+    AGENT_VERSION: agentVersion,
+    AGENT_URL: requiredEnv('AGENT_URL'),
+    AGENT_SHA256: requiredEnv('AGENT_SHA256'),
+    AGENT_AWS_REGION: bridgeEnvironment.AGENT_AWS_REGION,
   })}`,
   'bash on_box_deploy.sh',
+  'bash install_bridge.sh',
   'NIBRUNNER_DEPLOY',
 ].join('\n');
 
 await runCommand({
   instanceId,
   script,
-  comment: `Install nibrunner ${versions.version}`,
+  comment: `Deploy nibrunner ${versions.version} bridge ${agentVersion}`,
 });
