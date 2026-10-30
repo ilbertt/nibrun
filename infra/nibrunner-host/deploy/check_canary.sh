@@ -2,7 +2,10 @@
 set -Eeuo pipefail
 
 cd /opt/nibrun/nibrunner-host
-test ! -e /var/lib/nibrun/host-id
+if [ -e /var/lib/nibrun/host-id ] || [ -e /var/lib/nibrunner/bridge/host-id ]; then
+  echo "refusing to run the isolated canary on a registered host" >&2
+  exit 1
+fi
 systemctl is-active --quiet nibrunnerd.service
 DEBIAN_FRONTEND=noninteractive apt-get install -y -q busybox-static jq
 

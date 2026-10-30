@@ -19,8 +19,13 @@ if (!(await Bun.file(binaryPath).exists())) {
 }
 
 const url = `s3://${deployBucket}/agent/${revision}/nibrun-agent`;
+const hasher = new Bun.CryptoHasher('sha256');
+for await (const chunk of Bun.file(binaryPath).stream()) {
+  hasher.update(chunk);
+}
 await aws(['s3', 'cp', binaryPath, url]);
 
 core.setOutput('url', url);
 core.setOutput('version', revision);
+core.setOutput('sha256', hasher.digest('hex'));
 core.info(`${url} (${Bun.file(binaryPath).size} bytes)`);
