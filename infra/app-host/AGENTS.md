@@ -29,6 +29,13 @@ hand back every privilege it removed.
   it has a config of its own rather than the live server's: two processes sharing either is two
   processes fighting over it.
 
+## KVM diagnostics
+
+The host deploy enables `kvm_intel.dump_invalid_vmcs` through its writable sysfs parameter
+and persists it in `/etc/modprobe.d/nibrun-kvm.conf` for future module loads. Never reload KVM
+to apply this setting on a running host. Failure dumps enter the host's kernel journal and
+the existing central log store; they provide CPU and VM control state for investigation.
+
 ## Agent version retention
 
 After the service health gate, deploys prune only complete, SHA-named agent installations with

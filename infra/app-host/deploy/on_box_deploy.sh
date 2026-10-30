@@ -270,6 +270,20 @@ changed_settings() {
   [ "$before" != "$after" ]
 }
 
+# Existing hosts already have KVM in use. Its writable diagnostic parameter avoids
+# reloading the module, which would interrupt every microVM on the host.
+cat > /etc/modprobe.d/nibrun-kvm.conf.new <<'EOF'
+options kvm_intel dump_invalid_vmcs=1
+EOF
+chmod 0644 /etc/modprobe.d/nibrun-kvm.conf.new
+changed_file /etc/modprobe.d/nibrun-kvm.conf && log "Invalid VMCS dumps configured at boot" || true
+
+kvm_diagnostics_parameter=/sys/module/kvm_intel/parameters/dump_invalid_vmcs
+if [ "$(cat "$kvm_diagnostics_parameter")" != Y ]; then
+  printf 'Y\n' > "$kvm_diagnostics_parameter"
+  log "Invalid VMCS dumps enabled"
+fi
+
 # A guest reaches the internet through this host: its default route is the tap,
 # and the agent's ruleset masquerades what leaves. Without forwarding the kernel
 # discards those packets before a single rule is consulted, and discards them
