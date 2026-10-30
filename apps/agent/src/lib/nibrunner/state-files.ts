@@ -3,6 +3,7 @@ import { type HostDesiredState, type HostId, Sha256DigestSchema } from '@repo/pr
 import { Value } from '@sinclair/typebox/value';
 import { Data, Effect } from 'effect';
 import { writeTextFile } from '#lib/json-store.ts';
+import type { HostDesiredState as NibrunnerDesiredState } from '#lib/nibrunner/desired.gen.ts';
 import { nibrunnerDesiredState } from '#lib/nibrunner/desired-state.ts';
 import type { HostReportedState as NibrunnerReport } from '#lib/nibrunner/reported.gen.ts';
 import { decodeNibrunnerReport } from '#lib/nibrunner/reported-state.ts';
@@ -36,6 +37,10 @@ function documentDigest(text: string) {
   return Value.Parse(Sha256DigestSchema, new Bun.CryptoHasher('sha256').update(text).digest('hex'));
 }
 
+export function nibrunnerDocument(desired: HostDesiredState) {
+  return nibrunnerDesiredState({ desired, revision: documentDigest(JSON.stringify(desired)) });
+}
+
 const readDocument = Effect.fn('nibrunner.readDocument')(function* (path: string) {
   const fs = yield* FileSystem.FileSystem;
   if (!(yield* fs.exists(path))) {
@@ -61,18 +66,26 @@ export const writeNibrunnerDesired = Effect.fn('nibrunner.writeDesired')(functio
   path: string;
   desired: HostDesiredState;
 }) {
+  const converted = yield* decode(() => nibrunnerDocument(desired));
+  return yield* writeNibrunnerDocument({ path, desired: converted });
+});
+
+export const writeNibrunnerDocument = Effect.fn('nibrunner.writeDocument')(function* ({
+  path,
+  desired,
+}: {
+  path: string;
+  desired: NibrunnerDesiredState;
+}) {
   const fs = yield* FileSystem.FileSystem;
-  const converted = yield* decode(() =>
-    nibrunnerDesiredState({ desired, revision: documentDigest(JSON.stringify(desired)) }),
-  );
-  const text = `${JSON.stringify(converted)}\n`;
+  const text = `${JSON.stringify(desired)}\n`;
   if (!(yield* fs.exists(path)) || (yield* fs.readFileString(path)) !== text) {
     yield* writeTextFile({ path, value: text });
   }
   return documentDigest(text);
 });
 
-export const readNibrunnerDesiredDigest = Effect.fn('nibrunner.readDesiredDigest')(function* ({
+const readOwnedDocument = Effect.fn('nibrunner.readOwnedDocument')(function* ({
   path,
   hostId,
 }: {
@@ -80,7 +93,7 @@ export const readNibrunnerDesiredDigest = Effect.fn('nibrunner.readDesiredDigest
   hostId: HostId;
 }) {
   const text = yield* readDocument(path);
-  const value: unknown = yield* Effect.try({
+  const value: NibrunnerDesiredState = yield* Effect.try({
     try: () => JSON.parse(text),
     catch: () => new MalformedNibrunnerFile({ path }),
   });
@@ -92,5 +105,18 @@ export const readNibrunnerDesiredDigest = Effect.fn('nibrunner.readDesiredDigest
   ) {
     return yield* new ForeignNibrunnerDocument({ path });
   }
-  return documentDigest(text);
+  return { desired: value, digest: documentDigest(text) };
 });
+
+export const readNibrunnerDesired = Effect.fn('nibrunner.readDesired')(function* (input: {
+  path: string;
+  hostId: HostId;
+}) {
+  return (yield* readOwnedDocument(input)).desired;
+});
+
+export const readNibrunnerDesiredDigest = Effect.fn('nibrunner.readDesiredDigest')(
+  function* (input: { path: string; hostId: HostId }) {
+    return (yield* readOwnedDocument(input)).digest;
+  },
+);
