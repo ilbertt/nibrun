@@ -7,6 +7,7 @@ import {
   type Sha256Digest,
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
+import { Effect } from 'effect';
 import { NibrunnerReportMismatch } from '#lib/nibrunner/failure.ts';
 import type { HostReportedState as NibrunnerReport } from '#lib/nibrunner/reported.gen.ts';
 import { decode } from '#lib/protocol.ts';
@@ -77,18 +78,24 @@ function reportedHostState({
   return report.state === 'ready' ? context.admissionState : report.state;
 }
 
-export function nibrunnerReportedState(context: ReportContext) {
+export function decodeNibrunnerReport(value: NibrunnerReport) {
   return decode(function parseReport() {
-    const report = parseMessage({
+    return parseMessage({
       schema: HostReportedStateSchema,
-      value: Value.Clean(
-        HostReportedStateSchema,
-        omitNullProperties(normalizedReport(context.value)),
-      ),
+      value: Value.Clean(HostReportedStateSchema, omitNullProperties(normalizedReport(value))),
     });
-    if (report.hostId !== context.hostId) {
-      throw new NibrunnerReportMismatch({ reason: 'belongs to a different host' });
-    }
-    return { ...report, state: reportedHostState({ report, context }) };
   });
+}
+
+export function nibrunnerReportedState(context: ReportContext) {
+  return decodeNibrunnerReport(context.value).pipe(
+    Effect.flatMap(function fenceReport(report) {
+      return decode(function checkHost() {
+        if (report.hostId !== context.hostId) {
+          throw new NibrunnerReportMismatch({ reason: 'belongs to a different host' });
+        }
+        return { ...report, state: reportedHostState({ report, context }) };
+      });
+    }),
+  );
 }
