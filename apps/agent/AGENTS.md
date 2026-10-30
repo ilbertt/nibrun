@@ -14,6 +14,11 @@ the version in `infra/nibrunner-host/versions.json`. Run
 `bun run --filter @repo/internal-scripts generate-nibrunner-types` after changing that pin.
 The agent's type check rejects stale generated types; do not edit the generated files by hand.
 
+`AGENT_ENGINE=nibrunner` runs the control-plane bridge without initializing the legacy VM or
+ZeroFS services. `AGENT_NIBRUNNER_STATE_DIR` defaults to `/var/lib/nibrunner`; its `bridge/host-id`
+persists registration separately from the engine's state. The bridge cannot advertise `ready`
+while host routing, live queries and storage handoff remain under commissioning.
+
 Besides converging, it answers directory reads through `lib/agent/filesystem.ts` and cron
 listings through `lib/agent/cron-query.ts`, each on routes of its own.
 Directory reads wake idle apps through `AppWaker` and hold `GuestActivity` through the wake

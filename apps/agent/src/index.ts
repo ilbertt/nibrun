@@ -1,6 +1,6 @@
 import { FetchHttpClient } from '@effect/platform';
 import { BunContext, BunRuntime } from '@effect/platform-bun';
-import { Effect, Layer } from 'effect';
+import { Config, Effect, Layer } from 'effect';
 import { run } from '#lib/agent/run.ts';
 import { AgentLogger } from '#lib/logger.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
@@ -24,6 +24,7 @@ import { FilesystemReader } from '#services/filesystem-reader.service.ts';
 import { GuestActivity } from '#services/guest-activity.service.ts';
 import { HostFirewall } from '#services/host-firewall.service.ts';
 import { LogStore } from '#services/log-store.service.ts';
+import { NibrunnerBridge } from '#services/nibrunner-bridge.service.ts';
 import { Reconciler } from '#services/reconciler.service.ts';
 import { RefreshSignal } from '#services/refresh-signal.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
@@ -80,4 +81,19 @@ const agent = Layer.mergeAll(
 
 // The agent stopping must not stop anything it started: the VMs are systemd's children, which is
 // what lets this component be redeployed as often as it changes.
-BunRuntime.runMain(run.pipe(Effect.provide(agent), Effect.provide(AgentLogger)));
+const program = Effect.gen(function* () {
+  const engine = yield* Config.literal(
+    'legacy',
+    'nibrunner',
+  )('AGENT_ENGINE').pipe(Config.withDefault('legacy'));
+  if (engine === 'nibrunner') {
+    return yield* Effect.flatMap(NibrunnerBridge, (bridge) => bridge.run).pipe(
+      Effect.scoped,
+      Effect.provide(NibrunnerBridge.Default),
+      Effect.provide(platform),
+    );
+  }
+  return yield* run.pipe(Effect.provide(agent));
+});
+
+BunRuntime.runMain(program.pipe(Effect.provide(AgentLogger)));
