@@ -574,7 +574,7 @@ export const DEPLOY_PRESETS = {
   calnode: {
     isRecommended: false,
     projectUrl: 'https://github.com/Calnode/calnode',
-    version: 'v0.11.2',
+    version: 'v0.12.0',
     markdownContent: calnodePage,
     title: 'Calnode',
     subtitle: 'A scheduling and booking app with calendar integrations, an API and an MCP server.',
@@ -582,8 +582,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'calnode',
       binary:
-        'https://github.com/Calnode/calnode/releases/download/v0.11.2/calnode_0.11.2_linux_amd64.tar.gz',
-      sha256: 'dc69723becc79ab23125e6e8ff2c030c8fc268b54ec5de4313684702c7b2c03b',
+        'https://github.com/Calnode/calnode/releases/download/v0.12.0/calnode_0.12.0_linux_amd64.tar.gz',
+      sha256: 'c2849636e0a484b8b914b8542dc7ab47702280bff3e44e5ac50f33e97f662f85',
       port: 3000,
       env: [
         `BASE_URL=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
