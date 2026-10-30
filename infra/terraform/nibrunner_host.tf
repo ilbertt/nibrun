@@ -77,6 +77,32 @@ resource "aws_iam_role_policy_attachment" "nibrunner_host_ssm_core" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+data "aws_iam_policy_document" "nibrunner_host" {
+  statement {
+    sid       = "AgentBinaryRead"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.deploy.arn}/agent/*"]
+  }
+
+  statement {
+    sid       = "ArtifactsRead"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.artifacts.arn}/*"]
+  }
+
+  statement {
+    sid       = "ImportsRead"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.imports.arn}/*"]
+  }
+}
+
+resource "aws_iam_role_policy" "nibrunner_host" {
+  name   = "${local.resource_name_prefix}-nibrunner-host"
+  role   = aws_iam_role.nibrunner_host.id
+  policy = data.aws_iam_policy_document.nibrunner_host.json
+}
+
 resource "aws_iam_instance_profile" "nibrunner_host" {
   name = "${local.resource_name_prefix}-nibrunner-host"
   role = aws_iam_role.nibrunner_host.name
