@@ -14,6 +14,10 @@ const configuration = (await Bun.file(join(hostDirectory, 'config.toml.template'
   .replaceAll('{{VPC_IPV4_CIDR_BLOCK}}', requiredEnv('VPC_IPV4_CIDR_BLOCK'))
   .replaceAll('{{VPC_IPV6_CIDR_BLOCK}}', requiredEnv('VPC_IPV6_CIDR_BLOCK'));
 const installer = await Bun.file(join(hostDirectory, 'deploy/on_box_deploy.sh')).text();
+const tlsInstaller = await Bun.file(join(hostDirectory, 'deploy/install_tls.sh')).text();
+const originPullCa = await Bun.file(
+  join(repoRoot, 'infra/caddy/cloudflare-origin-pull-ca.pem'),
+).text();
 const bridgeInstaller = await Bun.file(join(hostDirectory, 'deploy/install_bridge.sh')).text();
 const bridgeUnit = await Bun.file(
   join(hostDirectory, 'systemd/nibrun-nibrunner-bridge.service'),
@@ -39,6 +43,8 @@ const script = [
   'umask 077',
   writeRemoteFile({ name: 'config.toml', content: configuration }),
   writeRemoteFile({ name: 'on_box_deploy.sh', content: installer }),
+  writeRemoteFile({ name: 'install_tls.sh', content: tlsInstaller }),
+  writeRemoteFile({ name: 'origin-pull-ca.pem', content: originPullCa }),
   writeRemoteFile({ name: 'install_bridge.sh', content: bridgeInstaller }),
   writeRemoteFile({ name: 'nibrun-nibrunner-bridge.service', content: bridgeUnit }),
   writeRemoteFile({ name: 'bridge.env', content: `${environmentFile}\n` }),
@@ -46,6 +52,9 @@ const script = [
     NIBRUNNER_VERSION: versions.version,
     NIBRUNNER_INSTALLER_SHA256: versions.installerSha256,
     NIBRUNNER_BINARY_SHA256: versions.binarySha256,
+    AWS_REGION: requiredEnv('AWS_REGION'),
+    NIBRUNNER_TLS_CERT_PARAMETER: requiredEnv('NIBRUNNER_TLS_CERT_PARAMETER'),
+    NIBRUNNER_TLS_KEY_PARAMETER: requiredEnv('NIBRUNNER_TLS_KEY_PARAMETER'),
     AGENT_VERSION: agentVersion,
     AGENT_URL: requiredEnv('AGENT_URL'),
     AGENT_SHA256: requiredEnv('AGENT_SHA256'),
