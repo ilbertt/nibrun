@@ -34,6 +34,14 @@ resource "aws_security_group" "instance" {
     security_groups = [aws_security_group.app_host.id]
   }
 
+  ingress {
+    description     = "Agent control channel from nibrunner"
+    from_port       = var.internal_port
+    to_port         = var.internal_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.nibrunner_host.id]
+  }
+
   # The fleet's log writes. Scoped to the app hosts' group like the control
   # channel above, and a rule of its own so that widening one path does not
   # silently widen the other. What answers here proxies /insert and nothing else.
