@@ -9,12 +9,43 @@ export const VM_RECOVERY_POLICY = Object.freeze({
   healthyResetMs: 60_000,
 });
 
+export const KVM_RECOVERY_POLICY = Object.freeze({
+  ...VM_RECOVERY_POLICY,
+  maxRetries: 10,
+  initialBackoffMs: 30_000,
+  maxBackoffMs: 120_000,
+});
+
 export type VmRecovery = {
   readonly attempts: number;
   readonly nextAttemptAtMs?: number;
   readonly healthySinceMs?: number;
   readonly failure?: VmFailure;
 };
+
+export function vmRecoveryPolicy(failure: VmFailure) {
+  return failure.kind === 'kvm' ? KVM_RECOVERY_POLICY : VM_RECOVERY_POLICY;
+}
+
+function vmRetryDelayMs({ attempts, failure }: { attempts: number; failure: VmFailure }) {
+  if (failure.kind === 'kvm' && attempts >= VM_RECOVERY_POLICY.maxRetries) {
+    return backoffDelayMs({
+      attempt: attempts - VM_RECOVERY_POLICY.maxRetries + 1,
+      policy: KVM_RECOVERY_POLICY,
+    });
+  }
+  return backoffDelayMs({ attempt: attempts + 1, policy: VM_RECOVERY_POLICY });
+}
+
+export function vmRecoveryAlert(recovery: VmRecovery) {
+  if (recovery.failure?.kind !== 'kvm') {
+    return undefined;
+  }
+  if (recovery.nextAttemptAtMs === undefined) {
+    return 'kvm-recovery-exhausted';
+  }
+  return recovery.attempts === VM_RECOVERY_POLICY.maxRetries ? 'kvm-recovery-cooldown' : undefined;
+}
 
 export function afterVmFailure({
   recovery,
@@ -26,14 +57,13 @@ export function afterVmFailure({
   nowMs: number;
 }): VmRecovery {
   const attempts = recovery?.attempts ?? 0;
-  const retry = failure.retryable && attempts < VM_RECOVERY_POLICY.maxRetries;
+  const retry = failure.retryable && attempts < vmRecoveryPolicy(failure).maxRetries;
   return {
     attempts,
     failure,
     ...(retry
       ? {
-          nextAttemptAtMs:
-            nowMs + backoffDelayMs({ attempt: attempts + 1, policy: VM_RECOVERY_POLICY }),
+          nextAttemptAtMs: nowMs + vmRetryDelayMs({ attempts, failure }),
         }
       : {}),
   };

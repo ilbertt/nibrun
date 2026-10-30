@@ -73,6 +73,12 @@ admission use the same reservation; snapshot disk budgets reserve the per-app ca
 unreadable app reservation refuses new memory admission or snapshots. Staged reservations remain
 until explicit lifecycle cleanup removes their configuration.
 
+KVM entry failures use a separate recovery budget after the normal fast retries. Keep their
+cooldown deadlines and consumed attempts in the persisted instance record so agent restarts
+cannot bypass backoff. Entering cooldown and exhausting KVM recovery emit structured error logs
+with `alert` identifiers; other VM failures retain their normal budget, and tenant process crash
+loops remain terminal. A continuous healthy interval resets recovery.
+
 **Written in Effect.** Every effectful path is an `Effect` with a typed error channel; anything a
 test needs to substitute is a service. State that used to be
 mutable class fields lives in a `Ref`. The loops in `lib/agent/` are fibers, and their retry

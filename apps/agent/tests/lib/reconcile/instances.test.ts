@@ -2,7 +2,17 @@ import { describe, expect, test } from 'bun:test';
 import { FetchHttpClient } from '@effect/platform';
 import { DeploymentIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { Deferred, Duration, Effect, Fiber, Layer, TestClock, TestContext } from 'effect';
+import {
+  Clock,
+  Deferred,
+  Duration,
+  Effect,
+  Fiber,
+  Layer,
+  Logger,
+  TestClock,
+  TestContext,
+} from 'effect';
 import { CommandFailed } from '#lib/exec.ts';
 import {
   refreshStates,
@@ -10,7 +20,7 @@ import {
   startInstance,
   suspendInstance,
 } from '#lib/reconcile/instances.ts';
-import { VM_RECOVERY_POLICY } from '#lib/vm/recovery.ts';
+import { KVM_RECOVERY_POLICY, VM_RECOVERY_POLICY } from '#lib/vm/recovery.ts';
 import { SleepRefused, SnapshotUnusable } from '#lib/vm/snapshot.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { AppWaker } from '#services/app-waker.service.ts';
@@ -416,23 +426,40 @@ describe('unexpected VM exits recover within a separate budget', () => {
   });
 
   for (const unit of [INACTIVE_UNIT, FAILED_UNIT]) {
-    test(`a KVM exit is retried three times even when systemd says ${unit === INACTIVE_UNIT ? 'success' : 'failure'}`, () => {
+    test(`KVM cooldown stays recoverable and alerts even when systemd says ${unit === INACTIVE_UNIT ? 'success' : 'failure'}`, () => {
       const vms = recordingVms();
+      const alerts: { level: string; fields: Record<string, unknown> }[] = [];
+      const capturing = Logger.replace(
+        Logger.defaultLogger,
+        Logger.make(({ logLevel, annotations }) => {
+          const fields = Object.fromEntries(annotations);
+          if (fields.alert) {
+            alerts.push({ level: logLevel.label, fields });
+          }
+        }),
+      );
       return onHost({ vms, unit, console: KVM_CONSOLE })(
         Effect.gen(function* () {
           yield* AgentState.putRecord(
             instanceRecord({ state: 'running', startedAt: OBSERVED_AT, onRequest: true }),
           );
-          for (let attempt = 0; attempt < VM_RECOVERY_POLICY.maxRetries; attempt++) {
+          for (let attempt = 0; attempt < KVM_RECOVERY_POLICY.maxRetries; attempt++) {
             yield* refreshStates;
             const recovering = yield* recordOf;
             expect(recovering?.state).toBe('starting');
             expect(recovering?.recovery?.attempts).toBe(attempt);
+            expect(recovering?.message).toContain(`(${attempt + 1} of 10)`);
             expect((yield* AgentState.snapshot).deferredWork).toBe(true);
+            yield* refreshStates;
             yield* startInstance(desiredInstance({ desiredState: 'on-request' }));
             yield* resumeInstance(desiredInstance({ desiredState: 'on-request' }));
             expect(vms.calls).toHaveLength(attempt);
-            yield* TestClock.adjust(Duration.millis(VM_RECOVERY_POLICY.maxBackoffMs));
+            const delayMs =
+              (recovering?.recovery?.nextAttemptAtMs ?? 0) - (yield* Clock.currentTimeMillis);
+            yield* TestClock.adjust(Duration.millis(delayMs - 1));
+            yield* startInstance(desiredInstance({ desiredState: 'on-request' }));
+            expect(vms.calls).toHaveLength(attempt);
+            yield* TestClock.adjust('1 millis');
             yield* startInstance(desiredInstance({ desiredState: 'on-request' }));
             expect(vms.calls).toHaveLength(attempt + 1);
           }
@@ -442,8 +469,33 @@ describe('unexpected VM exits recover within a separate budget', () => {
           yield* TestClock.adjust('1 day');
           yield* startInstance(desiredInstance({ desiredState: 'on-request' }));
           yield* resumeInstance(desiredInstance({ desiredState: 'on-request' }));
-          expect(vms.calls).toEqual(['boot', 'boot', 'boot']);
-        }).pipe(Effect.provide(TestContext.TestContext)),
+          expect(vms.calls).toEqual(
+            Array.from({ length: KVM_RECOVERY_POLICY.maxRetries }, () => 'boot'),
+          );
+          expect(alerts).toEqual([
+            {
+              level: 'ERROR',
+              fields: expect.objectContaining({
+                alert: 'kvm-recovery-cooldown',
+                appId: APP_ID,
+                failureKind: 'kvm',
+                retryAttempts: VM_RECOVERY_POLICY.maxRetries,
+                maxRetries: KVM_RECOVERY_POLICY.maxRetries,
+                nextAttemptAtMs: expect.any(Number),
+              }),
+            },
+            {
+              level: 'ERROR',
+              fields: expect.objectContaining({
+                alert: 'kvm-recovery-exhausted',
+                appId: APP_ID,
+                failureKind: 'kvm',
+                retryAttempts: KVM_RECOVERY_POLICY.maxRetries,
+                maxRetries: KVM_RECOVERY_POLICY.maxRetries,
+              }),
+            },
+          ]);
+        }).pipe(Effect.provide(TestContext.TestContext), Effect.provide(capturing)),
       );
     });
   }
