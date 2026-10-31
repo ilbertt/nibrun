@@ -142,15 +142,15 @@ export const DEPLOY_PRESETS = {
   sharkord: {
     isRecommended: false,
     projectUrl: 'https://github.com/sharkord/sharkord',
-    version: 'v0.0.28',
+    version: 'v0.0.29',
     markdownContent: sharkordPage,
     category: DeployCategory.Communication,
     title: 'Sharkord',
     subtitle: 'A self-hosted chat server with voice, video and screen sharing.',
     deployLink: {
       name: 'sharkord',
-      binary: 'https://github.com/Sharkord/sharkord/releases/download/v0.0.28/sharkord-linux-x64',
-      sha256: '1a5680513ce43a31cccccfef1696794ea25a250baf61c3aa8acfe440f5dbe9b6',
+      binary: 'https://github.com/Sharkord/sharkord/releases/download/v0.0.29/sharkord-linux-x64',
+      sha256: '844b4114c93724975968966c2d6d4ad73584de71204a3ac6b7b18ef2827d1c6b',
       port: 4991,
       'extra-public-port': true,
       env: [
@@ -227,7 +227,7 @@ export const DEPLOY_PRESETS = {
   'libredb-studio': {
     isRecommended: false,
     projectUrl: 'https://github.com/libredb/libredb-studio',
-    version: '1.1.0',
+    version: '1.2.0',
     markdownContent: libredbStudioPage,
     category: DeployCategory.DeveloperTools,
     title: 'LibreDB Studio',
@@ -238,7 +238,7 @@ export const DEPLOY_PRESETS = {
         'https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64-baseline.zip',
       sha256: 'e0446eb55995772eb9894bebae9a6be368d985a8b9271ee124486f9946eedd76',
       'initial-data':
-        'https://github.com/libredb/libredb-studio/releases/download/1.1.0/libredb-studio-standalone-1.1.0-linux-x64.tar.gz',
+        'https://github.com/libredb/libredb-studio/releases/download/1.2.0/libredb-studio-standalone-1.2.0-linux-x64.tar.gz',
       port: 3000,
       arg: ['--smol', '/app/data/server.js'],
       env: [
@@ -574,7 +574,7 @@ export const DEPLOY_PRESETS = {
   calnode: {
     isRecommended: false,
     projectUrl: 'https://github.com/Calnode/calnode',
-    version: 'v0.11.2',
+    version: 'v0.12.0',
     markdownContent: calnodePage,
     title: 'Calnode',
     subtitle: 'A scheduling and booking app with calendar integrations, an API and an MCP server.',
@@ -582,8 +582,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'calnode',
       binary:
-        'https://github.com/Calnode/calnode/releases/download/v0.11.2/calnode_0.11.2_linux_amd64.tar.gz',
-      sha256: 'dc69723becc79ab23125e6e8ff2c030c8fc268b54ec5de4313684702c7b2c03b',
+        'https://github.com/Calnode/calnode/releases/download/v0.12.0/calnode_0.12.0_linux_amd64.tar.gz',
+      sha256: 'c2849636e0a484b8b914b8542dc7ab47702280bff3e44e5ac50f33e97f662f85',
       port: 3000,
       env: [
         `BASE_URL=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
