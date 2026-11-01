@@ -13,8 +13,7 @@
 	# its TLS handshake deadline from the smallest read or write timeout set, and
 	# with none set there is no deadline at all. A connection opened and left
 	# mid-handshake is then held for as long as its opener likes, and the refusal
-	# that was the whole point never arrives. This listener is open to the world
-	# rather than to Cloudflare's ranges, so it is the one anyone can hold.
+	# that was the whole point never arrives.
 	#
 	# The header timeout alone: a write timeout would cut the log stream, which
 	# is meant to stay open, and a body timeout an upload of a binary.
