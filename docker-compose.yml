@@ -30,7 +30,7 @@ services:
       - nibrun
 
   umami:
-    image: ghcr.io/umami-software/umami:3.4.0
+    image: ghcr.io/umami-software/umami:3.4.1
     container_name: umami
     init: true
     environment:
@@ -201,7 +201,7 @@ services:
   # in the container to run one with. `/health` answers, but only from outside, so
   # the deploy gates on the container staying up instead.
   victorialogs:
-    image: victoriametrics/victoria-logs:v1.52.0
+    image: victoriametrics/victoria-logs:v1.53.0
     container_name: victorialogs
     command:
       - -retentionPeriod=${VICTORIALOGS_RETENTION_PERIOD}
@@ -228,7 +228,7 @@ services:
   # SSM port-forward, which already costs AWS credentials. The change that gives
   # it a public route is the change that has to give it DOZZLE_AUTH_PROVIDER.
   dozzle:
-    image: amir20/dozzle:v10.10
+    image: amir20/dozzle:v11.4
     container_name: dozzle
     environment:
       - DOZZLE_NO_ANALYTICS=true
