@@ -350,7 +350,7 @@ export const DEPLOY_PRESETS = {
   memos: {
     isRecommended: false,
     projectUrl: 'https://github.com/usememos/memos',
-    version: 'v0.31.0',
+    version: '26.10.0',
     markdownContent: memosPage,
     category: DeployCategory.NotesAndKnowledge,
     title: 'Memos',
@@ -358,8 +358,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'memos',
       binary:
-        'https://github.com/usememos/memos/releases/download/v0.31.0/memos_0.31.0_linux_amd64.tar.gz',
-      sha256: 'd99bf9de5e947cd41f7f1ae59e1e97d9af933d1bcc2d1316b3ab1ffe0a69e5c0',
+        'https://github.com/usememos/memos/releases/download/26.10.0/memos_26.10.0_linux_amd64.tar.gz',
+      sha256: '873e639c6a9e9bac47af57d628477fa87b7e965fadf0354c7d1a4e5280681de7',
       port: 5230,
       env: [
         `MEMOS_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
