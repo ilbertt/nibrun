@@ -85,7 +85,7 @@ export const writeNibrunnerDocument = Effect.fn('nibrunner.writeDocument')(funct
   return documentDigest(text);
 });
 
-const readOwnedDocument = Effect.fn('nibrunner.readOwnedDocument')(function* ({
+export const readNibrunnerDesiredDocument = Effect.fn('nibrunner.readDesiredDocument')(function* ({
   path,
   hostId,
 }: {
@@ -112,11 +112,11 @@ export const readNibrunnerDesired = Effect.fn('nibrunner.readDesired')(function*
   path: string;
   hostId: HostId;
 }) {
-  return (yield* readOwnedDocument(input)).desired;
+  return (yield* readNibrunnerDesiredDocument(input)).desired;
 });
 
 export const readNibrunnerDesiredDigest = Effect.fn('nibrunner.readDesiredDigest')(
   function* (input: { path: string; hostId: HostId }) {
-    return (yield* readOwnedDocument(input)).digest;
+    return (yield* readNibrunnerDesiredDocument(input)).digest;
   },
 );
