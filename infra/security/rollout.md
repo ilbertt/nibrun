@@ -62,6 +62,11 @@ Dependency updates, the Monaco sanitizer patch, and the dependency advisory CI g
 reviewed separately in [PR #1101](https://github.com/ilbertt/nibrun/pull/1101). Its updated
 lockfile has no high or critical audit findings; this infrastructure PR retains the original
 dependency versions.
+Docker service and API runtime image updates are reviewed separately in
+[PR #1103](https://github.com/ilbertt/nibrun/pull/1103). Docker Caddy keeps its existing
+`2.11-alpine` tag, which receives compatible patch releases when the deploy pulls images.
+The app-host Caddy binary update remains here because its installer verifies a fixed archive
+checksum.
 
 The legacy Firecracker processes were also observed running as root, without the launcher
 using the jailer. That isolation gap needs a separately reviewed implementation and boot,
