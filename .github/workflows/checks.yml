@@ -62,22 +62,10 @@ jobs:
           sudo env "PATH=$PATH" NIBRUN_TEST_ZEROFS_SYSTEMD=1 "$(command -v bun)" run --filter @repo/agent test tests/lib/volumes/app-zerofs-systemd-linux.test.ts tests/lib/volumes/app-zerofs-retirement-linux.test.ts
           sudo env "PATH=$PATH" NIBRUN_TEST_ZEROFS=1 "$(command -v bun)" run --filter @repo/agent test tests/lib/volumes/zerofs-persistence.test.ts tests/lib/reconcile/checkpoints-linux.test.ts
 
-  security:
-    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Code
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: ./.github/actions/prepare
-
-      - name: Check dependency advisories
-        run: bun check:security
-
   checks-passed:
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     name: checks:required
-    needs: [types, codestyle, tests, security]
+    needs: [types, codestyle, tests]
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs passed

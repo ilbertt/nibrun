@@ -29,9 +29,3 @@ Publishing a guest image and adopting it are separate steps. `infra/app-host/ver
 must name an uploaded, validated artifact, not a locally calculated candidate. Adoption changes
 future cold boots; running guests must be replaced, and old snapshots must not be restored.
 The nibrunner release carries its own guest kernel and needs an independent update.
-
-The dependency gate is `bun check:security`, also required by CI. Run the full `bun audit`
-when reviewing updates: the gate fails at high severity but does not hide lower-severity
-findings from the full audit. Root overrides currently move DOMPurify to 3.4.17 and fflate to
-0.8.3 because upstream packages pin vulnerable copies. Monaco also needs the import patch in
-`packages/sqlite-explorer/patches/`. Recheck overrides and patches when those parents update.

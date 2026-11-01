@@ -6,4 +6,3 @@
 - Import package CSS into the host’s Tailwind stylesheet after its theme.
 - Bundle Monaco with Vite and configure its loader after importing LibreDB. Hosts must define `process.env.NEXT_PUBLIC_BASE_PATH` and `process.env.NEXT_PUBLIC_MONACO_VS_PATH` as empty strings.
 - Keep LibreDB patches here, registered in the root package.json because Bun ignores workspace registrations. Recheck them on upgrades; composite/ambiguous constraints and blob keys have no navigation.
-- Monaco's ESM sanitizer is patched to import the audited DOMPurify package instead of its vendored copy. Keep the root override until Monaco updates its exact dependency; changing only the override does not fix the vendored code. Recheck both on upgrades.

@@ -17,7 +17,7 @@
     "check:types": "bun run --bun tsc"
   },
   "dependencies": {
-    "@base-ui/react": "^1.9.0",
+    "@base-ui/react": "^1.8.0",
     "@fontsource-variable/space-grotesk": "^5.3.0",
     "@fontsource/space-mono": "^5.3.0",
     "@repo/global-constants": "workspace:*",
@@ -27,14 +27,14 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "sonner": "catalog:",
-    "tailwind-merge": "^3.7.0",
+    "tailwind-merge": "^3.6.0",
     "tw-animate-css": "^1.4.0"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "shadcn": "^4.23.0",
+    "shadcn": "^4.21.0",
     "tailwindcss": "catalog:",
     "typescript": "catalog:"
   }

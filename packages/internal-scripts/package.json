@@ -35,7 +35,7 @@
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
-    "git-cliff": "^2.14.2",
+    "git-cliff": "^2.13.1",
     "json-schema-to-typescript": "16.0.0",
     "typescript": "catalog:"
   },

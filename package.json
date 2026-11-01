@@ -5,10 +5,9 @@
   "license": "Apache-2.0",
   "scripts": {
     "build": "turbo build",
-    "check:types": "turbo check:types",
+    "check:types": "bun run --bun turbo check:types",
     "test": "bun run --bun turbo test",
     "check:codestyle": "bun run --bun biome check",
-    "check:security": "bun audit --audit-level high",
     "check:all": "bun check:types && bun check:codestyle && bun run test",
     "check:commit-message": "bun run --bun commitlint",
     "fix:codestyle": "bun run --bun biome check --write"
@@ -19,35 +18,35 @@
       "packages/*"
     ],
     "catalog": {
-      "@better-auth/core": "1.7.7",
+      "@better-auth/core": "1.7.2",
       "@libsql/client": "^0.18.0",
       "@sinclair/typebox": "^0.34.52",
       "@tailwindcss/vite": "^4.3.3",
-      "@tanstack/react-router": "^1.170.46",
+      "@tanstack/react-router": "^1.170.32",
       "@tanstack/redact": "^0.2.0",
-      "@tanstack/router-plugin": "^1.168.48",
-      "@types/react": "^19.3.0",
-      "@types/react-dom": "^19.3.0",
-      "@vitejs/plugin-react": "^6.1.2",
-      "better-auth": "1.7.7",
-      "lucide-react": "^1.66.0",
-      "react": "^19.3.1",
-      "react-dom": "^19.3.1",
+      "@tanstack/router-plugin": "^1.168.35",
+      "@types/react": "^19.2.18",
+      "@types/react-dom": "^19.2.7",
+      "@vitejs/plugin-react": "^6.1.1",
+      "better-auth": "1.7.2",
+      "lucide-react": "^1.41.0",
+      "react": "^19.2.8",
+      "react-dom": "^19.2.8",
       "sonner": "^2.0.8",
       "tailwindcss": "^4.3.3",
       "typescript": "^7.0.2",
-      "vite": "^8.3.5"
+      "vite": "^8.2.2"
     }
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.6",
-    "@commitlint/cli": "^21.2.4",
-    "@commitlint/config-conventional": "^21.2.4",
-    "@commitlint/format": "^21.2.3",
-    "@commitlint/types": "^21.2.3",
+    "@commitlint/cli": "^21.2.2",
+    "@commitlint/config-conventional": "^21.2.2",
+    "@commitlint/format": "^21.2.2",
+    "@commitlint/types": "^21.2.0",
     "@types/bun": "1.4.4",
     "typescript": "catalog:",
-    "turbo": "^2.11.10"
+    "turbo": "^2.10.12"
   },
   "packageManager": "bun@1.4.4",
   "engines": {
@@ -55,11 +54,6 @@
   },
   "patchedDependencies": {
     "@libredb/studio@0.18.0": "packages/sqlite-explorer/patches/@libredb%2Fstudio@0.18.0.patch",
-    "@tanstack/redact@0.2.0": "patches/@tanstack%2Fredact@0.2.0.patch",
-    "monaco-editor@0.57.0": "packages/sqlite-explorer/patches/monaco-editor@0.57.0.patch"
-  },
-  "overrides": {
-    "dompurify": "3.4.17",
-    "fflate": "0.8.3"
+    "@tanstack/redact@0.2.0": "patches/@tanstack%2Fredact@0.2.0.patch"
   }
 }

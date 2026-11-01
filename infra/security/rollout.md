@@ -49,7 +49,7 @@ must also be removed if rollback is intended to persist across future deployment
 | Nibrunner guest kernel | Release `v2026.10.7` manifest pins `6.1.180` | Separate nibrunner release with patched guest kernel |
 | App-host Caddy | `2.11.4` | Deploy verified `2.11.7` pin |
 | Control-plane Caddy | `2.11.7` | Already meets the checked advisory's patched version |
-| JavaScript dependencies | Changes in this PR only | Review, pass checks, deploy applications and distribute rebuilt CLI |
+| JavaScript dependencies | Updated separately in [PR #1101](https://github.com/ilbertt/nibrun/pull/1101) | Review and deploy the dependency PR; distribute rebuilt CLI |
 
 The candidate guest kernel is `6.1.191`, with the rootfs package snapshot advanced to
 2026-10-31. The adopted image remains unchanged until a validated artifact is published.
@@ -58,11 +58,10 @@ The source archive checksum and required kernel configuration passed locally. Fu
 compilation was stopped before completion; rootfs validation and a real Firecracker boot
 test remain outstanding. No candidate image is ready for adoption.
 
-The updated dependency audit has no high or critical findings. Full audit still reports
-`deepmerge` (low; no fixed latest release) and `minimatch` (moderate; parent constrains the
-old major), both through the shadcn development tooling. No advisory is suppressed.
-Monaco's vendored sanitizer import is patched as well as the DOMPurify dependency override;
-the built Monaco chunk was checked to contain version `3.4.17`.
+Dependency updates, the Monaco sanitizer patch, and the dependency advisory CI gate are
+reviewed separately in [PR #1101](https://github.com/ilbertt/nibrun/pull/1101). Its updated
+lockfile has no high or critical audit findings; this infrastructure PR retains the original
+dependency versions.
 
 The legacy Firecracker processes were also observed running as root, without the launcher
 using the jailer. That isolation gap needs a separately reviewed implementation and boot,

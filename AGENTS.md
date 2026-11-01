@@ -73,15 +73,10 @@ needs — fixtures, stubs, recorders — belongs in `tests/support/`, reached th
 `#tests/*` mapping. Not every package needs tests; a package whose correctness is only checkable
 at runtime does.
 
-The root's `build` and `check:types` run Turbo without `bun run --bun`: that flag symlinks
-`node` to Bun for every descendant process. Miniflare, used by `@repo/www` prerendering and
-Wrangler type generation, needs real Node. CI installs it from the root `package.json`'s
-`engines.node`. Individual TypeScript checks still run under Bun.
-
-CI also runs `bun check:security`, rejecting high and critical dependency advisories. Review
-the full `bun audit` when updating dependencies; lower-severity findings remain actionable.
-Document temporary security overrides and vendored dependency patches in the owning package's
-`AGENTS.md`, and recheck them when upgrading the parent dependency.
+The root's `build` is the one turbo script without `bun run --bun`: that flag symlinks `node`
+to Bun for every descendant process, and miniflare — which `@repo/www` prerenders through —
+crashes on teardown under Bun's `node:http`. CI installs a real Node from the root
+`package.json`'s `engines.node`, so the www build finds one.
 
 Check `package.json` scripts (root and per-app) for other available commands.
 
