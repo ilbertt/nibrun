@@ -91,3 +91,9 @@ instance decrypts with its own role. Both GHCR packages must be public for the s
 pulls with no registry credentials.
 
 `workflow_dispatch` takes `allow_destroy` for the times a plan legitimately replaces something.
+
+Compose pulls service images on each deploy. Keep compatible moving tags such as
+`caddy:2.11-alpine`, `postgres:18-alpine` and `alpine:3.24` where upstream publishes them;
+an exact patch tag requires an explicit bump to receive the next patch release. Image builds
+use `--pull` to refresh their base images. Guest-image and runtime toolchain digests remain
+pinned separately because they are inputs to reproducible artifacts.

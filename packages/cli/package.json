@@ -15,18 +15,18 @@
     "check:types": "bun run --bun tsc"
   },
   "dependencies": {
-    "@clack/prompts": "^1.7.0",
+    "@clack/prompts": "1.7.0",
     "@parshjs/core": "^0.0.11",
     "@parshjs/env": "^0.0.3",
     "@parshjs/files": "^0.0.4",
     "@repo/api-client": "workspace:*",
-    "@repo/app-ui": "workspace:*",
-    "@repo/app-operations": "workspace:*",
-    "@repo/global-constants": "workspace:*",
-    "better-auth": "catalog:",
-    "zod": "^4.5.4",
     "@repo/api-constants": "workspace:*",
-    "@repo/protocol": "workspace:*"
+    "@repo/app-operations": "workspace:*",
+    "@repo/app-ui": "workspace:*",
+    "@repo/global-constants": "workspace:*",
+    "@repo/protocol": "workspace:*",
+    "better-auth": "catalog:",
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@parshjs/codegen": "^0.0.5",
