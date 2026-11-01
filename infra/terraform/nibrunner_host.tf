@@ -53,6 +53,15 @@ resource "aws_security_group" "nibrunner_host" {
   description = "nibrunner commissioning host; SSM access only"
   vpc_id      = aws_vpc.app.id
 
+  ingress {
+    description      = "HTTPS from Cloudflare"
+    from_port        = 443
+    to_port          = 443
+    protocol         = "tcp"
+    cidr_blocks      = local.cloudflare_ipv4_cidrs
+    ipv6_cidr_blocks = local.cloudflare_ipv6_cidrs
+  }
+
   egress {
     description      = "All outbound"
     from_port        = 0
@@ -111,4 +120,9 @@ resource "aws_iam_instance_profile" "nibrunner_host" {
 output "nibrunner_host_instance_id" {
   description = "SSM target for commissioning nibrunner before admitting app deployments."
   value       = aws_instance.nibrunner_host.id
+}
+
+output "nibrunner_host_public_ip" {
+  description = "Temporary origin address for testing nibrunner before the production cutover."
+  value       = aws_instance.nibrunner_host.public_ip
 }
