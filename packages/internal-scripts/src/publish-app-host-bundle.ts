@@ -34,7 +34,7 @@ const revision = requiredEnv('GITHUB_SHA');
 const appHostDir = join(repoRoot, 'infra/app-host');
 const bundlePath = join(tmpdir(), 'nibrun-app-host-bundle.tar.gz');
 
-await $`tar czf ${bundlePath} -C ${appHostDir} ${BUNDLE_DIRECTORIES} -C ${join(appHostDir, 'deploy')} ${ON_BOX_SCRIPTS} -C ${join(repoRoot, 'infra/caddy')} ${SHARED_CADDY_FILES}`;
+await $`tar czf ${bundlePath} -C ${appHostDir} ${BUNDLE_DIRECTORIES} -C ${join(appHostDir, 'deploy')} ${ON_BOX_SCRIPTS} -C ${join(repoRoot, 'infra/security')} install_ipv4_options_filter.sh -C ${join(repoRoot, 'infra/caddy')} ${SHARED_CADDY_FILES}`;
 
 const bundleBytes = Bun.file(bundlePath).size;
 const url = `s3://${deployBucket}/app-host-bundles/${revision}.tar.gz`;

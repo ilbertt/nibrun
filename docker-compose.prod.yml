@@ -49,7 +49,7 @@ services:
   # land in it — the log dashboard's bcrypt hash sat here and did exactly that,
   # since bcrypt re-salts on every run.
   caddy:
-    image: caddy:2.11-alpine
+    image: caddy:2.11.7-alpine
     container_name: caddy
     restart: always
     ports:

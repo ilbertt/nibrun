@@ -3,6 +3,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+bash install_ipv4_options_filter.sh
+
 : "${NIBRUNNER_VERSION:?}" "${NIBRUNNER_INSTALLER_SHA256:?}" "${NIBRUNNER_BINARY_SHA256:?}"
 
 if [ -e /var/lib/nibrun/host-id ]; then

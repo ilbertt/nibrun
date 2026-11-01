@@ -6,6 +6,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+bash install_ipv4_options_filter.sh
+
 log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
 
 : "${API_IMAGE_URI:?}" "${API_HOSTNAME:?}" "${API_GITHUB_CLIENT_ID:?}" \

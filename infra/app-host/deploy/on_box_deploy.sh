@@ -11,6 +11,8 @@ set -euo pipefail
 
 cd "$(dirname "$0")"
 
+bash install_ipv4_options_filter.sh
+
 log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
 
 : "${AWS_REGION:?}" "${SSM_SECRET_PREFIX:?}" \

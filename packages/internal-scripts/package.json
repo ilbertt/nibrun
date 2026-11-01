@@ -30,11 +30,12 @@
     "terraform-plan": "bun run src/terraform-plan.ts",
     "verify-public-images": "bun run src/verify-public-images.ts",
     "check:types": "bun run --bun tsc",
-    "test": "bun test tests"
+    "test": "bun test tests",
+    "ssm-mitigate-ipv4-options": "bun run src/ssm-mitigate-ipv4-options.ts"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
-    "git-cliff": "^2.13.1",
+    "git-cliff": "^2.14.2",
     "json-schema-to-typescript": "16.0.0",
     "typescript": "catalog:"
   },

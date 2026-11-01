@@ -37,7 +37,7 @@ if (!seedBuild.success) {
   throw new AggregateError(seedBuild.logs, 'Unable to bundle Umami bootstrap');
 }
 
-await $`tar czf ${bundlePath} -C ${repoRoot} ${COMPOSE_FILES} -C ${join(repoRoot, 'infra/deploy')} ${ON_BOX_SCRIPTS} -C ${join(repoRoot, 'infra')} ${CADDY_DIR} -C ${tmpdir()} ${seedScript}`;
+await $`tar czf ${bundlePath} -C ${repoRoot} ${COMPOSE_FILES} -C ${join(repoRoot, 'infra/deploy')} ${ON_BOX_SCRIPTS} -C ${join(repoRoot, 'infra/security')} install_ipv4_options_filter.sh -C ${join(repoRoot, 'infra')} ${CADDY_DIR} -C ${tmpdir()} ${seedScript}`;
 
 const url = `s3://${deployBucket}/bundles/${revision}.tar.gz`;
 await aws(['s3', 'cp', bundlePath, url]);
