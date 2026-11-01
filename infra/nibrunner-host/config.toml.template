@@ -29,8 +29,15 @@ denied_egress_addresses_v4 = ["{{VPC_IPV4_CIDR_BLOCK}}"]
 denied_egress_addresses_v6 = ["{{VPC_IPV6_CIDR_BLOCK}}"]
 
 [proxy.http]
-listen_address = "127.0.0.1"
-port = 8080
+listen_address = "0.0.0.0"
+port = 443
+
+[proxy.http.tls]
+certificate = "/etc/nibrunner/tls/current/origin.crt"
+key = "/etc/nibrunner/tls/current/origin.key"
+
+[proxy.http.tls.client_ca]
+certificate = "/etc/nibrunner/tls/current/origin-pull-ca.pem"
 
 [metrics]
 listen_address = "127.0.0.1"
