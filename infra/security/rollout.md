@@ -54,6 +54,9 @@ must also be removed if rollback is intended to persist across future deployment
 The candidate guest kernel is `6.1.191`, with the rootfs package snapshot advanced to
 2026-10-31. The adopted image remains unchanged until a validated artifact is published.
 Running guests do not acquire a new kernel just because an image is adopted.
+The source archive checksum and required kernel configuration passed locally. Full image
+compilation was stopped before completion; rootfs validation and a real Firecracker boot
+test remain outstanding. No candidate image is ready for adoption.
 
 The updated dependency audit has no high or critical findings. Full audit still reports
 `deepmerge` (low; no fixed latest release) and `minimatch` (moderate; parent constrains the

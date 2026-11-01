@@ -5,7 +5,7 @@
   "license": "Apache-2.0",
   "scripts": {
     "build": "turbo build",
-    "check:types": "bun run --bun turbo check:types",
+    "check:types": "turbo check:types",
     "test": "bun run --bun turbo test",
     "check:codestyle": "bun run --bun biome check",
     "check:security": "bun audit --audit-level high",
