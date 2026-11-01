@@ -280,6 +280,27 @@ variable "app_host_caddy_tls_key" {
   }
 }
 
+variable "nibrunner_origin_tls_cert" {
+  type        = string
+  description = "PEM of the nibrunner origin certificate. CI passes the NIBRUNNER_ORIGIN_TLS_CERT repository variable through."
+
+  validation {
+    condition     = strcontains(var.nibrunner_origin_tls_cert, "BEGIN CERTIFICATE")
+    error_message = "nibrunner_origin_tls_cert must be a PEM certificate."
+  }
+}
+
+variable "nibrunner_origin_tls_key" {
+  type        = string
+  sensitive   = true
+  description = "PEM of the nibrunner origin private key. CI passes the NIBRUNNER_ORIGIN_TLS_KEY repository secret through."
+
+  validation {
+    condition     = strcontains(var.nibrunner_origin_tls_key, "PRIVATE KEY")
+    error_message = "nibrunner_origin_tls_key must be a PEM private key."
+  }
+}
+
 # Custom domains. A brought domain is in nobody's zone here, so the edge has to
 # be told about each one as it is added — the one Cloudflare operation that
 # cannot be a manual step in infra/AGENTS.md the way the rest of them are.

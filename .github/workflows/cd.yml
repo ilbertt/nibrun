@@ -113,6 +113,8 @@ jobs:
           TF_VAR_caddy_tls_key: ${{ secrets.CADDY_TLS_KEY }}
           TF_VAR_app_host_caddy_tls_cert: ${{ vars.APP_HOST_CADDY_TLS_CERT }}
           TF_VAR_app_host_caddy_tls_key: ${{ secrets.APP_HOST_CADDY_TLS_KEY }}
+          TF_VAR_nibrunner_origin_tls_cert: ${{ vars.NIBRUNNER_ORIGIN_TLS_CERT }}
+          TF_VAR_nibrunner_origin_tls_key: ${{ secrets.NIBRUNNER_ORIGIN_TLS_KEY }}
           TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           TF_VAR_cloudflare_zone_id: ${{ vars.CLOUDFLARE_ZONE_ID }}
           ALLOW_DESTROY: ${{ inputs.allow_destroy }}
@@ -236,6 +238,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NIBRUNNER_HOST_INSTANCE_ID: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_host_instance_id }}
+      NIBRUNNER_ORIGIN_TLS_CERT_PARAMETER: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_origin_tls_cert_parameter }}
+      NIBRUNNER_ORIGIN_TLS_KEY_PARAMETER: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_origin_tls_key_parameter }}
       VPC_IPV4_CIDR_BLOCK: ${{ fromJSON(needs.terraform.outputs.values).vpc_ipv4_cidr_block }}
       VPC_IPV6_CIDR_BLOCK: ${{ fromJSON(needs.terraform.outputs.values).vpc_ipv6_cidr_block }}
       AGENT_URL: ${{ needs.publish-agent.outputs.url }}
