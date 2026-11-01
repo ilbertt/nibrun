@@ -4,6 +4,7 @@ import { CONTROL_PLANE_BACKOFF } from '#lib/agent/backoff.ts';
 import { supervised } from '#lib/agent/loop.ts';
 import type { ControlPlaneClient } from '#lib/control/client.ts';
 import { makeSessionHolder } from '#lib/control/session.ts';
+import { pollNibrunnerFilesystem } from '#lib/nibrunner/filesystem-query.ts';
 import { nibrunnerReportedState } from '#lib/nibrunner/reported-state.ts';
 import { stageNibrunnerArtifacts } from '#lib/nibrunner/stage-artifacts.ts';
 import {
@@ -18,6 +19,7 @@ import { nibrunnerWithdrawals } from '#lib/nibrunner/withdrawals.ts';
 import { decode } from '#lib/protocol.ts';
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import type { NibrunnerBridgeConfig } from '#services/nibrunner-bridge-config.service.ts';
+import { NibrunnerFilesystem } from '#services/nibrunner-filesystem.service.ts';
 
 const REPORT_MAX_AGE_MS = 30_000;
 
@@ -29,6 +31,7 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
   config: NibrunnerBridgeConfig;
 }) {
   const store = yield* ArtifactStore;
+  const filesystem = yield* NibrunnerFilesystem;
   const initial = yield* readNibrunnerReport(config.reportedStateFile);
   const sessions = yield* makeSessionHolder({
     control,
@@ -91,7 +94,7 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
     return session.poll;
   }).pipe(Effect.tapErrorTag('ControlPlaneError', sessions.onExpired));
 
-  const reportOnce = Effect.gen(function* () {
+  const currentState = Effect.gen(function* () {
     const session = yield* sessions.current;
     const desiredDigest = yield* readNibrunnerDesiredDigest({
       path: config.desiredStateFile,
@@ -106,13 +109,51 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
       maxAgeMs: REPORT_MAX_AGE_MS,
       admissionState: 'draining',
     });
+    return { session, report };
+  });
+
+  const reportOnce = Effect.gen(function* () {
+    const { session, report } = yield* currentState;
     yield* control.sendReportedState({ sessionToken: session.sessionToken, report });
     return session.poll;
   }).pipe(Effect.tapErrorTag('ControlPlaneError', sessions.onExpired));
 
+  const servedAppIds = Effect.gen(function* () {
+    const { session, report } = yield* currentState;
+    if (report.state !== 'draining' && report.state !== 'ready') {
+      return [];
+    }
+    const desired = yield* readNibrunnerDesired({
+      path: config.desiredStateFile,
+      hostId: session.hostId,
+    });
+    return report.instances
+      .filter((instance) =>
+        desired.instances.some(
+          (wanted) =>
+            wanted.appId === instance.appId &&
+            wanted.deploymentId === instance.deploymentId &&
+            wanted.desiredState !== 'stopped',
+        ),
+      )
+      .map((instance) => instance.appId);
+  });
+
+  const filesystemOnce = Effect.gen(function* () {
+    return yield* pollNibrunnerFilesystem({
+      control,
+      session: yield* sessions.current,
+      servedAppIds,
+    });
+  }).pipe(
+    Effect.provideService(NibrunnerFilesystem, filesystem),
+    Effect.tapErrorTag('ControlPlaneError', sessions.onExpired),
+  );
+
   return {
     pollOnce,
     reportOnce,
+    filesystemOnce,
     run: Effect.all(
       [
         supervised({
@@ -127,6 +168,11 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
             Effect.flatMap((poll) => Effect.sleep(`${poll.reportIntervalMs} millis`)),
           ),
           onFailure: (cause) => Effect.logWarning('nibrunner report failed', cause),
+          schedule: CONTROL_PLANE_BACKOFF,
+        }),
+        supervised({
+          once: filesystemOnce,
+          onFailure: () => Effect.logWarning('nibrunner filesystem query failed'),
           schedule: CONTROL_PLANE_BACKOFF,
         }),
       ],
