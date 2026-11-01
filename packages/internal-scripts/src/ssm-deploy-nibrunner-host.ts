@@ -1,7 +1,10 @@
 import { join } from 'node:path';
+import { requireMainWorkflow } from '#shared/actions.ts';
 import { requiredEnv } from '#shared/env.ts';
 import { repoRoot } from '#shared/paths.ts';
 import { exportLine, runCommand, writeRemoteFile } from '#shared/ssm.ts';
+
+requireMainWorkflow();
 
 const instanceId = requiredEnv('NIBRUNNER_HOST_INSTANCE_ID');
 const hostDirectory = join(repoRoot, 'infra/nibrunner-host');
