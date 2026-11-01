@@ -29,6 +29,19 @@ export function serving(handler: (request: Request) => Response | Promise<Respon
   );
 }
 
+export function servingUnix({
+  socketPath,
+  handler,
+}: {
+  socketPath: string;
+  handler: (request: Request) => Response | Promise<Response>;
+}) {
+  return Effect.acquireRelease(
+    Effect.sync(() => Bun.serve({ unix: socketPath, fetch: handler })),
+    (server) => Effect.asVoid(Effect.sync(() => server.stop(true))),
+  );
+}
+
 /**
  * A real listener rather than a substituted `fetch`: what a client hands the network is the thing
  * under test, and the only way to read it without trusting the client's plumbing is to receive it.

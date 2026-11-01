@@ -3,6 +3,10 @@ import { FileSystem } from '@effect/platform';
 import {
   AppIdSchema,
   DeploymentIdSchema,
+  type FilesystemQueryRequest,
+  type FilesystemQueryResponse,
+  FilesystemQueryResultSchema,
+  FilesystemQuerySchema,
   type HostDesiredState,
   HostIdSchema,
   type HostReportedState,
@@ -13,19 +17,23 @@ import { Value } from '@sinclair/typebox/value';
 import { Deferred, Effect, Layer, Schedule } from 'effect';
 import { makeControlPlaneClient } from '#lib/control/client.ts';
 import { makeNibrunnerBridge } from '#lib/nibrunner/bridge.ts';
+import { makeNibrunnerFilesystem } from '#lib/nibrunner/filesystem.ts';
 import type { HostReportedState as NibrunnerReport } from '#lib/nibrunner/reported.gen.ts';
 import { readNibrunnerDesired, writeNibrunnerDesired } from '#lib/nibrunner/state-files.ts';
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { NibrunnerBridgeConfig } from '#services/nibrunner-bridge-config.service.ts';
+import { NibrunnerFilesystem } from '#services/nibrunner-filesystem.service.ts';
 import { artifactStore } from '#tests/support/artifacts.ts';
 import {
+  APP_ID,
+  DEPLOYMENT_ID,
   desiredInstance,
   desiredState,
   HOST_ID,
   POLL_SETTINGS_FIXTURE,
 } from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
-import { serving } from '#tests/support/server.ts';
+import { serving, servingUnix } from '#tests/support/server.ts';
 
 const run = provided(platform);
 const SESSION_LIFETIME_MS = 300_000;
@@ -36,7 +44,11 @@ function fixture(initialDesired: HostDesiredState) {
   return Effect.gen(function* () {
     const fs = yield* FileSystem.FileSystem;
     const directory = yield* temporaryDirectory;
-    const world = { desired: initialDesired };
+    const world = {
+      desired: initialDesired,
+      query: { result: 'none' } as FilesystemQueryResponse,
+    };
+    const filesystemRequests: FilesystemQueryRequest[] = [];
     const reports: HostReportedState[] = [];
     const registrations: string[] = [];
     const { baseUrl } = yield* serving(async (request) => {
@@ -55,6 +67,14 @@ function fixture(initialDesired: HostDesiredState) {
       if (path.endsWith('/desired-state')) {
         return Response.json(world.desired);
       }
+      if (path.endsWith('/filesystem-query')) {
+        filesystemRequests.push((await request.json()) as FilesystemQueryRequest);
+        return Response.json(world.query);
+      }
+      if (path.endsWith('/filesystem-query-result')) {
+        Value.Parse(FilesystemQueryResultSchema, await request.json());
+        return Response.json({});
+      }
       reports.push(Value.Parse(HostReportedStateSchema, await request.json()));
       return Response.json({});
     });
@@ -67,6 +87,7 @@ function fixture(initialDesired: HostDesiredState) {
       artifactBucket: 'binaries',
       importBucket: 'imports',
       awsRegion: 'eu-central-1',
+      filesystemSocket: `${directory}/filesystem.sock`,
     });
     const acceptedDigest = yield* writeNibrunnerDesired({
       path: config.desiredStateFile,
@@ -92,10 +113,18 @@ function fixture(initialDesired: HostDesiredState) {
       world,
       reports,
       registrations,
+      filesystemRequests,
       create: makeNibrunnerBridge({
         config,
         control: makeControlPlaneClient({ baseUrl }),
-      }),
+      }).pipe(
+        Effect.provideService(
+          NibrunnerFilesystem,
+          NibrunnerFilesystem.make(
+            makeNibrunnerFilesystem({ socketPath: config.filesystemSocket }),
+          ),
+        ),
+      ),
     };
   });
 }
@@ -119,6 +148,52 @@ test('the bridge registers, polls and forwards draining reports across a process
     }),
   );
 });
+
+test.each(['running', 'on-request', 'stopped', 'replaced', 'stale', 'unaccepted'] as const)(
+  'filesystem queries advertise only the accepted current deployment: %s',
+  async (state) => {
+    await run(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const instance = desiredInstance({
+          desiredState: state === 'on-request' || state === 'stopped' ? state : 'running',
+        });
+        const setup = yield* fixture(desiredState({ instances: [instance] }));
+        const report: NibrunnerReport = JSON.parse(
+          yield* fs.readFileString(setup.config.reportedStateFile),
+        );
+        report.instances = [
+          {
+            appId: APP_ID,
+            deploymentId: state === 'replaced' ? NEXT_DEPLOYMENT_ID : DEPLOYMENT_ID,
+            state: state === 'on-request' ? 'idle' : 'running',
+            restartCount: 0,
+          },
+        ];
+        if (state === 'stale') {
+          report.reportedAt = '1970-01-01T00:00:00Z';
+        }
+        if (state === 'unaccepted') {
+          report.acceptedDigest = null;
+        }
+        yield* fs.writeFileString(setup.config.reportedStateFile, JSON.stringify(report));
+        setup.world.query = {
+          result: 'query',
+          query: Value.Parse(FilesystemQuerySchema, { queryId: 'query', appId: APP_ID, path: '/' }),
+        };
+        yield* servingUnix({
+          socketPath: setup.config.filesystemSocket,
+          handler: () => Response.json({ path: '/app/data', entries: [], truncated: false }),
+        });
+        const bridge = yield* setup.create.pipe(Effect.provide(artifactStore()));
+        yield* bridge.filesystemOnce;
+        expect(setup.filesystemRequests).toEqual([
+          { servedAppIds: state === 'running' || state === 'on-request' ? [APP_ID] : [] },
+        ]);
+      }),
+    );
+  },
+);
 
 test('stops and removals bypass a blocked download without omitting an unrelated running app', async () => {
   await run(
