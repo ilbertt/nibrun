@@ -1,5 +1,17 @@
 data "cloudflare_zones" "control_plane" {
   account = { id = var.cloudflare_account_id }
+
+  lifecycle {
+    postcondition {
+      condition = alltrue([
+        for hostname in local.control_plane_hostnames : length([
+          for zone in self.result : zone.id
+          if hostname == zone.name || endswith(hostname, ".${zone.name}")
+        ]) == 1
+      ])
+      error_message = "Each control-plane hostname must match exactly one visible Cloudflare zone. Grant the Terraform token Zone Read on those zones; the cutover also requires DNS Edit there."
+    }
+  }
 }
 
 locals {
