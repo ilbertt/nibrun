@@ -1,6 +1,5 @@
-# The public edge, and the only thing on the box listening off-loopback.
-# Cloudflare terminates the visitor's TLS; this terminates the edge-to-origin
-# leg. Routing for user apps is a later phase.
+# Cloudflared reaches the unpublished HTTP listener over Docker networking.
+# Keep authenticated HTTPS available until the tunnel and DNS are verified.
 {
 	# No ACME: the certificate is a Cloudflare Origin Certificate, which the
 	# deploy fetches from SSM and writes into tls/ next to this file. It names
@@ -41,9 +40,7 @@
 	}
 }
 
-https://{$API_HOSTNAME} {
-	import origin_tls
-
+(api_route) {
 	# The api serves nothing under /internal yet. Denying the namespace before
 	# it exists is the point: fleet-host agents reach the api over the private
 	# network, and a route added there later would otherwise be public from the
@@ -59,6 +56,7 @@ https://{$API_HOSTNAME} {
 	# measured surviving 8s of downtime and a changed container address.
 	handle {
 		reverse_proxy api:3000 {
+			header_up X-Forwarded-Proto https
 			lb_try_duration 30s
 			lb_try_interval 250ms
 		}
@@ -119,22 +117,20 @@ https://{$API_HOSTNAME} {
 # Container logs. Dozzle authenticates its own visitors (simple auth, prod only)
 # — the edge only gets them here, and deliberately does not add a second gate in
 # front of the login page.
-https://{$DOZZLE_HOSTNAME} {
-	import origin_tls
-
+(dozzle_route) {
 	# Log streaming is a websocket; reverse_proxy upgrades it as-is, and the
 	# retries below sit before the upgrade, where a dial that never connected is
 	# safe to repeat.
 	reverse_proxy dozzle:8080 {
+		header_up X-Forwarded-Proto https
 		lb_try_duration 30s
 		lb_try_interval 250ms
 	}
 }
 
-https://{$UMAMI_HOSTNAME} {
-	import origin_tls
-
+(umami_route) {
 	reverse_proxy umami:3000 {
+		header_up X-Forwarded-Proto https
 		lb_try_duration 30s
 		lb_try_interval 250ms
 	}
@@ -144,9 +140,7 @@ https://{$UMAMI_HOSTNAME} {
 # way to expose a subset of itself: one -httpAuth credential covers every
 # endpoint including /insert, and -select.disable is all-or-nothing. So both the
 # gate and the endpoint allowlist are here.
-https://{$VICTORIALOGS_HOSTNAME} {
-	import origin_tls
-
+(victorialogs_route) {
 	# Rendered by on_box_deploy.sh from the SSM password, the way Dozzle's user
 	# list is; bcrypt is what basic_auth reads, and nothing on the box holds the
 	# password itself. A file under the mounted directory rather than an
@@ -172,6 +166,7 @@ https://{$VICTORIALOGS_HOSTNAME} {
 	@select path /select/*
 	handle @select {
 		reverse_proxy victorialogs:9428 {
+			header_up X-Forwarded-Proto https
 			lb_try_duration 30s
 			lb_try_interval 250ms
 		}
@@ -180,4 +175,44 @@ https://{$VICTORIALOGS_HOSTNAME} {
 	handle {
 		respond 404
 	}
+}
+
+http://{$API_HOSTNAME} {
+	import api_route
+}
+
+https://{$API_HOSTNAME} {
+	import origin_tls
+	import api_route
+}
+
+http://{$DOZZLE_HOSTNAME} {
+	import dozzle_route
+}
+
+https://{$DOZZLE_HOSTNAME} {
+	import origin_tls
+	import dozzle_route
+}
+
+http://{$UMAMI_HOSTNAME} {
+	import umami_route
+}
+
+https://{$UMAMI_HOSTNAME} {
+	import origin_tls
+	import umami_route
+}
+
+http://{$VICTORIALOGS_HOSTNAME} {
+	import victorialogs_route
+}
+
+https://{$VICTORIALOGS_HOSTNAME} {
+	import origin_tls
+	import victorialogs_route
+}
+
+http:// {
+	respond 404
 }
