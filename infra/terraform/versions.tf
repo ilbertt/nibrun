@@ -16,6 +16,10 @@ terraform {
   }
 
   required_providers {
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.4"
+    }
     cloudflare = {
       source  = "cloudflare/cloudflare"
       version = "~> 5.28"

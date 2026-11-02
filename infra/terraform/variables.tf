@@ -254,53 +254,6 @@ variable "caddy_tls_key" {
   }
 }
 
-# The app hosts' own pair, issued for app_host_domain. Separate from the control
-# plane's because a Cloudflare Origin Certificate is issued per zone and
-# app_host_domain is a different zone by design — the same split the two proxies
-# already are. It has to be a wildcard: hostnames are handed out per app, and
-# reissuing a certificate every time somebody creates one is not a deploy step.
-variable "app_host_caddy_tls_cert" {
-  type        = string
-  description = "PEM of the Cloudflare Origin Certificate for *.app_host_domain. CI passes the APP_HOST_CADDY_TLS_CERT repository variable through."
-
-  validation {
-    condition     = strcontains(var.app_host_caddy_tls_cert, "BEGIN CERTIFICATE")
-    error_message = "app_host_caddy_tls_cert must be a PEM certificate."
-  }
-}
-
-variable "app_host_caddy_tls_key" {
-  type        = string
-  sensitive   = true
-  description = "PEM of the private key for app_host_caddy_tls_cert. CI passes the APP_HOST_CADDY_TLS_KEY repository secret through."
-
-  validation {
-    condition     = strcontains(var.app_host_caddy_tls_key, "PRIVATE KEY")
-    error_message = "app_host_caddy_tls_key must be a PEM private key."
-  }
-}
-
-variable "nibrunner_origin_tls_cert" {
-  type        = string
-  description = "PEM of the nibrunner origin certificate. CI passes the NIBRUNNER_ORIGIN_TLS_CERT repository variable through."
-
-  validation {
-    condition     = strcontains(var.nibrunner_origin_tls_cert, "BEGIN CERTIFICATE")
-    error_message = "nibrunner_origin_tls_cert must be a PEM certificate."
-  }
-}
-
-variable "nibrunner_origin_tls_key" {
-  type        = string
-  sensitive   = true
-  description = "PEM of the nibrunner origin private key. CI passes the NIBRUNNER_ORIGIN_TLS_KEY repository secret through."
-
-  validation {
-    condition     = strcontains(var.nibrunner_origin_tls_key, "PRIVATE KEY")
-    error_message = "nibrunner_origin_tls_key must be a PEM private key."
-  }
-}
-
 # Where the two names in the app host zone that serve nothing send their visitors:
 # the apex, and the fallback origin. Nothing here provisions it — the marketing
 # site is a Worker of its own — so it enters as configuration, and has no default

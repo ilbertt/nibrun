@@ -40,10 +40,14 @@ A records only, for both. Cloudflare is the only client either origin has, and i
 visitors over IPv6 from its own edge — an AAAA here would publish an address nothing needs to
 reach. Both addresses outlive a replacement, so the records are written once.
 
-Then, **in both zones**: SSL/TLS **Full (strict)**; an **Origin Certificate** (ECC — Cloudflare's
-edge is its only client), whose two halves are a proxy's TLS inputs; and **Authenticated Origin
-Pulls → Global** on. Turn that last one on *before* the first deploy carrying a proxy — Caddy
-requires the client certificate it enables, and without it every visitor gets a `525`.
+Then, **in both zones**: SSL/TLS **Full (strict)** and **Authenticated Origin Pulls → Global** on.
+Turn AOP on *before* the first deploy carrying a proxy — Caddy requires its client certificate,
+and without it every visitor gets a `525`. The control-plane Origin Certificate remains a
+manual input while its direct HTTPS path is retained. Terraform issues separate ECC origin
+certificates and keys for app hosts and nibrunner, each covering its domain and wildcard, into
+the existing SSM parameters. These keys remain in encrypted Terraform state like the existing
+SSM-managed secrets. Certificate rotation requires deploying a second certificate before
+revoking the first; `prevent_destroy` blocks revocation during an ordinary apply.
 
 Sign-in needs a GitHub OAuth App whose callback URL is
 `https://<api_hostname>/api/auth/callback/github`.
@@ -72,9 +76,8 @@ Custom domains, in the `app_domain` zone only:
   the edge proving itself to the origin, which is the half `security_group.tf` rests on.
 - The apex redirects to the marketing site from the app-host proxy, and reaching it takes two
   things here: `<app_domain>` A → `app_host_public_ips`, **proxied**, since the bare name has no
-  record of its own; and an **Origin Certificate** naming `<app_domain>` beside `*.<app_domain>`,
-  because a wildcard does not cover the bare name and the zone is Full (strict) — without the
-  reissue the apex answers `526`. `fallback.<app_domain>` needs neither and works as it stands.
+  record of its own. Terraform's origin certificate includes both `<app_domain>` and
+  `*.<app_domain>` because a wildcard does not cover the bare name.
 
 Terraform looks up the existing `app_host_domain` zone and provisions the API's account-owned
 token with *Zone → SSL and Certificates → Edit* on that zone only. The token goes to SSM and
