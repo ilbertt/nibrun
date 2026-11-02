@@ -122,6 +122,8 @@ jobs:
           TF_VAR_nibrunner_origin_tls_cert: ${{ vars.NIBRUNNER_ORIGIN_TLS_CERT }}
           TF_VAR_nibrunner_origin_tls_key: ${{ secrets.NIBRUNNER_ORIGIN_TLS_KEY }}
           TF_VAR_cloudflare_api_token: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_account_id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          TF_VAR_cloudflare_terraform_api_token: ${{ secrets.CLOUDFLARE_TERRAFORM_API_TOKEN }}
           TF_VAR_cloudflare_zone_id: ${{ vars.CLOUDFLARE_ZONE_ID }}
           ALLOW_DESTROY: ${{ inputs.allow_destroy }}
         run: bun run --filter @repo/internal-scripts terraform-apply

@@ -13,7 +13,8 @@ transit, so nothing can drift.
 
 ## First run
 
-All of this is manual and none of it is in code.
+AWS bootstrap and the initial DNS/origin configuration below are manual. The control-plane
+Tunnel is provisioned by Terraform.
 
 ```sh
 # Console → CloudFormation → upload bootstrap/github-oidc-bootstrap.yaml, once.
@@ -77,7 +78,7 @@ Custom domains, in the `app_domain` zone only:
 - An **API token** scoped to *Zone → SSL and Certificates → Edit* on this zone and nothing else,
   as the `CLOUDFLARE_API_TOKEN` repository secret, with the zone id as `CLOUDFLARE_ZONE_ID`.
 
-Unlike every other Cloudflare step here, registering a hostname cannot be manual — a brought
+Registering a custom hostname cannot be manual — a brought
 domain arrives whenever an owner adds one — which is what the token is for.
 
 ## Deploying
