@@ -18,6 +18,9 @@ CONFIG_PAHOLE_VERSION
 CONFIG_AMAZON_DRIVER_UPDATES
 CONFIG_DMA_PAGE_TOUCHING
 
+# 6.1.191 removes NTFS classic; the base config already disabled this driver.
+CONFIG_NTFS_FS
+
 # Amazon Linux carries this =y; vanilla 6.1 has no such driver. It is a second
 # wall-clock source for snapshot resume. Ours is kvmclock, which nibrun.config
 # asserts.
