@@ -1,6 +1,6 @@
 variable "cloudflare_account_id" {
   type        = string
-  description = "Account owning the control-plane Tunnel. CI supplies the CLOUDFLARE_ACCOUNT_ID repository variable."
+  description = "Account owning the control-plane Tunnel and app_host_domain zone. CI supplies the CLOUDFLARE_ACCOUNT_ID repository variable."
 
   validation {
     condition     = can(regex("^[0-9a-f]{32}$", var.cloudflare_account_id))
@@ -11,7 +11,7 @@ variable "cloudflare_account_id" {
 variable "cloudflare_terraform_api_token" {
   type        = string
   sensitive   = true
-  description = "Infrastructure-only API token with Cloudflare Tunnel Edit on the selected account. Never sent to the application or instance."
+  description = "Infrastructure-only API token with Cloudflare Tunnel Edit and Account API Tokens Edit on the selected account, plus Zone Read on app_host_domain. Never sent to the application or instance."
 
   validation {
     condition     = trimspace(var.cloudflare_terraform_api_token) != ""

@@ -75,8 +75,11 @@ Custom domains, in the `app_domain` zone only:
   record of its own; and an **Origin Certificate** naming `<app_domain>` beside `*.<app_domain>`,
   because a wildcard does not cover the bare name and the zone is Full (strict) — without the
   reissue the apex answers `526`. `fallback.<app_domain>` needs neither and works as it stands.
-- An **API token** scoped to *Zone → SSL and Certificates → Edit* on this zone and nothing else,
-  as the `CLOUDFLARE_API_TOKEN` repository secret, with the zone id as `CLOUDFLARE_ZONE_ID`.
+
+Terraform looks up the existing `app_host_domain` zone and provisions the API's account-owned
+token with *Zone → SSL and Certificates → Edit* on that zone only. The token goes to SSM and
+the zone ID to the existing deploy output; the zone and its manually configured settings are
+not managed by Terraform.
 
 Registering a custom hostname cannot be manual — a brought
 domain arrives whenever an owner adds one — which is what the token is for.
