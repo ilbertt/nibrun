@@ -104,3 +104,8 @@ Compose pulls service images on each deploy. Keep compatible moving tags such as
 an exact patch tag requires an explicit bump to receive the next patch release. Image builds
 use `--pull` to refresh their base images. Guest-image and runtime toolchain digests remain
 pinned separately because they are inputs to reproducible artifacts.
+
+Control-plane deploys prune unused Docker images, including tagged releases, before pulling
+and again after the health gate and Caddy reload. Images created within the last 24 hours stay
+cached for rollbacks; every image referenced by a container is preserved regardless of age.
+Cleanup never prunes volumes or removes persistent data.
