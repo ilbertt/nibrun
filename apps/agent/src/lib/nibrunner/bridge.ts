@@ -4,14 +4,16 @@ import { CONTROL_PLANE_BACKOFF } from '#lib/agent/backoff.ts';
 import { supervised } from '#lib/agent/loop.ts';
 import type { ControlPlaneClient } from '#lib/control/client.ts';
 import { makeSessionHolder } from '#lib/control/session.ts';
+import { nibrunnerCronListings, pollNibrunnerCron } from '#lib/nibrunner/cron-query.ts';
 import { pollNibrunnerFilesystem } from '#lib/nibrunner/filesystem-query.ts';
+import { nibrunnerQueryDeployments } from '#lib/nibrunner/query-deployments.ts';
 import { nibrunnerReportedState } from '#lib/nibrunner/reported-state.ts';
 import { stageNibrunnerArtifacts } from '#lib/nibrunner/stage-artifacts.ts';
 import {
   ForeignNibrunnerDocument,
   nibrunnerDocument,
   readNibrunnerDesired,
-  readNibrunnerDesiredDigest,
+  readNibrunnerDesiredDocument,
   readNibrunnerReport,
   writeNibrunnerDocument,
 } from '#lib/nibrunner/state-files.ts';
@@ -96,7 +98,7 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
 
   const currentState = Effect.gen(function* () {
     const session = yield* sessions.current;
-    const desiredDigest = yield* readNibrunnerDesiredDigest({
+    const { desired, digest } = yield* readNibrunnerDesiredDocument({
       path: config.desiredStateFile,
       hostId: session.hostId,
     });
@@ -104,12 +106,12 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
     const report = yield* nibrunnerReportedState({
       value,
       hostId: session.hostId,
-      desiredDigest,
+      desiredDigest: digest,
       nowMs: yield* Clock.currentTimeMillis,
       maxAgeMs: REPORT_MAX_AGE_MS,
       admissionState: 'draining',
     });
-    return { session, report };
+    return { session, report, desired, value };
   });
 
   const reportOnce = Effect.gen(function* () {
@@ -119,25 +121,31 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
   }).pipe(Effect.tapErrorTag('ControlPlaneError', sessions.onExpired));
 
   const servedAppIds = Effect.gen(function* () {
-    const { session, report } = yield* currentState;
-    if (report.state !== 'draining' && report.state !== 'ready') {
-      return [];
-    }
-    const desired = yield* readNibrunnerDesired({
-      path: config.desiredStateFile,
-      hostId: session.hostId,
-    });
-    return report.instances
-      .filter((instance) =>
-        desired.instances.some(
-          (wanted) =>
-            wanted.appId === instance.appId &&
-            wanted.deploymentId === instance.deploymentId &&
-            wanted.desiredState !== 'stopped',
-        ),
-      )
+    const { desired, report } = yield* currentState;
+    return nibrunnerQueryDeployments({ desired, report })
+      .filter((instance) => instance.desiredState !== 'stopped')
       .map((instance) => instance.appId);
   });
+
+  const cronListings = Effect.gen(function* () {
+    const { value, desired, report } = yield* currentState;
+    const deployments = nibrunnerQueryDeployments({ desired, report });
+    const listings = yield* nibrunnerCronListings(value);
+    return listings.filter((listing) =>
+      deployments.some(
+        (deployment) =>
+          deployment.appId === listing.appId && deployment.deploymentId === listing.deploymentId,
+      ),
+    );
+  });
+
+  const cronOnce = Effect.gen(function* () {
+    return yield* pollNibrunnerCron({
+      control,
+      session: yield* sessions.current,
+      listings: cronListings,
+    });
+  }).pipe(Effect.tapErrorTag('ControlPlaneError', sessions.onExpired));
 
   const filesystemOnce = Effect.gen(function* () {
     return yield* pollNibrunnerFilesystem({
@@ -154,6 +162,7 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
     pollOnce,
     reportOnce,
     filesystemOnce,
+    cronOnce,
     run: Effect.all(
       [
         supervised({
@@ -173,6 +182,11 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
         supervised({
           once: filesystemOnce,
           onFailure: () => Effect.logWarning('nibrunner filesystem query failed'),
+          schedule: CONTROL_PLANE_BACKOFF,
+        }),
+        supervised({
+          once: cronOnce,
+          onFailure: () => Effect.logWarning('nibrunner cron query failed'),
           schedule: CONTROL_PLANE_BACKOFF,
         }),
       ],

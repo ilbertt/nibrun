@@ -34,6 +34,7 @@ const argv = [
   'build',
   '--platform',
   platform,
+  '--pull',
   '--push',
   '--tag',
   imageUri,

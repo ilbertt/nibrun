@@ -26,7 +26,7 @@ ARG UMAMI_HOSTNAME
 ENV VITE_UMAMI_HOSTNAME=${UMAMI_HOSTNAME}
 RUN bun run build --filter=@repo/api
 
-FROM gcr.io/distroless/base-debian12:debug AS release
+FROM gcr.io/distroless/base-debian13:debug AS release
 WORKDIR /app
 COPY --from=build /monorepo/apps/api/dist/nibrun-api ./
 ENV NODE_ENV=production
