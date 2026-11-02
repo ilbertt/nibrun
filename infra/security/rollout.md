@@ -51,12 +51,12 @@ must also be removed if rollback is intended to persist across future deployment
 | Control-plane Caddy | `2.11.7` | Already meets the checked advisory's patched version |
 | JavaScript dependencies | Updated separately in [PR #1101](https://github.com/ilbertt/nibrun/pull/1101) | Review and deploy the dependency PR; distribute rebuilt CLI |
 
-The candidate guest kernel is `6.1.191`, with the rootfs package snapshot advanced to
-2026-10-31. The adopted image remains unchanged until a validated artifact is published.
-Running guests do not acquire a new kernel just because an image is adopted.
-The source archive checksum and required kernel configuration passed locally. Full image
-compilation was stopped before completion; rootfs validation and a real Firecracker boot
-test remain outstanding. No candidate image is ready for adoption.
+The guest kernel and rootfs updates are reviewed separately in
+[PR #1112](https://github.com/ilbertt/nibrun/pull/1112). Its candidate kernel is `6.1.191`, with
+the Debian snapshot advanced to 2026-10-31. Follow that PR for build and boot validation.
+Publishing, adoption and a controlled cold restart of existing guests are separate steps;
+this host-mitigation PR does not change the guest image. Nibrunner also needs its own release
+with a patched kernel.
 
 Dependency updates, the Monaco sanitizer patch, and the dependency advisory CI gate are
 reviewed separately in [PR #1101](https://github.com/ilbertt/nibrun/pull/1101). Its updated
