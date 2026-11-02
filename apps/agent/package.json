@@ -15,6 +15,7 @@
     "@effect/platform": "0.97.1",
     "@effect/platform-bun": "0.91.2",
     "@repo/api-client": "workspace:*",
+    "@repo/global-constants": "workspace:*",
     "@repo/protocol": "workspace:*",
     "@repo/sqlite": "workspace:*",
     "@sinclair/typebox": "catalog:",
