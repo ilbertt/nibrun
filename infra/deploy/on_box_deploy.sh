@@ -46,6 +46,7 @@ secret() {
     --query Parameter.Value --output text
 }
 
+CLOUDFLARED_TOKEN="$(secret cloudflared_token)"
 API_DB_PASSWORD="$(secret api_db_password)"
 API_BETTER_AUTH_SECRET="$(secret api_better_auth_secret)"
 API_TENANT_SECRETS_KEY="$(secret api_tenant_secrets_key)"
@@ -83,6 +84,7 @@ write_pem caddy_tls_key caddy/tls/origin.key
 # (container ports, internal service URLs) deliberately do not appear.
 cat > .env <<EOF
 AWS_REGION=${AWS_REGION}
+CLOUDFLARED_TOKEN=${CLOUDFLARED_TOKEN}
 
 API_IMAGE_URI=${API_IMAGE_URI}
 API_HOSTNAME=${API_HOSTNAME}

@@ -83,6 +83,27 @@ services:
     networks:
       - nibrun
 
+  # No published ports. The named Tunnel reaches Caddy's private HTTP listener;
+  # the existing HTTPS path stays available until DNS has been verified.
+  cloudflared:
+    image: cloudflare/cloudflared:2026.10.5
+    container_name: cloudflared
+    restart: always
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    command: ["tunnel", "--metrics", "127.0.0.1:2000", "run"]
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARED_TOKEN:?}
+    healthcheck:
+      test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:2000", "ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - nibrun
+
   # Local reaches Dozzle over loopback and needs no login; here it is behind a
   # public hostname, so it grows one. Simple auth over forward-proxy because the
   # edge has no identity to forward — Authenticated Origin Pulls proves the

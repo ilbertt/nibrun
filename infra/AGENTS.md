@@ -7,7 +7,7 @@ an instance has no Bun; everything CI runs lives in `@repo/internal-scripts`.
 The Terraform explains itself — read it rather than a description of it here.
 
 Config carries its component's prefix (`API_`, `POSTGRES_`, `PG_BACKUP_`, `CADDY_`, `DOZZLE_`,
-`VICTORIALOGS_`, `PGWEB_`, `UMAMI_`) unless more than one component reads it, and keeps one name from
+`VICTORIALOGS_`, `PGWEB_`, `UMAMI_`, `CLOUDFLARED_`) unless more than one component reads it, and keeps one name from
 the Terraform output through the SSM command to the `.env` the box writes. Nothing is aliased in
 transit, so nothing can drift.
 
@@ -98,3 +98,19 @@ Compose pulls service images on each deploy. Keep compatible moving tags such as
 an exact patch tag requires an explicit bump to receive the next patch release. Image builds
 use `--pull` to refresh their base images. Guest-image and runtime toolchain digests remain
 pinned separately because they are inputs to reproducible artifacts.
+
+## Control-plane connector and DNS cutover
+
+The connector reads Terraform's generated token from SSM into the instance's private `.env`,
+like other service credentials. Compose recreates it when the token changes; the existing
+health gate waits for a connection to Cloudflare. Connector health does not verify HTTP routing.
+
+After deploying, move one dashboard hostname first: replace its proxied A record with a proxied
+CNAME to `terraform output -raw cloudflared_tunnel_hostname`, removing any conflicting AAAA
+record. Verify its login and streaming/query flow, then move the remaining control-plane
+hostnames. Check API health, `/internal` rejection, sign-in, uploads and dashboard behavior;
+compare latency. Terraform already owns all four tunnel routes and the unmatched-host 404.
+
+The existing authenticated HTTPS path stays available, so restoring the A records rolls DNS
+back. A follow-up PR removes public 443 and the control-plane origin TLS configuration after
+the switch is verified. App-host ingress and private fleet listeners remain unchanged.
