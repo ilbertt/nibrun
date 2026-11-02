@@ -12,9 +12,9 @@
     "directory": "release-v1.16.1-x86_64"
   },
   "caddy": {
-    "version": "v2.11.7",
-    "url": "https://github.com/caddyserver/caddy/releases/download/v2.11.7/caddy_2.11.7_linux_amd64.tar.gz",
-    "sha256": "727b91701a392de6ebc5027509f548bf39979e5216340d0faed8fa5e69c84f8b"
+    "version": "v2.11.4",
+    "url": "https://github.com/caddyserver/caddy/releases/download/v2.11.4/caddy_2.11.4_linux_amd64.tar.gz",
+    "sha256": "527fbf917c39189a1e3b31d34fa955601680b2d5c8055d2a87b8b9588dec7bb9"
   },
   "guestImage": "6.1.180-a9ee73790531"
 }

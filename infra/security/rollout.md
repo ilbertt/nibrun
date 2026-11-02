@@ -47,7 +47,7 @@ must also be removed if rollback is intended to persist across future deployment
 | Nibrunner host kernel | `7.0.0-1016-aws` | Ubuntu vendor fix and controlled reboot; advisory still lists fix in progress |
 | Legacy guest kernel | Adopted `6.1.180-a9ee73790531` | Build, boot-test, publish and adopt patched image; replace existing guests |
 | Nibrunner guest kernel | Release `v2026.10.7` manifest pins `6.1.180` | Separate nibrunner release with patched guest kernel |
-| App-host Caddy | `2.11.4` | Deploy verified `2.11.7` pin |
+| App-host Caddy | `2.11.4` | Review and deploy [PR #1115](https://github.com/ilbertt/nibrun/pull/1115) for `2.11.7` |
 | Control-plane Caddy | `2.11.7` | Already meets the checked advisory's patched version |
 | JavaScript dependencies | Updated separately in [PR #1101](https://github.com/ilbertt/nibrun/pull/1101) | Review and deploy the dependency PR; distribute rebuilt CLI |
 
@@ -65,7 +65,8 @@ dependency versions.
 Docker service and API runtime image updates are reviewed separately in
 [PR #1103](https://github.com/ilbertt/nibrun/pull/1103). Docker Caddy keeps its existing
 `2.11-alpine` tag, which receives compatible patch releases when the deploy pulls images.
-The app-host Caddy binary update remains here because its installer verifies a fixed archive
+The app-host Caddy binary update is reviewed separately in
+[PR #1115](https://github.com/ilbertt/nibrun/pull/1115); its installer verifies a fixed archive
 checksum.
 
 The legacy Firecracker processes were also observed running as root, without the launcher
