@@ -201,7 +201,7 @@ resource "aws_ssm_parameter" "pgweb_auth_pass" {
 resource "aws_ssm_parameter" "app_host_caddy_tls_cert" {
   name  = "${var.ssm_secret_prefix}/app_host_caddy_tls_cert"
   type  = "SecureString"
-  value = base64encode(var.app_host_caddy_tls_cert)
+  value = base64encode(cloudflare_origin_ca_certificate.origin["app_host"].certificate)
 
   tags = {
     Name = "${local.resource_name_prefix}-app-host-caddy-tls-cert"
@@ -211,7 +211,7 @@ resource "aws_ssm_parameter" "app_host_caddy_tls_cert" {
 resource "aws_ssm_parameter" "app_host_caddy_tls_key" {
   name  = "${var.ssm_secret_prefix}/app_host_caddy_tls_key"
   type  = "SecureString"
-  value = base64encode(var.app_host_caddy_tls_key)
+  value = base64encode(tls_private_key.origin["app_host"].private_key_pem_pkcs8)
 
   tags = {
     Name = "${local.resource_name_prefix}-app-host-caddy-tls-key"

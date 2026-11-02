@@ -120,7 +120,7 @@ resource "aws_iam_instance_profile" "nibrunner_host" {
 resource "aws_ssm_parameter" "nibrunner_origin_tls_cert" {
   name  = "${var.ssm_secret_prefix}/nibrunner_origin_tls_cert"
   type  = "SecureString"
-  value = base64encode(var.nibrunner_origin_tls_cert)
+  value = base64encode(cloudflare_origin_ca_certificate.origin["nibrunner"].certificate)
 
   tags = {
     Name = "${local.resource_name_prefix}-nibrunner-origin-tls-cert"
@@ -130,7 +130,7 @@ resource "aws_ssm_parameter" "nibrunner_origin_tls_cert" {
 resource "aws_ssm_parameter" "nibrunner_origin_tls_key" {
   name  = "${var.ssm_secret_prefix}/nibrunner_origin_tls_key"
   type  = "SecureString"
-  value = base64encode(var.nibrunner_origin_tls_key)
+  value = base64encode(tls_private_key.origin["nibrunner"].private_key_pem_pkcs8)
 
   tags = {
     Name = "${local.resource_name_prefix}-nibrunner-origin-tls-key"

@@ -80,10 +80,7 @@ jobs:
           TF_VAR_api_github_client_secret: ${{ secrets.API_GITHUB_CLIENT_SECRET }}
           TF_VAR_caddy_tls_cert: ${{ vars.CADDY_TLS_CERT }}
           TF_VAR_caddy_tls_key: ${{ secrets.CADDY_TLS_KEY }}
-          TF_VAR_app_host_caddy_tls_cert: ${{ vars.APP_HOST_CADDY_TLS_CERT }}
-          TF_VAR_app_host_caddy_tls_key: ${{ secrets.APP_HOST_CADDY_TLS_KEY }}
-          TF_VAR_nibrunner_origin_tls_cert: ${{ vars.NIBRUNNER_ORIGIN_TLS_CERT }}
-          TF_VAR_nibrunner_origin_tls_key: ${{ secrets.NIBRUNNER_ORIGIN_TLS_KEY }}
+          TF_VAR_nibrunner_origin_domain: ${{ vars.NIBRUNNER_ORIGIN_DOMAIN }}
           TF_VAR_cloudflare_account_id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           TF_VAR_cloudflare_terraform_api_token: ${{ secrets.CLOUDFLARE_TERRAFORM_API_TOKEN }}
         run: bun run --filter @repo/internal-scripts terraform-plan
