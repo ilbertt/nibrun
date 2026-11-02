@@ -32,7 +32,7 @@ a rebuilt account to names its predecessor still holds for ~90 days.
 DNS, every record **proxied** (orange cloud):
 
 - Terraform manages the four control-plane hostnames as CNAMEs to the control-plane Tunnel.
-  The initial cutover imports their existing A records and updates them in place.
+  Existing records must be adopted explicitly before applying this configuration.
 - `*.<app_domain>` A → `app_host_public_ips`. One record covers the whole fleet, so there is
   nothing per app in DNS.
 
