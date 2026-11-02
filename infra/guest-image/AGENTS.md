@@ -78,8 +78,8 @@ tarball with a published sha256 is a stronger thing to hash than a GitHub source
 pay for it by naming every divergence in `kernel/config-drift.allow`.
 
 That file is enforced: every assignment in the base config must survive into the generated
-`.config` unless listed there or deliberately overridden. The whole measured divergence is
-fifteen lines. The only one worth knowing: `CONFIG_SYSGENID`, the generation counter userspace
+`.config` unless listed there or deliberately overridden. Every allowed divergence is named
+in that file. The only one worth knowing: `CONFIG_SYSGENID`, the generation counter userspace
 watches to reseed a PRNG of its own after a snapshot restore. The kernel's half is already
 covered by `CONFIG_VMGENID=y`, so `getrandom()` comes back fresh; what is missing duplicates
 nothing unless **one snapshot is restored more than once**, which is an invariant to hold rather
@@ -119,7 +119,7 @@ privileged container, and the host kernel never parses a filesystem image.
 
 ## What has actually been booted
 
-**Under Firecracker v1.16.1 on x86_64 with `/dev/kvm`, with the real `/init` and all four
+**Linux 6.1.180 under Firecracker v1.16.1 on x86_64 with `/dev/kvm`, with the real `/init` and all four
 drives.** The whole contract above is measured, not assumed: `vda`…`vdd` enumerate in
 declaration order, the artifact mount is read-only from inside the guest, the tenant runs as
 uid 65534 with cwd `/app` and its data at `/app/data`, the guest's own names and the tenant's
