@@ -213,6 +213,9 @@ resource "aws_ssm_parameter" "app_host_caddy_tls_key" {
   type  = "SecureString"
   value = base64encode(tls_private_key.origin["app_host"].private_key_pem_pkcs8)
 
+  # Failed issuance must leave the existing certificate/key pair in SSM intact.
+  depends_on = [cloudflare_origin_ca_certificate.origin["app_host"]]
+
   tags = {
     Name = "${local.resource_name_prefix}-app-host-caddy-tls-key"
   }
