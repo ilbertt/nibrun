@@ -28,9 +28,10 @@ resource "tls_cert_request" "origin" {
 }
 
 resource "cloudflare_origin_ca_certificate" "origin" {
-  for_each           = tls_cert_request.origin
-  csr                = each.value.cert_request_pem
-  hostnames          = each.value.dns_names
+  for_each = tls_cert_request.origin
+  csr      = each.value.cert_request_pem
+  # Origin CA sorts hostnames on read. Keep the CSR itself stable to avoid reissuance.
+  hostnames          = sort(each.value.dns_names)
   request_type       = "origin-ecc"
   requested_validity = 5475
 
