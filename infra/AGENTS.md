@@ -14,7 +14,7 @@ transit, so nothing can drift.
 ## First run
 
 AWS bootstrap and the initial DNS/origin configuration below are manual. The control-plane
-Tunnel is provisioned by Terraform as described below.
+Tunnel is provisioned by Terraform.
 
 ```sh
 # Console → CloudFormation → upload bootstrap/github-oidc-bootstrap.yaml, once.
@@ -92,30 +92,6 @@ instance decrypts with its own role. Both GHCR packages must be public for the s
 pulls with no registry credentials.
 
 `workflow_dispatch` takes `allow_destroy` for the times a plan legitimately replaces something.
-
-## Cloudflare Terraform credentials
-
-Before merging the Cloudflare provisioning change, configure these GitHub repository settings:
-
-- Variable `CLOUDFLARE_ACCOUNT_ID`: the account ID owning the control-plane zone, not its zone ID.
-- Secret `CLOUDFLARE_TERRAFORM_API_TOKEN`: a dedicated API token with **Account → Cloudflare
-  Tunnel → Edit**, scoped to that account. The API also calls this permission Cloudflare Tunnel
-  Write. No DNS or Access-policy permissions are needed for this provisioning step.
-
-Keep the existing `CLOUDFLARE_API_TOKEN` restricted to application custom-domain registration.
-The infrastructure token is used only by Terraform. Both plan and apply need it: Cloudflare
-requires Tunnel Write even to retrieve the connector token.
-
-Terraform creates the remotely managed `nibrun-control-plane` tunnel and derives its four
-hostname routes from the existing hostname variables, forwarding to `http://caddy:80` with a
-404 fallback. It retrieves the connector token directly into SSM SecureString at
-`${ssm_secret_prefix}/cloudflared_token`; do not create a `CLOUDFLARED_TOKEN` GitHub secret or
-copy the connector token manually. It is sensitive Terraform state, like other managed secrets.
-`cloudflared_tunnel_hostname` is the non-secret CNAME target for the later DNS cutover.
-
-This provisioning does not change DNS, close public HTTPS or start a connector. Deploy the
-connector separately and verify it before moving DNS. Terraform owns the tunnel configuration;
-change its routes here rather than editing them in the Cloudflare dashboard.
 
 Compose pulls service images on each deploy. Keep compatible moving tags such as
 `caddy:2.11-alpine`, `postgres:18-alpine` and `alpine:3.24` where upstream publishes them;
