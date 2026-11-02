@@ -8,6 +8,12 @@ cd "$(dirname "$0")"
 
 log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
 
+prune_unused_images() {
+  log "Pruning unused images older than 24 hours"
+  docker image prune --all --force --filter 'until=24h' | tail -n 1
+  df -h /
+}
+
 : "${API_IMAGE_URI:?}" "${API_HOSTNAME:?}" "${API_GITHUB_CLIENT_ID:?}" \
   "${ARTIFACTS_BUCKET:?}" "${EXPORTS_BUCKET:?}" "${IMPORTS_BUCKET:?}" \
   "${EXPORT_RETENTION_DAYS:?}" \
@@ -161,6 +167,10 @@ require_free_port() {
 require_free_port INTERNAL_PORT "${INTERNAL_PORT}"
 require_free_port LOG_INGEST_PORT "${LOG_INGEST_PORT}"
 
+# Recover headroom before downloading another release; keep recent images cached
+# for rollbacks. Docker also preserves every image referenced by a container.
+prune_unused_images
+
 log "Pulling images"
 $compose pull
 
@@ -199,9 +209,6 @@ $compose exec -T umami node --input-type=module < seed-umami.mjs
 
 log "Starting services (up -d --remove-orphans)"
 $compose up -d --remove-orphans
-
-log "Pruning dangling images"
-docker image prune -f
 
 # Gate the deploy on container health: every long-running service must report a
 # `healthy` healthcheck, and one-shot services (migrations) must have exited 0.
@@ -245,6 +252,8 @@ done
 # reload — leaving the old certificate served until something restarts it.
 log "Reloading Caddy"
 $compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --force
+
+prune_unused_images
 
 log "Compose service status"
 $compose ps -a --format 'table {{.Name}}\t{{.Status}}'
