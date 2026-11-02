@@ -73,7 +73,7 @@ resource "aws_ssm_parameter" "api_github_client_secret" {
 resource "aws_ssm_parameter" "api_cloudflare_api_token" {
   name  = "${var.ssm_secret_prefix}/api_cloudflare_api_token"
   type  = "SecureString"
-  value = var.cloudflare_api_token
+  value = cloudflare_account_token.api_custom_hostnames.value
 
   tags = {
     Name = "${local.resource_name_prefix}-api-cloudflare-api-token"
