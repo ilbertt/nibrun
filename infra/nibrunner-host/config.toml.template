@@ -44,4 +44,4 @@ listen_address = "127.0.0.1"
 port = 9100
 
 [filesystem]
-socket = "/run/nibrunner/filesystem.sock"
+socket = {{FILESYSTEM_SOCKET}}
