@@ -132,6 +132,9 @@ resource "aws_ssm_parameter" "nibrunner_origin_tls_key" {
   type  = "SecureString"
   value = base64encode(tls_private_key.origin["nibrunner"].private_key_pem_pkcs8)
 
+  # Failed issuance must leave the existing certificate/key pair in SSM intact.
+  depends_on = [cloudflare_origin_ca_certificate.origin["nibrunner"]]
+
   tags = {
     Name = "${local.resource_name_prefix}-nibrunner-origin-tls-key"
   }
