@@ -31,14 +31,13 @@ a rebuilt account to names its predecessor still holds for ~90 days.
 
 DNS, every record **proxied** (orange cloud):
 
-- one A record per control-plane hostname (`api_hostname`, `dozzle_hostname`,
-  `victorialogs_hostname`, `umami_hostname`) → `terraform output public_ip`
+- Terraform manages the four control-plane hostnames as CNAMEs to the control-plane Tunnel.
+  The initial cutover imports their existing A records and updates them in place.
 - `*.<app_domain>` A → `app_host_public_ips`. One record covers the whole fleet, so there is
   nothing per app in DNS.
 
-A records only, for both. Cloudflare is the only client either origin has, and it serves
-visitors over IPv6 from its own edge — an AAAA here would publish an address nothing needs to
-reach. Both addresses outlive a replacement, so the records are written once.
+App-host origins use A records only. Cloudflare serves visitors over IPv6 from its own edge;
+the Tunnel needs no public origin address. App-host addresses outlive a replacement.
 
 Then, **in both zones**: SSL/TLS **Full (strict)** and **Authenticated Origin Pulls → Global** on.
 Turn AOP on *before* the first deploy carrying a proxy — Caddy requires its client certificate,

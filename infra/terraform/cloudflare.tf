@@ -11,7 +11,7 @@ variable "cloudflare_account_id" {
 variable "cloudflare_terraform_api_token" {
   type        = string
   sensitive   = true
-  description = "Infrastructure-only API token with Cloudflare Tunnel Edit and Account API Tokens Edit on the selected account, Zone Read on app_host_domain, and SSL and Certificates Edit on app_host_domain and nibrunner_origin_domain. Never sent to the application or instance."
+  description = "Infrastructure-only API token with Cloudflare Tunnel Edit and Account API Tokens Edit on the selected account, Zone Read on the application and control-plane zones, DNS Edit on the control-plane zones, and SSL and Certificates Edit on app_host_domain and nibrunner_origin_domain. Never sent to the application or instance."
 
   validation {
     condition     = trimspace(var.cloudflare_terraform_api_token) != ""

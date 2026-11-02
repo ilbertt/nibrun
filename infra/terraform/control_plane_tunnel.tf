@@ -1,3 +1,8 @@
+locals {
+  control_plane_hostnames       = toset([var.api_hostname, var.dozzle_hostname, var.victorialogs_hostname, var.umami_hostname])
+  control_plane_tunnel_hostname = "${cloudflare_zero_trust_tunnel_cloudflared.control_plane.id}.cfargotunnel.com"
+}
+
 resource "cloudflare_zero_trust_tunnel_cloudflared" "control_plane" {
   account_id = var.cloudflare_account_id
   name       = "${local.resource_name_prefix}-control-plane"
@@ -9,7 +14,7 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "control_plane" {
   tunnel_id  = cloudflare_zero_trust_tunnel_cloudflared.control_plane.id
   config = {
     ingress = concat([
-      for hostname in [var.api_hostname, var.dozzle_hostname, var.victorialogs_hostname, var.umami_hostname] : {
+      for hostname in local.control_plane_hostnames : {
         hostname = hostname
         service  = "http://caddy:80"
         origin_request = {
@@ -36,6 +41,6 @@ resource "aws_ssm_parameter" "cloudflared_token" {
 }
 
 output "cloudflared_tunnel_hostname" {
-  description = "CNAME target for the later DNS cutover; provisioning the tunnel does not change DNS."
-  value       = "${cloudflare_zero_trust_tunnel_cloudflared.control_plane.id}.cfargotunnel.com"
+  description = "CNAME target for the control-plane hostnames."
+  value       = local.control_plane_tunnel_hostname
 }
