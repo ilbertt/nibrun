@@ -8,6 +8,7 @@ import {
   TableRow,
 } from '@repo/ui/components/table';
 import { Link } from '@tanstack/react-router';
+import { AppIcon } from '#components/apps/app-icon.tsx';
 import { AppStatusBadge } from '#components/apps/app-status-badge.tsx';
 import { HostnameLink } from '#components/apps/hostname-link.tsx';
 import { dayAndMinute } from '#lib/format-timestamp.ts';
@@ -32,8 +33,9 @@ export function AppsTable({ apps }: { apps: readonly AppSummary[] }) {
               <Link
                 to={AppRoute.to}
                 params={{ appId: app.id }}
-                className="font-medium hover:underline"
+                className="inline-flex items-center gap-2 font-medium hover:underline"
               >
+                <AppIcon app={app} />
                 {app.name}
               </Link>
             </TableCell>
