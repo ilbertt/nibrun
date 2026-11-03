@@ -4,7 +4,7 @@ import { FileSystem, Path } from '@effect/platform';
 import { Deferred, Effect, Exit, Fiber, Layer, Option } from 'effect';
 import { devicePathFor, NBD_DIRECTORY } from '#lib/volumes/device-file.ts';
 import { FILESYSTEM_LABEL, format } from '#lib/volumes/ext4.ts';
-import { isAttached } from '#lib/volumes/nbd.ts';
+import { ddExecutable, isAttached } from '#lib/volumes/nbd.ts';
 import type { VolumeImageCopyInput } from '#lib/volumes/volume-image-copy.ts';
 import { preflightVolumeImageCopy } from '#lib/volumes/volume-migration-preflight.ts';
 import { createCheckpoint, flush } from '#lib/volumes/zerofs.ts';
@@ -276,17 +276,19 @@ function volumeBlock(contents: string) {
 }
 
 function writeNbdBlock({ source, devicePath }: { source: string; devicePath: string }) {
-  return stdoutOf({
-    command: [
-      'dd',
-      `if=${source}`,
-      `of=${devicePath}`,
-      `bs=${VOLUME_SIZE_BYTES}`,
-      'count=1',
-      'oflag=direct',
-      'conv=fsync',
-      'status=none',
-    ],
+  return Effect.gen(function* () {
+    return yield* stdoutOf({
+      command: [
+        yield* ddExecutable(),
+        `if=${source}`,
+        `of=${devicePath}`,
+        `bs=${VOLUME_SIZE_BYTES}`,
+        'count=1',
+        'oflag=direct',
+        'conv=fsync',
+        'status=none',
+      ],
+    });
   });
 }
 
@@ -360,7 +362,7 @@ test.skipIf(process.platform !== 'linux' || process.env.NIBRUN_TEST_ZEROFS !== '
               effect: Effect.gen(function* () {
                 yield* stdoutOf({
                   command: [
-                    'dd',
+                    yield* ddExecutable(),
                     `if=${target.devicePath}`,
                     `of=${recovered}`,
                     `bs=${VOLUME_SIZE_BYTES}`,

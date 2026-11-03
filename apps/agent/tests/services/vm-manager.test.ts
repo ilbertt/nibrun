@@ -364,7 +364,9 @@ describe('configured storage gates every VM start', () => {
           const stage = yield* hostAsleepAndRefusing();
           const result = yield* stage.blockedByVmUnit(operation);
           expect(Either.isLeft(result) && result.left._tag).toBe('VmStorageUnitUnavailable');
-          expect(stage.commands.map(({ command }) => command[0])).toEqual(['dd']);
+          expect(stage.commands.map(({ command }) => command.includes('iflag=direct'))).toEqual([
+            true,
+          ]);
           expect(yield* stage.kept).toEqual({ stamp: true, snapshot: true });
         }),
       );
