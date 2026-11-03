@@ -13,8 +13,29 @@ fi
 
 install -m 0644 apt.conf /etc/apt/apt.conf.d/99nibrun-lock-timeout
 
+if [ -d /var/lib/nibrunner/volumes ] &&
+  [ -n "$(find /var/lib/nibrunner/volumes -type f -print -quit)" ]; then
+  echo "refusing to activate ZeroFS while local volume data remains" >&2
+  exit 1
+fi
+
 modprobe kvm_intel
 test -c /dev/kvm
+
+instance_store_device=
+for candidate in /dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_*; do
+  case "$candidate" in
+    *-part[0-9]*) continue ;;
+  esac
+  [ -b "$candidate" ] || continue
+  instance_store_device=$candidate
+  break
+done
+if [ -z "$instance_store_device" ]; then
+  echo "no EC2 instance-store device found for nibrunner host storage" >&2
+  exit 1
+fi
+sed -i "s|{{HOST_STORAGE_DEVICE}}|$instance_store_device|g" config.toml
 
 marker=/opt/nibrun/nibrunner-host/installed-binary.sha256
 if ! cmp -s config.toml /etc/nibrunner/config.toml ||
@@ -23,7 +44,7 @@ if ! cmp -s config.toml /etc/nibrunner/config.toml ||
   work=$(mktemp -d)
   trap 'rm -rf "$work"' EXIT
   apt-get update -q
-  DEBIAN_FRONTEND=noninteractive apt-get install -y -q nftables e2fsprogs nbd-client fuse3 kmod passwd curl ca-certificates awscli
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -q nftables e2fsprogs xfsprogs util-linux mount nbd-client fuse3 kmod passwd curl ca-certificates awscli
   curl -fsSL --retry 3 \
     "https://github.com/ilbertt/nibrunner/releases/download/${NIBRUNNER_VERSION}/nibrunnerd-linux-x64" \
     -o "$work/nibrunnerd"
@@ -35,11 +56,10 @@ if ! cmp -s config.toml /etc/nibrunner/config.toml ||
   install -d -m 0700 /etc/nibrunner
   install -m 0600 config.toml /etc/nibrunner/config.toml
   nibrunnerd install --from "$work"
-  systemctl daemon-reload
-  systemctl try-restart nibrunnerd.service
   printf '%s\n' "$NIBRUNNER_BINARY_SHA256" > "$marker"
 fi
 
+bash install_storage_environment.sh
 nibrunnerd start
 systemctl is-active --quiet nibrunnerd.service
 curl --fail --silent --show-error --max-time 10 http://127.0.0.1:9100/metrics > /dev/null

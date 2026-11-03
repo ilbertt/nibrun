@@ -22,6 +22,7 @@ const configuration = (await Bun.file(join(hostDirectory, 'config.toml.template'
   .replaceAll('{{VPC_IPV4_CIDR_BLOCK}}', requiredEnv('VPC_IPV4_CIDR_BLOCK'))
   .replaceAll('{{VPC_IPV6_CIDR_BLOCK}}', requiredEnv('VPC_IPV6_CIDR_BLOCK'))
   .replaceAll('{{GUEST_IMAGE_DIRECTORY}}', JSON.stringify(guestDirectory))
+  .replaceAll('{{ZEROFS_STORAGE_URL}}', JSON.stringify(requiredEnv('NIBRUNNER_ZEROFS_STORAGE_URL')))
   .replaceAll('{{FILESYSTEM_SOCKET}}', JSON.stringify(NIBRUNNER_FILESYSTEM_SOCKET))
   .replaceAll(
     '{{FALLBACK_ORIGIN_HOST}}',
@@ -30,6 +31,9 @@ const configuration = (await Bun.file(join(hostDirectory, 'config.toml.template'
   .replaceAll('{{FALLBACK_REDIRECT}}', JSON.stringify(requiredEnv('NIBRUNNER_FALLBACK_REDIRECT')));
 const installer = await Bun.file(join(hostDirectory, 'deploy/on_box_deploy.sh')).text();
 const aptConfiguration = await Bun.file(join(hostDirectory, 'apt.conf')).text();
+const storageEnvironmentInstaller = await Bun.file(
+  join(hostDirectory, 'deploy/install_storage_environment.sh'),
+).text();
 const tunnelInstaller = await Bun.file(join(hostDirectory, 'deploy/install_tunnel.sh')).text();
 const tunnelUnit = await Bun.file(
   join(hostDirectory, 'systemd/nibrun-nibrunner-tunnel.service'),
@@ -60,6 +64,7 @@ const script = [
   writeRemoteFile({ name: 'config.toml', content: configuration }),
   writeRemoteFile({ name: 'on_box_deploy.sh', content: installer }),
   writeRemoteFile({ name: 'apt.conf', content: aptConfiguration }),
+  writeRemoteFile({ name: 'install_storage_environment.sh', content: storageEnvironmentInstaller }),
   writeRemoteFile({ name: 'install_tunnel.sh', content: tunnelInstaller }),
   writeRemoteFile({ name: 'nibrun-nibrunner-tunnel.service', content: tunnelUnit }),
   writeRemoteFile({ name: 'install_bridge.sh', content: bridgeInstaller }),
@@ -71,6 +76,9 @@ const script = [
     NIBRUNNER_GUEST_IMAGE_URL: requiredEnv('NIBRUNNER_GUEST_IMAGE_URL'),
     NIBRUNNER_GUEST_IMAGE_SHA256: requiredEnv('NIBRUNNER_GUEST_IMAGE_SHA256'),
     AWS_REGION: requiredEnv('AWS_REGION'),
+    NIBRUNNER_ZEROFS_ENCRYPTION_PASSWORD_PARAMETER: requiredEnv(
+      'NIBRUNNER_ZEROFS_ENCRYPTION_PASSWORD_PARAMETER',
+    ),
     NIBRUNNER_CLOUDFLARED_TOKEN_PARAMETER: requiredEnv('NIBRUNNER_CLOUDFLARED_TOKEN_PARAMETER'),
     AGENT_VERSION: agentVersion,
     AGENT_URL: requiredEnv('AGENT_URL'),
