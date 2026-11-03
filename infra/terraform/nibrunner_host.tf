@@ -94,6 +94,12 @@ data "aws_iam_policy_document" "nibrunner_host" {
   }
 
   statement {
+    sid       = "GuestImageRead"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.deploy.arn}/nibrunner-guest/*"]
+  }
+
+  statement {
     sid       = "ArtifactsRead"
     actions   = ["s3:GetObject"]
     resources = ["${aws_s3_bucket.artifacts.arn}/*"]

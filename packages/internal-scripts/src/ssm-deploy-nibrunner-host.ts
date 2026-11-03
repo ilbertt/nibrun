@@ -11,12 +11,17 @@ const instanceId = requiredEnv('NIBRUNNER_HOST_INSTANCE_ID');
 const hostDirectory = join(repoRoot, 'infra/nibrunner-host');
 const versions = (await Bun.file(join(hostDirectory, 'versions.json')).json()) as {
   version: string;
-  installerSha256: string;
   binarySha256: string;
 };
+const guestVersion = requiredEnv('NIBRUNNER_GUEST_IMAGE_VERSION');
+if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,100}$/.test(guestVersion)) {
+  throw new Error('The guest image version is not a safe directory name.');
+}
+const guestDirectory = `/var/lib/nibrunner/guest-images/${guestVersion}`;
 const configuration = (await Bun.file(join(hostDirectory, 'config.toml.template')).text())
   .replaceAll('{{VPC_IPV4_CIDR_BLOCK}}', requiredEnv('VPC_IPV4_CIDR_BLOCK'))
   .replaceAll('{{VPC_IPV6_CIDR_BLOCK}}', requiredEnv('VPC_IPV6_CIDR_BLOCK'))
+  .replaceAll('{{GUEST_IMAGE_DIRECTORY}}', JSON.stringify(guestDirectory))
   .replaceAll('{{FILESYSTEM_SOCKET}}', JSON.stringify(NIBRUNNER_FILESYSTEM_SOCKET));
 const installer = await Bun.file(join(hostDirectory, 'deploy/on_box_deploy.sh')).text();
 const tlsInstaller = await Bun.file(join(hostDirectory, 'deploy/install_tls.sh')).text();
@@ -53,8 +58,9 @@ const script = [
   writeRemoteFile({ name: 'bridge.env', content: `${environmentFile}\n` }),
   `export ${exportLine({
     NIBRUNNER_VERSION: versions.version,
-    NIBRUNNER_INSTALLER_SHA256: versions.installerSha256,
     NIBRUNNER_BINARY_SHA256: versions.binarySha256,
+    NIBRUNNER_GUEST_IMAGE_URL: requiredEnv('NIBRUNNER_GUEST_IMAGE_URL'),
+    NIBRUNNER_GUEST_IMAGE_SHA256: requiredEnv('NIBRUNNER_GUEST_IMAGE_SHA256'),
     AWS_REGION: requiredEnv('AWS_REGION'),
     NIBRUNNER_ORIGIN_TLS_CERT_PARAMETER: requiredEnv('NIBRUNNER_ORIGIN_TLS_CERT_PARAMETER'),
     NIBRUNNER_ORIGIN_TLS_KEY_PARAMETER: requiredEnv('NIBRUNNER_ORIGIN_TLS_KEY_PARAMETER'),
