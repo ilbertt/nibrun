@@ -18,6 +18,7 @@
     "publish-agent-binary": "bun run src/publish-agent-binary.ts",
     "publish-app-host-bundle": "bun run src/publish-app-host-bundle.ts",
     "publish-guest-image": "bun run src/publish-guest-image.ts",
+    "publish-nibrunner-guest-image": "bun run src/publish-nibrunner-guest-image.ts",
     "publish-runtime-bundle": "bun run src/publish-runtime-bundle.ts",
     "retire-nibrunner-commissioning-parameters": "bun run src/retire-nibrunner-commissioning-parameters.ts",
     "seed-umami": "bun run src/seed-umami.ts",

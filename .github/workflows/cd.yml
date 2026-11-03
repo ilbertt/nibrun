@@ -238,8 +238,30 @@ jobs:
           AGENT_URL: ${{ needs.publish-agent.outputs.url }}
         run: bun run --filter @repo/internal-scripts ssm-deploy-app-hosts
 
+  publish-nibrunner-guest-image:
+    needs: terraform
+    runs-on: ubuntu-latest
+    env:
+      DEPLOY_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).deploy_bucket }}
+    outputs:
+      version: ${{ steps.image.outputs.version }}
+      url: ${{ steps.image.outputs.url }}
+      sha256: ${{ steps.image.outputs.sha256 }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/prepare
+      - uses: ./.github/actions/aws-credentials
+        with:
+          role-to-assume: ${{ fromJSON(needs.terraform.outputs.values).github_deploy_role_arn }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: Build the nibrun guest image
+        run: bun run --filter @repo/internal-scripts build-nibrunner-guest-image
+      - name: Publish the guest image
+        id: image
+        run: bun run --filter @repo/internal-scripts publish-nibrunner-guest-image
+
   deploy-nibrunner-host:
-    needs: [terraform, publish-agent]
+    needs: [terraform, publish-agent, publish-nibrunner-guest-image]
     runs-on: ubuntu-latest
     env:
       NIBRUNNER_HOST_INSTANCE_ID: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_host_instance_id }}
@@ -249,6 +271,9 @@ jobs:
       VPC_IPV6_CIDR_BLOCK: ${{ fromJSON(needs.terraform.outputs.values).vpc_ipv6_cidr_block }}
       AGENT_URL: ${{ needs.publish-agent.outputs.url }}
       AGENT_SHA256: ${{ needs.publish-agent.outputs.sha256 }}
+      NIBRUNNER_GUEST_IMAGE_VERSION: ${{ needs.publish-nibrunner-guest-image.outputs.version }}
+      NIBRUNNER_GUEST_IMAGE_URL: ${{ needs.publish-nibrunner-guest-image.outputs.url }}
+      NIBRUNNER_GUEST_IMAGE_SHA256: ${{ needs.publish-nibrunner-guest-image.outputs.sha256 }}
       AGENT_CONTROL_PLANE_URL: ${{ fromJSON(needs.terraform.outputs.values).control_plane_internal_url }}
       AGENT_ARTIFACT_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).artifacts_bucket }}
       AGENT_IMPORT_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).imports_bucket }}

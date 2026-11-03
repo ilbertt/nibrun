@@ -9,7 +9,7 @@ time_zone = "UTC"
 state_dir = "/var/lib/nibrunner"
 runtime_dir = "/run/nibrunner"
 snapshot_dir = "/var/lib/nibrunner/snapshots"
-guest_image_dir = "/var/lib/nibrunner/guest"
+guest_image_dir = {{GUEST_IMAGE_DIRECTORY}}
 desired_state_file = "/var/lib/nibrunner/desired.json"
 versions_file = "/var/lib/nibrunner/versions.json"
 
