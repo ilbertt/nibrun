@@ -3,7 +3,9 @@ ARG RUNTIME_TOOLCHAIN=nibrun-guest-runtime:build
 FROM ${RUNTIME_TOOLCHAIN} AS build
 RUN apt-get install -y --no-install-recommends e2fsprogs
 COPY init.c /image-init.c
+COPY tests/app.c /image-test-app.c
 RUN musl-gcc ${CFLAGS} -s -I/build/src -o /image-init /image-init.c ${RUNTIME_SOURCES} ${SQLITE_LINK}; \
+    musl-gcc ${CFLAGS} -s -o /image-test-app /image-test-app.c ${SQLITE_LINK}; \
     if readelf -l /image-init | grep -q INTERP; then exit 1; fi
 
 COPY --from=stock rootfs.ext4 /stock/rootfs.ext4
@@ -23,3 +25,4 @@ RUN debugfs -R 'dump /init /installed-init' /output/rootfs.ext4; \
 FROM scratch AS image
 COPY --from=build /output/rootfs.ext4 /rootfs.ext4
 COPY --from=build /image-init /image-init
+COPY --from=build /image-test-app /test-app

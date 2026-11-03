@@ -71,6 +71,12 @@ jobs:
       - uses: ./.github/actions/prepare
       - name: Build the nibrun guest image
         run: bun run --filter @repo/internal-scripts build-nibrunner-guest-image
+      - name: Boot the image with the pinned engine
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nftables e2fsprogs iproute2 iptables nbd-client fuse3 passwd kmod
+          test -c /dev/kvm
+          sudo env "PATH=$PATH" NIBRUN_TEST_NIBRUNNER_GUEST_IMAGE=1 "$(command -v bun)" run --filter @repo/agent test tests/lib/nibrunner/guest-image-linux.test.ts
 
   security:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
