@@ -62,6 +62,16 @@ jobs:
           sudo env "PATH=$PATH" NIBRUN_TEST_ZEROFS_SYSTEMD=1 "$(command -v bun)" run --filter @repo/agent test tests/lib/volumes/app-zerofs-systemd-linux.test.ts tests/lib/volumes/app-zerofs-retirement-linux.test.ts
           sudo env "PATH=$PATH" NIBRUN_TEST_ZEROFS=1 "$(command -v bun)" run --filter @repo/agent test tests/lib/volumes/zerofs-persistence.test.ts tests/lib/reconcile/checkpoints-linux.test.ts
 
+  nibrunner-guest-image:
+    if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/prepare
+      - name: Build the nibrun guest image
+        run: bun run --filter @repo/internal-scripts build-nibrunner-guest-image
+
   security:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false
     runs-on: ubuntu-latest
@@ -77,7 +87,7 @@ jobs:
   checks-passed:
     if: always() && (github.event_name != 'pull_request' || github.event.pull_request.draft == false)
     name: checks:required
-    needs: [types, codestyle, tests, security]
+    needs: [types, codestyle, tests, security, nibrunner-guest-image]
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs passed
