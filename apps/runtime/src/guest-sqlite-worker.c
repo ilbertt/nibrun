@@ -68,20 +68,55 @@ static bool transfer(int connection, unsigned char *bytes, size_t length,
   return !stopping;
 }
 
+static int data_directory(const char *path) {
+  if (path[0] != '/') {
+    errno = EINVAL;
+    return -1;
+  }
+  int directory = open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+  char *copy = strdup(path);
+  if (directory < 0 || copy == NULL) {
+    if (directory >= 0)
+      close(directory);
+    free(copy);
+    return -1;
+  }
+  char *remaining = NULL;
+  for (char *component = strtok_r(copy, "/", &remaining); component != NULL;
+       component = strtok_r(NULL, "/", &remaining)) {
+    int next = strcmp(component, "..") == 0
+                   ? -1
+                   : openat(directory, component,
+                            O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC);
+    close(directory);
+    directory = next;
+    if (directory < 0)
+      break;
+  }
+  free(copy);
+  return directory;
+}
+
 static bool jail_worker(const char *mount_point) {
   const struct rlimit memory = {.rlim_cur = 128 * 1024 * 1024,
                                 .rlim_max = 128 * 1024 * 1024};
   const struct rlimit files = {.rlim_cur = 64, .rlim_max = 64};
   int oom = open("/proc/self/oom_score_adj", O_WRONLY | O_CLOEXEC);
   if (oom >= 0) {
-    ssize_t count = write(oom, "500", 3);
+    ssize_t count = write(oom, "1000", 4);
     (void)count;
     close(oom);
   }
-  return setrlimit(RLIMIT_AS, &memory) == 0 &&
-         setrlimit(RLIMIT_NOFILE, &files) == 0 && chdir(mount_point) == 0 &&
-         chroot(".") == 0 && chdir("/") == 0 && setgroups(0, NULL) == 0 &&
-         setgid(TENANT_GID) == 0 && setuid(TENANT_UID) == 0;
+  int directory = data_directory(mount_point);
+  if (directory < 0)
+    return false;
+  bool ready = setrlimit(RLIMIT_AS, &memory) == 0 &&
+               setrlimit(RLIMIT_NOFILE, &files) == 0 &&
+               fchdir(directory) == 0 && chroot(".") == 0 && chdir("/") == 0 &&
+               setgroups(0, NULL) == 0 && setgid(TENANT_GID) == 0 &&
+               setuid(TENANT_UID) == 0;
+  close(directory);
+  return ready;
 }
 
 #define SQLITE_HTTP_HEADER_BYTES 16384
