@@ -78,6 +78,10 @@ The root's `build` and `check:types` run Turbo without `bun run --bun`: that fla
 Wrangler type generation, needs real Node. CI installs it from the root `package.json`'s
 `engines.node`. Individual TypeScript checks still run under Bun.
 
+The checks workflow pins its test runner to Ubuntu 24.04. Its NBD, systemd and FUSE
+integrations depend on the host kernel and system packages; upgrade the runner image
+separately from the JavaScript toolchain.
+
 CI also runs `bun check:security`, rejecting high and critical dependency advisories. Review
 the full `bun audit` when updating dependencies; lower-severity findings remain actionable.
 Document temporary security overrides and vendored dependency patches in the owning package's
