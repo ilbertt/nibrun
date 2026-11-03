@@ -6,6 +6,10 @@ data "aws_ec2_instance_type" "nibrunner_host" {
   instance_type = "r8id.xlarge"
 }
 
+locals {
+  nibrunner_filesystems_prefix = "nibrunner/primary"
+}
+
 # Keep this engine separate: the legacy deploy starts the shared ZeroFS writer,
 # and a second writer against that prefix fences the machine serving existing apps.
 resource "aws_instance" "nibrunner_host" {
@@ -88,13 +92,48 @@ resource "aws_iam_role_policy_attachment" "nibrunner_host_ssm_core" {
 
 data "aws_iam_policy_document" "nibrunner_host" {
   statement {
-    sid       = "TunnelTokenRead"
-    actions   = ["ssm:GetParameter"]
-    resources = [aws_ssm_parameter.nibrunner_cloudflared_token.arn]
+    sid = "FilesystemsWrite"
+    actions = [
+      "s3:GetObject",
+      "s3:PutObject",
+      "s3:DeleteObject",
+      "s3:AbortMultipartUpload",
+    ]
+    resources = ["${aws_s3_bucket.filesystems.arn}/${local.nibrunner_filesystems_prefix}/*"]
   }
 
   statement {
-    sid       = "TunnelTokenDecryptViaSsm"
+    sid       = "FilesystemsList"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.filesystems.arn]
+    condition {
+      test     = "StringLike"
+      variable = "s3:prefix"
+      values = [
+        local.nibrunner_filesystems_prefix,
+        "${local.nibrunner_filesystems_prefix}/*",
+      ]
+    }
+  }
+
+  # Multipart listing does not support an s3:prefix condition.
+  statement {
+    sid       = "FilesystemsMultipartList"
+    actions   = ["s3:ListBucketMultipartUploads"]
+    resources = [aws_s3_bucket.filesystems.arn]
+  }
+
+  statement {
+    sid     = "HostSecretsRead"
+    actions = ["ssm:GetParameter"]
+    resources = [
+      aws_ssm_parameter.nibrunner_cloudflared_token.arn,
+      aws_ssm_parameter.nibrunner_zerofs_encryption_password.arn,
+    ]
+  }
+
+  statement {
+    sid       = "HostSecretsDecryptViaSsm"
     actions   = ["kms:Decrypt"]
     resources = ["*"]
     condition {
@@ -105,7 +144,10 @@ data "aws_iam_policy_document" "nibrunner_host" {
     condition {
       test     = "StringEquals"
       variable = "kms:EncryptionContext:PARAMETER_ARN"
-      values   = [aws_ssm_parameter.nibrunner_cloudflared_token.arn]
+      values = [
+        aws_ssm_parameter.nibrunner_cloudflared_token.arn,
+        aws_ssm_parameter.nibrunner_zerofs_encryption_password.arn,
+      ]
     }
   }
 
@@ -143,6 +185,37 @@ resource "aws_iam_role_policy" "nibrunner_host" {
 resource "aws_iam_instance_profile" "nibrunner_host" {
   name = "${local.resource_name_prefix}-nibrunner-host"
   role = aws_iam_role.nibrunner_host.name
+}
+
+resource "random_password" "nibrunner_zerofs_encryption_password" {
+  length  = 48
+  special = false
+
+  lifecycle {
+    prevent_destroy = true
+  }
+}
+
+resource "aws_ssm_parameter" "nibrunner_zerofs_encryption_password" {
+  name  = "${var.ssm_secret_prefix}/nibrunner_zerofs_encryption_password"
+  type  = "SecureString"
+  value = random_password.nibrunner_zerofs_encryption_password.result
+
+  lifecycle {
+    prevent_destroy = true
+  }
+
+  tags = {
+    Name = "${local.resource_name_prefix}-nibrunner-zerofs-encryption-password"
+  }
+}
+
+output "nibrunner_zerofs_storage_url" {
+  value = "s3://${aws_s3_bucket.filesystems.bucket}/${local.nibrunner_filesystems_prefix}"
+}
+
+output "nibrunner_zerofs_encryption_password_parameter" {
+  value = aws_ssm_parameter.nibrunner_zerofs_encryption_password.name
 }
 
 output "nibrunner_host_instance_id" {
