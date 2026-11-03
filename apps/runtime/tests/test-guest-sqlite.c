@@ -107,6 +107,18 @@ static void session(const char *directory) {
   finish(process, connection);
 }
 
+static void symlink_root(const char *directory) {
+  char link[256];
+  snprintf(link, sizeof(link), "%s-link", directory);
+  EXPECT(symlink(directory, link) == 0);
+  int connection;
+  pid_t process = start(link, &connection);
+  char response;
+  EXPECT(recv(connection, &response, 1, 0) == 0);
+  finish(process, connection);
+  unlink(link);
+}
+
 static void bad_path(const char *directory) {
   int connection;
   pid_t process = start(directory, &connection);
@@ -149,6 +161,7 @@ int main(void) {
   sqlite3_close(database);
   EXPECT(chown(path, TENANT_UID, TENANT_GID) == 0);
   session(directory);
+  symlink_root(directory);
   bad_path(directory);
   malformed_headers(directory);
   unlink(path);
