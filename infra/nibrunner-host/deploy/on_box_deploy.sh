@@ -14,6 +14,7 @@ fi
 modprobe kvm_intel
 test -c /dev/kvm
 
+bash install_data.sh
 bash install_tls.sh
 
 marker=/opt/nibrun/nibrunner-host/installed-binary.sha256

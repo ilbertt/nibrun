@@ -24,6 +24,12 @@ const configuration = (await Bun.file(join(hostDirectory, 'config.toml.template'
   .replaceAll('{{GUEST_IMAGE_DIRECTORY}}', JSON.stringify(guestDirectory))
   .replaceAll('{{FILESYSTEM_SOCKET}}', JSON.stringify(NIBRUNNER_FILESYSTEM_SOCKET));
 const installer = await Bun.file(join(hostDirectory, 'deploy/on_box_deploy.sh')).text();
+const dataInstaller = await Bun.file(join(hostDirectory, 'deploy/install_data.sh')).text();
+const dataInitializer = await Bun.file(
+  join(repoRoot, 'infra/app-host/deploy/ensure_ephemeral_data.sh'),
+).text();
+const dataUnit = await Bun.file(join(hostDirectory, 'systemd/nibrunner-data.service')).text();
+const dataDependencies = await Bun.file(join(hostDirectory, 'systemd/data.conf')).text();
 const tlsInstaller = await Bun.file(join(hostDirectory, 'deploy/install_tls.sh')).text();
 const originPullCa = await Bun.file(join(hostDirectory, 'cloudflare-origin-pull-ca.pem')).text();
 const bridgeInstaller = await Bun.file(join(hostDirectory, 'deploy/install_bridge.sh')).text();
@@ -51,6 +57,10 @@ const script = [
   'umask 077',
   writeRemoteFile({ name: 'config.toml', content: configuration }),
   writeRemoteFile({ name: 'on_box_deploy.sh', content: installer }),
+  writeRemoteFile({ name: 'install_data.sh', content: dataInstaller }),
+  writeRemoteFile({ name: 'ensure_ephemeral_data.sh', content: dataInitializer }),
+  writeRemoteFile({ name: 'nibrunner-data.service', content: dataUnit }),
+  writeRemoteFile({ name: 'data.conf', content: dataDependencies }),
   writeRemoteFile({ name: 'install_tls.sh', content: tlsInstaller }),
   writeRemoteFile({ name: 'origin-pull-ca.pem', content: originPullCa }),
   writeRemoteFile({ name: 'install_bridge.sh', content: bridgeInstaller }),
