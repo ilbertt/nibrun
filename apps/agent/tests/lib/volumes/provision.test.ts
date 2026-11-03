@@ -165,7 +165,9 @@ describe('provisioning on a selected live filesystem', () => {
         yield* provisionVolume({ desired: desiredVolume(), filesystem: stage.filesystem }).pipe(
           Effect.provide(stage.layer),
         );
-        expect(stage.commands.executables()).toEqual(['dd']);
+        expect(
+          stage.commands.commands.map(({ command }) => command.includes('iflag=direct')),
+        ).toEqual([true]);
       }),
     );
   });

@@ -58,6 +58,7 @@ export const isAttached = (devicePath: string) =>
 
 /** One block, at the offset every filesystem on the device keeps something at. */
 const PROBE_BYTES = 4096;
+const GNU_DD_PATH = '/usr/bin/gnudd';
 const READ_SUCCEEDED = 0;
 const NO_BYTES = 0;
 
@@ -123,23 +124,31 @@ const attachedSizeBytes = (devicePath: string) =>
  * probes it again until an attach succeeds — so the count is bounded by the devices on the host,
  * not by how often the reconcile runs.
  */
-const readsFirstBlock = (devicePath: string) =>
-  run({
-    command: [
-      'dd',
-      `if=${devicePath}`,
-      'of=/dev/null',
-      `bs=${PROBE_BYTES}`,
-      'count=1',
-      'iflag=direct',
-    ],
-    timeout: PROBE_TIMEOUT,
-  }).pipe(
-    Effect.map((result) => result.code === READ_SUCCEEDED),
-    // A probe that could not be run is not evidence the device is well, and the repair it leads
-    // to costs a detach and an attach against a device nobody is using yet.
-    Effect.catchAll(() => Effect.succeed(false)),
-  );
+function readsFirstBlock(devicePath: string) {
+  return Effect.gen(function* () {
+    const executable = yield* ddExecutable();
+    const result = yield* run({
+      command: [
+        executable,
+        `if=${devicePath}`,
+        'of=/dev/null',
+        `bs=${PROBE_BYTES}`,
+        'count=1',
+        'iflag=direct',
+      ],
+      timeout: PROBE_TIMEOUT,
+    });
+    return result.code === READ_SUCCEEDED;
+  }).pipe(Effect.catchAll(() => Effect.succeed(false)));
+}
+
+export function ddExecutable() {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    // Ubuntu's uutils dd misaligns O_DIRECT buffers; its GNU binary avoids false probe failures.
+    return (yield* fs.exists(GNU_DD_PATH)) ? GNU_DD_PATH : 'dd';
+  });
+}
 
 function connect({
   client,
