@@ -262,7 +262,7 @@ export const DEPLOY_PRESETS = {
   'open-connector': {
     isRecommended: false,
     projectUrl: 'https://github.com/oomol-lab/open-connector',
-    version: 'v1.9.4',
+    version: 'v1.9.5',
     markdownContent: openConnectorPage,
     category: DeployCategory.DeveloperTools,
     title: 'OpenConnector',
@@ -270,8 +270,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'open-connector',
       binary:
-        'https://github.com/oomol-lab/open-connector/releases/download/v1.9.4/open-connector-linux-x64',
-      sha256: 'a7cae7bc1b0ee43e75bead92a725a2dc6285be0ecbe253c8511d5aaff2f22fdb',
+        'https://github.com/oomol-lab/open-connector/releases/download/v1.9.5/open-connector-linux-x64',
+      sha256: 'e937dc6414d22580c0bcf3176a7d25d338cbc385f4ea24198947230e6cbc0d9b',
       port: 3000,
       env: [
         'HOST=0.0.0.0',
@@ -350,7 +350,7 @@ export const DEPLOY_PRESETS = {
   memos: {
     isRecommended: false,
     projectUrl: 'https://github.com/usememos/memos',
-    version: '26.10.0',
+    version: '26.11.0',
     markdownContent: memosPage,
     category: DeployCategory.NotesAndKnowledge,
     title: 'Memos',
@@ -358,8 +358,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'memos',
       binary:
-        'https://github.com/usememos/memos/releases/download/26.10.0/memos_26.10.0_linux_amd64.tar.gz',
-      sha256: '873e639c6a9e9bac47af57d628477fa87b7e965fadf0354c7d1a4e5280681de7',
+        'https://github.com/usememos/memos/releases/download/26.11.0/memos_26.11.0_linux_amd64.tar.gz',
+      sha256: '38b81c2bd1859555f4f7f277756541fd1ca332c94bbbee443626ace42d7b4061',
       port: 5230,
       env: [
         `MEMOS_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
@@ -574,7 +574,7 @@ export const DEPLOY_PRESETS = {
   calnode: {
     isRecommended: false,
     projectUrl: 'https://github.com/Calnode/calnode',
-    version: 'v0.12.0',
+    version: 'v0.13.0',
     markdownContent: calnodePage,
     title: 'Calnode',
     subtitle: 'A scheduling and booking app with calendar integrations, an API and an MCP server.',
@@ -582,8 +582,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'calnode',
       binary:
-        'https://github.com/Calnode/calnode/releases/download/v0.12.0/calnode_0.12.0_linux_amd64.tar.gz',
-      sha256: 'c2849636e0a484b8b914b8542dc7ab47702280bff3e44e5ac50f33e97f662f85',
+        'https://github.com/Calnode/calnode/releases/download/v0.13.0/calnode_0.13.0_linux_amd64.tar.gz',
+      sha256: '82b98e3e51d76723df27a7f50f75a3079249142570b1c8058734c1dc805fb3da',
       port: 3000,
       env: [
         `BASE_URL=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
