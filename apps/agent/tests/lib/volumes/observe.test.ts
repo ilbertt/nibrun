@@ -111,7 +111,9 @@ describe('observation on a selected live filesystem', () => {
           },
         ]);
         expect(stage.lookups).toEqual([APP_ID]);
-        expect(stage.commands.executables()).toEqual(['dd']);
+        expect(
+          stage.commands.commands.map(({ command }) => command.includes('iflag=direct')),
+        ).toEqual([true]);
         expect(stage.commands.commands[0]?.command).toContain(`if=${stage.slot.nbdDevicePath}`);
       }),
     );
@@ -218,7 +220,10 @@ describe('observation on a selected live filesystem', () => {
         );
         expect(observed).toHaveLength(2);
         expect(observed.every(({ attached }) => attached)).toBe(true);
-        expect(commands.executables()).toEqual(['dd', 'dd']);
+        expect(commands.commands.map(({ command }) => command.includes('iflag=direct'))).toEqual([
+          true,
+          true,
+        ]);
       }),
     );
   });
@@ -267,7 +272,9 @@ describe('observation on a selected live filesystem', () => {
         expect(observed[0]?.storagePrefix).toBe(HOST_STORAGE_PREFIX);
         expect(observed[0]?.attached).toBe(true);
         expect(stage.lookups).toEqual([APP_ID]);
-        expect(stage.commands.executables()).toEqual(['dd']);
+        expect(
+          stage.commands.commands.map(({ command }) => command.includes('iflag=direct')),
+        ).toEqual([true]);
       }),
     );
   });

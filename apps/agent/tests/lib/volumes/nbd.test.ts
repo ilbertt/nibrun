@@ -99,6 +99,18 @@ describe('a device that answers is not the same as a device with a client', () =
     expect(commands.find(({ command }) => isProbe(command))?.command).toContain('iflag=direct');
   });
 
+  test('Ubuntu GNU dd can probe a healthy device when the default dd rejects direct I/O', async () => {
+    const { commands, run } = host({
+      attributes: { ...attached, '/usr/bin/gnudd': '' },
+      answer: ({ command }) => succeeding({ code: command[0] === 'dd' ? READ_FAILED : 0 }),
+    });
+    expect(await run(isUsable(DEVICE))).toBe(true);
+    expect(commands).toHaveLength(1);
+    expect(commands[0]?.command[0]).toBe('/usr/bin/gnudd');
+    expect(commands[0]?.command).toContain('iflag=direct');
+    expect(commands[0]?.timeout).toBeDefined();
+  });
+
   test('a probe that reads is usable', async () => {
     const { run } = host();
     expect(await run(isUsable(DEVICE))).toBe(true);
