@@ -24,6 +24,7 @@ const configuration = (await Bun.file(join(hostDirectory, 'config.toml.template'
   .replaceAll('{{GUEST_IMAGE_DIRECTORY}}', JSON.stringify(guestDirectory))
   .replaceAll('{{FILESYSTEM_SOCKET}}', JSON.stringify(NIBRUNNER_FILESYSTEM_SOCKET));
 const installer = await Bun.file(join(hostDirectory, 'deploy/on_box_deploy.sh')).text();
+const aptConfiguration = await Bun.file(join(hostDirectory, 'apt.conf')).text();
 const tunnelInstaller = await Bun.file(join(hostDirectory, 'deploy/install_tunnel.sh')).text();
 const tunnelUnit = await Bun.file(
   join(hostDirectory, 'systemd/nibrun-nibrunner-tunnel.service'),
@@ -53,6 +54,7 @@ const script = [
   'umask 077',
   writeRemoteFile({ name: 'config.toml', content: configuration }),
   writeRemoteFile({ name: 'on_box_deploy.sh', content: installer }),
+  writeRemoteFile({ name: 'apt.conf', content: aptConfiguration }),
   writeRemoteFile({ name: 'install_tunnel.sh', content: tunnelInstaller }),
   writeRemoteFile({ name: 'nibrun-nibrunner-tunnel.service', content: tunnelUnit }),
   writeRemoteFile({ name: 'install_bridge.sh', content: bridgeInstaller }),

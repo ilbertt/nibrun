@@ -22,6 +22,8 @@ the SSM deploy, so the commissioning domain can be briefly unavailable during th
 The host fetches its Tunnel token directly from SSM. systemd passes it through `LoadCredential`
 to an unprivileged `cloudflared` process; CI and RunCommand receive only the parameter name.
 The signed Cloudflare APT repository supplies stable `cloudflared` updates on every deploy.
+The host installs `apt.conf` before any package operations so APT waits up to five minutes for
+the dpkg lock when unattended upgrades are running.
 
 Config carries its component's prefix (`API_`, `POSTGRES_`, `PG_BACKUP_`, `CADDY_`, `DOZZLE_`,
 `VICTORIALOGS_`, `PGWEB_`, `UMAMI_`, `CLOUDFLARED_`) unless more than one component reads it, and keeps one name from
