@@ -6,8 +6,17 @@
 # It forwards a range and is never told which app owns a port within it — that is
 # already resolved by the agent's ruleset on the app host.
 
+data "aws_ami" "port_relay" {
+  owners = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-2023.12.20261102.0-kernel-6.18-x86_64"]
+  }
+}
+
 resource "aws_instance" "port_relay" {
-  ami                    = data.aws_ssm_parameter.al2023_ami.value
+  ami                    = data.aws_ami.port_relay.id
   instance_type          = var.port_relay_instance_type
   subnet_id              = aws_subnet.app.id
   vpc_security_group_ids = [aws_security_group.port_relay.id]
@@ -41,8 +50,6 @@ resource "aws_instance" "port_relay" {
   }
 
   lifecycle {
-    ignore_changes = [ami]
-
     # One, not "at least one": the range is forwarded to a single host, and a tenant's port is
     # 22000 + its slot, which every host numbers from 0 — so two hosts both hold 22005 and the
     # port carries nothing to tell them apart. A second host would take no tenant traffic at all
