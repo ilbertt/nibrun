@@ -3,7 +3,6 @@ import { $ } from 'bun';
 import { writeSummary } from '#shared/actions.ts';
 import { optionalEnv, requiredEnv } from '#shared/env.ts';
 import { terraformDir } from '#shared/paths.ts';
-import { isImportedNibrunnerDnsCutover } from '#shared/terraform-dns-cutover.ts';
 
 type ResourceChange = {
   address: string;
@@ -48,14 +47,7 @@ export async function failOnUnexpectedDestroys(planFile: string) {
     ),
   ].sort() as string[];
 
-  const dnsCutovers = new Set(
-    (plan.resource_changes ?? [])
-      .filter(isImportedNibrunnerDnsCutover)
-      .map((resource: ResourceChange) => resource.address),
-  );
-  const unexpected = destroyed.filter(
-    (address) => !(allowed.has(address) || dnsCutovers.has(address)),
-  );
+  const unexpected = destroyed.filter((address) => !allowed.has(address));
 
   if (unexpected.length > 0) {
     await writeSummary(

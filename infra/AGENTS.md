@@ -11,10 +11,8 @@ ingress rules. Its HTTP proxy listens on `127.0.0.1:8080`; `cloudflared` preserv
 hostname so nibrunner can route each app. Public instance addresses support outbound traffic
 only. The separate legacy app-host fleet still uses its existing origin proxy and port relay.
 
-Terraform routes `nibrunner_domain` and its wildcard to that Tunnel, adopting an existing single
-A, AAAA or CNAME record per name during the plan. Consolidate multiple address records before
-cutover. The provider replaces imported A/AAAA records when converting them to CNAMEs; the
-destruction guard permits only this imported, proxied conversion within the same name and zone.
+Terraform creates proxied CNAME records for `nibrunner_domain` and its wildcard, both pointing
+to the Tunnel. The domain starts without existing DNS records.
 CI keeps reading the existing `NIBRUNNER_ORIGIN_DOMAIN` repository variable. The
 Terraform token needs Zone Read and DNS Edit on this zone as well as Cloudflare Tunnel Edit.
 Merge and deploy tunnel provisioning before the cutover, then wait for the host deploy's
