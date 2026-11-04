@@ -73,6 +73,8 @@ needs — fixtures, stubs, recorders — belongs in `tests/support/`, reached th
 `#tests/*` mapping. Not every package needs tests; a package whose correctness is only checkable
 at runtime does.
 
+When a package test executes files outside that package, include those files in its Turbo test inputs.
+
 The root's `build` and `check:types` run Turbo without `bun run --bun`: that flag symlinks
 `node` to Bun for every descendant process. Miniflare, used by `@repo/www` prerendering and
 Wrangler type generation, needs real Node. CI installs it from the root `package.json`'s
