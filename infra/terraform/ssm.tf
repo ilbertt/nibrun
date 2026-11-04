@@ -80,35 +80,6 @@ resource "aws_ssm_parameter" "api_cloudflare_api_token" {
   }
 }
 
-# The proxy's TLS material. Both halves land here rather than in the deploy's
-# own environment, for the same reason the OAuth App secret does — and the
-# certificate rides along even though it is public, so the box has one way to
-# read both.
-#
-# Encoded rather than stored as-is because a PEM is multi-line: the box reads
-# parameters with `aws ssm get-parameter --output text`, which mangles that, and
-# has no jq to read the JSON form instead. base64encode emits a single line, so
-# on_box_deploy.sh only has to decode.
-resource "aws_ssm_parameter" "caddy_tls_cert" {
-  name  = "${var.ssm_secret_prefix}/caddy_tls_cert"
-  type  = "SecureString"
-  value = base64encode(var.caddy_tls_cert)
-
-  tags = {
-    Name = "${local.resource_name_prefix}-caddy-tls-cert"
-  }
-}
-
-resource "aws_ssm_parameter" "caddy_tls_key" {
-  name  = "${var.ssm_secret_prefix}/caddy_tls_key"
-  type  = "SecureString"
-  value = base64encode(var.caddy_tls_key)
-
-  tags = {
-    Name = "${local.resource_name_prefix}-caddy-tls-key"
-  }
-}
-
 # The password for Dozzle's one login. Generated like every other secret here,
 # and read back the same way when you need it:
 #
@@ -194,10 +165,8 @@ resource "aws_ssm_parameter" "pgweb_auth_pass" {
 
 # --- App hosts ---
 
-# The user-app proxy's TLS material, carried exactly like the control plane
-# proxy's above — base64 for the same reason, and both halves through SSM so
-# neither reaches the deploy's own environment. A different certificate, because
-# it is issued for a different zone.
+# Base64 keeps each PEM on one line for SSM's text output. The app host fetches
+# both halves directly so private keys never enter the deploy workflow.
 resource "aws_ssm_parameter" "app_host_caddy_tls_cert" {
   name  = "${var.ssm_secret_prefix}/app_host_caddy_tls_cert"
   type  = "SecureString"

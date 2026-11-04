@@ -11,8 +11,7 @@ const COMPOSE_FILES = ['docker-compose.yml', 'docker-compose.prod.yml'];
 const ON_BOX_SCRIPTS = ['on_box_deploy.sh', 'ensure_data_volume.sh'];
 // Ships as a directory because that is how it is mounted: the proxy reads
 // through the directory, so replacing a file in it cannot leave the running
-// container on the old inode. Holds the Caddyfile and Cloudflare's public
-// origin-pull CA — the certificate that CA verifies comes from SSM instead.
+// container on the old inode. Holds the Caddyfile and generated authentication rules.
 const CADDY_DIR = 'caddy';
 
 const deployBucket = requiredEnv('DEPLOY_BUCKET');

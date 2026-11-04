@@ -1,21 +1,6 @@
-# Cloudflared reaches the unpublished HTTP listener over Docker networking.
-# Keep authenticated HTTPS available until the tunnel and DNS are verified.
+# Cloudflare terminates TLS and reaches this HTTP listener over Docker networking.
 {
-	# No ACME: the certificate is a Cloudflare Origin Certificate, which the
-	# deploy fetches from SSM and writes into tls/ next to this file. It names
-	# every hostname below, so every site serves the same pair — which is why
-	# adding one here means reissuing that certificate.
 	auto_https off
-
-	# Authenticated Origin Pulls refuses a connection during the handshake, but
-	# nothing bounds how long a caller may take to reach that point: Go derives
-	# its TLS handshake deadline from the smallest read or write timeout set, and
-	# with none set there is no deadline at all. A connection opened and left
-	# mid-handshake is then held for as long as its opener likes, and the refusal
-	# that was the whole point never arrives.
-	#
-	# The header timeout alone: a write timeout would cut the log stream, which
-	# is meant to stay open, and a body timeout an upload of a binary.
 	servers {
 		timeouts {
 			read_header 10s
@@ -23,28 +8,7 @@
 	}
 }
 
-# Authenticated Origin Pulls. The origin IP is discoverable, so the edge has to
-# prove it is the edge: without a client certificate signed by Cloudflare's
-# origin-pull CA the handshake is refused before any request is read. Turning
-# this on also makes Caddy enforce SNI == Host, which closes Host-header
-# spoofing along with it.
-#
-# A snippet because every site needs it identically, and a site that quietly
-# went without would accept connections straight from the origin IP.
-(origin_tls) {
-	tls /etc/caddy/tls/origin.crt /etc/caddy/tls/origin.key {
-		client_auth {
-			mode require_and_verify
-			trust_pool file /etc/caddy/cloudflare-origin-pull-ca.pem
-		}
-	}
-}
-
-(api_route) {
-	# The api serves nothing under /internal yet. Denying the namespace before
-	# it exists is the point: fleet-host agents reach the api over the private
-	# network, and a route added there later would otherwise be public from the
-	# moment it is written, with nothing to notice it.
+http://{$API_HOSTNAME} {
 	@internal path /internal /internal/*
 	handle @internal {
 		respond 404
@@ -63,10 +27,9 @@
 	}
 }
 
-# The private listener, reachable only from an app host: the security group
-# admits this port from the app hosts' group and nothing else, and the public
-# edge above answers 404 for the same paths. Plain HTTP — a Cloudflare Origin
-# Certificate names hostnames, and an agent dials a private address.
+# The private listener, reachable only from fleet hosts: the security group
+# admits this port from their security groups, and the public HTTP listener
+# answers 404 for the same paths.
 #
 # It is a separate listener rather than another path on 443 because Cloudflare
 # closes a proxied request at about 100 seconds, and the agent long-polls for up
@@ -117,7 +80,7 @@
 # Container logs. Dozzle authenticates its own visitors (simple auth, prod only)
 # — the edge only gets them here, and deliberately does not add a second gate in
 # front of the login page.
-(dozzle_route) {
+http://{$DOZZLE_HOSTNAME} {
 	# Log streaming is a websocket; reverse_proxy upgrades it as-is, and the
 	# retries below sit before the upgrade, where a dial that never connected is
 	# safe to repeat.
@@ -128,7 +91,7 @@
 	}
 }
 
-(umami_route) {
+http://{$UMAMI_HOSTNAME} {
 	reverse_proxy umami:3000 {
 		header_up X-Forwarded-Proto https
 		lb_try_duration 30s
@@ -140,7 +103,7 @@
 # way to expose a subset of itself: one -httpAuth credential covers every
 # endpoint including /insert, and -select.disable is all-or-nothing. So both the
 # gate and the endpoint allowlist are here.
-(victorialogs_route) {
+http://{$VICTORIALOGS_HOSTNAME} {
 	# Rendered by on_box_deploy.sh from the SSM password, the way Dozzle's user
 	# list is; bcrypt is what basic_auth reads, and nothing on the box holds the
 	# password itself. A file under the mounted directory rather than an
@@ -175,42 +138,6 @@
 	handle {
 		respond 404
 	}
-}
-
-http://{$API_HOSTNAME} {
-	import api_route
-}
-
-https://{$API_HOSTNAME} {
-	import origin_tls
-	import api_route
-}
-
-http://{$DOZZLE_HOSTNAME} {
-	import dozzle_route
-}
-
-https://{$DOZZLE_HOSTNAME} {
-	import origin_tls
-	import dozzle_route
-}
-
-http://{$UMAMI_HOSTNAME} {
-	import umami_route
-}
-
-https://{$UMAMI_HOSTNAME} {
-	import origin_tls
-	import umami_route
-}
-
-http://{$VICTORIALOGS_HOSTNAME} {
-	import victorialogs_route
-}
-
-https://{$VICTORIALOGS_HOSTNAME} {
-	import origin_tls
-	import victorialogs_route
 }
 
 http:// {

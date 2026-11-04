@@ -138,37 +138,6 @@ resource "aws_iam_instance_profile" "nibrunner_host" {
   role = aws_iam_role.nibrunner_host.name
 }
 
-resource "aws_ssm_parameter" "nibrunner_origin_tls_cert" {
-  name  = "${var.ssm_secret_prefix}/nibrunner_origin_tls_cert"
-  type  = "SecureString"
-  value = base64encode(cloudflare_origin_ca_certificate.nibrunner.certificate)
-
-  tags = {
-    Name = "${local.resource_name_prefix}-nibrunner-origin-tls-cert"
-  }
-}
-
-resource "aws_ssm_parameter" "nibrunner_origin_tls_key" {
-  name  = "${var.ssm_secret_prefix}/nibrunner_origin_tls_key"
-  type  = "SecureString"
-  value = base64encode(tls_private_key.nibrunner.private_key_pem_pkcs8)
-
-  # Failed issuance must leave the existing certificate/key pair in SSM intact.
-  depends_on = [cloudflare_origin_ca_certificate.nibrunner]
-
-  tags = {
-    Name = "${local.resource_name_prefix}-nibrunner-origin-tls-key"
-  }
-}
-
-output "nibrunner_origin_tls_cert_parameter" {
-  value = aws_ssm_parameter.nibrunner_origin_tls_cert.name
-}
-
-output "nibrunner_origin_tls_key_parameter" {
-  value = aws_ssm_parameter.nibrunner_origin_tls_key.name
-}
-
 output "nibrunner_host_instance_id" {
   description = "SSM target for commissioning nibrunner before admitting app deployments."
   value       = aws_instance.nibrunner_host.id

@@ -24,17 +24,13 @@ const ON_BOX_SCRIPTS = [
   'prune_agent_versions.sh',
 ];
 
-// Shared with the control plane's bundle: Cloudflare's origin-pull CA is one
-// certificate, and both proxies authenticate the same edge against it.
-const SHARED_CADDY_FILES = ['cloudflare-origin-pull-ca.pem'];
-
 const deployBucket = requiredEnv('DEPLOY_BUCKET');
 const revision = requiredEnv('GITHUB_SHA');
 
 const appHostDir = join(repoRoot, 'infra/app-host');
 const bundlePath = join(tmpdir(), 'nibrun-app-host-bundle.tar.gz');
 
-await $`tar czf ${bundlePath} -C ${appHostDir} ${BUNDLE_DIRECTORIES} -C ${join(appHostDir, 'deploy')} ${ON_BOX_SCRIPTS} -C ${join(repoRoot, 'infra/caddy')} ${SHARED_CADDY_FILES}`;
+await $`tar czf ${bundlePath} -C ${appHostDir} ${BUNDLE_DIRECTORIES} -C ${join(appHostDir, 'deploy')} ${ON_BOX_SCRIPTS}`;
 
 const bundleBytes = Bun.file(bundlePath).size;
 const url = `s3://${deployBucket}/app-host-bundles/${revision}.tar.gz`;

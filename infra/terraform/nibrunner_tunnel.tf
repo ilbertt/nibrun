@@ -1,3 +1,13 @@
+variable "nibrunner_domain" {
+  type        = string
+  description = "Domain routed to the nibrunner host. CI retains the existing NIBRUNNER_ORIGIN_DOMAIN repository variable."
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9.-]*\\.[a-z]{2,}$", var.nibrunner_domain))
+    error_message = "nibrunner_domain must be a domain name without a wildcard or URL scheme."
+  }
+}
+
 locals {
   nibrunner_hostnames       = toset([var.nibrunner_domain, "*.${var.nibrunner_domain}"])
   nibrunner_tunnel_hostname = "${cloudflare_zero_trust_tunnel_cloudflared.nibrunner.id}.cfargotunnel.com"

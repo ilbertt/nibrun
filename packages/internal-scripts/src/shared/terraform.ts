@@ -3,11 +3,7 @@ import { $ } from 'bun';
 import { writeSummary } from '#shared/actions.ts';
 import { optionalEnv, requiredEnv } from '#shared/env.ts';
 import { terraformDir } from '#shared/paths.ts';
-
-type ResourceChange = {
-  address: string;
-  change: { actions: string[] };
-};
+import { terraformDestroys } from '#shared/terraform-destroys.ts';
 
 export function terraform(args: string[]) {
   return $`terraform ${args}`.cwd(terraformDir);
@@ -39,15 +35,10 @@ export async function failOnUnexpectedDestroys(planFile: string) {
       .filter(Boolean),
   );
 
-  const destroyed = [
-    ...new Set(
-      (plan.resource_changes ?? [])
-        .filter((change: ResourceChange) => change.change.actions.includes('delete'))
-        .map((change: ResourceChange) => change.address),
-    ),
-  ].sort() as string[];
-
-  const unexpected = destroyed.filter((address) => !allowed.has(address));
+  const { destroyed, unexpected } = terraformDestroys({
+    resourceChanges: plan.resource_changes ?? [],
+    allowedAddresses: allowed,
+  });
 
   if (unexpected.length > 0) {
     await writeSummary(

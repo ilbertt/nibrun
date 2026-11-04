@@ -439,7 +439,7 @@ chown caddy:caddy /etc/caddy/tls/origin.crt /etc/caddy/tls/origin.key
 cp caddy/Caddyfile /etc/caddy/Caddyfile.new
 changed_file /etc/caddy/Caddyfile && NEEDS_RELOAD+=(caddy) || true
 
-cp cloudflare-origin-pull-ca.pem /etc/caddy/cloudflare-origin-pull-ca.pem.new
+cp caddy/cloudflare-origin-pull-ca.pem /etc/caddy/cloudflare-origin-pull-ca.pem.new
 changed_file /etc/caddy/cloudflare-origin-pull-ca.pem && NEEDS_RELOAD+=(caddy) || true
 
 # `caddy reload` re-adapts the Caddyfile, and the substitutions in it are read

@@ -43,7 +43,7 @@ resource "aws_instance" "app" {
   }
 }
 
-# Stable public IP — point the hostname's A record at this.
+# Stable outbound address; public requests arrive through Cloudflare Tunnel.
 resource "aws_eip" "app" {
   instance = aws_instance.app.id
   domain   = "vpc"
