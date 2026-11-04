@@ -46,19 +46,23 @@ PY
 }
 
 verify_empty
-systemctl stop nibrun-nibrunner-bridge.service nibrunnerd.service
+tunnel_service=()
+if systemctl cat nibrun-nibrunner-tunnel.service >/dev/null 2>&1; then
+  tunnel_service=(nibrun-nibrunner-tunnel.service)
+fi
+systemctl stop "${tunnel_service[@]}" nibrun-nibrunner-bridge.service nibrunnerd.service
 if ! verify_empty; then
-  systemctl start nibrunnerd.service nibrun-nibrunner-bridge.service
+  systemctl start nibrunnerd.service nibrun-nibrunner-bridge.service "${tunnel_service[@]}"
   exit 1
 fi
-systemctl disable nibrun-nibrunner-bridge.service nibrunnerd.service
+systemctl disable "${tunnel_service[@]}" nibrun-nibrunner-bridge.service nibrunnerd.service
 
 find /var/lib/nibrunner -mindepth 1 -maxdepth 1 ! -name bridge -exec rm -rf -- {} +
 find /var/lib/nibrunner/bridge -mindepth 1 -maxdepth 1 ! -name host-id -exec rm -rf -- {} +
 find /var/lib -mindepth 1 -maxdepth 1 -type d -name 'nibrunner-canary-*' -exec rm -rf -- {} +
 rm -rf -- /etc/nibrunner /opt/nibrun/nibrunner-host /run/nibrunner \
   /etc/systemd/system/nibrunnerd.service /etc/systemd/system/nibrunnerd.service.d \
-  /etc/systemd/system/nibrun-nibrunner-bridge.service
+  /etc/systemd/system/nibrun-nibrunner-bridge.service /etc/systemd/system/nibrun-nibrunner-tunnel.service
 rm -f -- /usr/local/bin/nibrunnerd \
   /tmp/nibrunner-invalid-tls.log /tmp/nibrunner-canary-refusal.log /tmp/nibrunner-data-stat
 systemctl daemon-reload

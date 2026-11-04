@@ -6,6 +6,23 @@ an instance has no Bun; everything CI runs lives in `@repo/internal-scripts`.
 
 The Terraform explains itself — read it rather than a description of it here.
 
+The isolated nibrunner host uses an outbound Cloudflare Tunnel and has no security-group
+ingress rules. Its HTTP proxy listens on `127.0.0.1:8080`; `cloudflared` preserves the requested
+hostname so nibrunner can route each app. Public instance addresses support outbound traffic
+only. The separate legacy app-host fleet still uses its existing origin proxy and port relay.
+
+Terraform routes `nibrunner_domain` and its wildcard to that Tunnel, adopting an existing single
+A, AAAA or CNAME record per name during the plan. Consolidate multiple address records before
+cutover. CI keeps reading the existing `NIBRUNNER_ORIGIN_DOMAIN` repository variable. The
+Terraform token needs Zone Read and DNS Edit on this zone as well as Cloudflare Tunnel Edit.
+Merge and deploy tunnel provisioning before the cutover, then wait for the host deploy's
+Tunnel readiness gate before retiring its origin certificate. The DNS cutover happens before
+the SSM deploy, so the commissioning domain can be briefly unavailable during that deploy.
+
+The host fetches its Tunnel token directly from SSM. systemd passes it through `LoadCredential`
+to an unprivileged `cloudflared` process; CI and RunCommand receive only the parameter name.
+The signed Cloudflare APT repository supplies stable `cloudflared` updates on every deploy.
+
 Config carries its component's prefix (`API_`, `POSTGRES_`, `PG_BACKUP_`, `CADDY_`, `DOZZLE_`,
 `VICTORIALOGS_`, `PGWEB_`, `UMAMI_`, `CLOUDFLARED_`) unless more than one component reads it, and keeps one name from
 the Terraform output through the SSM command to the `.env` the box writes. Nothing is aliased in

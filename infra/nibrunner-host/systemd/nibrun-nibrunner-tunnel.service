@@ -1,0 +1,22 @@
+[Unit]
+Description=Cloudflare Tunnel for the nibrunner HTTP proxy
+After=network-online.target nibrunnerd.service
+Wants=network-online.target nibrunnerd.service
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+DynamicUser=yes
+LoadCredential=tunnel-token:/etc/nibrunner/cloudflared/token
+ExecStart=/usr/bin/cloudflared tunnel --no-autoupdate --metrics 127.0.0.1:2000 run --token-file %d/tunnel-token
+Restart=always
+RestartSec=5
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target
