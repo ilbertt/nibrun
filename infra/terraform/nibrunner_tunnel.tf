@@ -6,6 +6,11 @@ variable "nibrunner_domain" {
     condition     = can(regex("^[a-z0-9][a-z0-9.-]*\\.[a-z]{2,}$", var.nibrunner_domain))
     error_message = "nibrunner_domain must be a domain name without a wildcard or URL scheme."
   }
+
+  validation {
+    condition     = var.nibrunner_domain != var.app_host_domain
+    error_message = "nibrunner_domain must use a separate zone from the legacy app-host domain."
+  }
 }
 
 locals {
@@ -23,12 +28,8 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "nibrunner" {
   account_id = var.cloudflare_account_id
   tunnel_id  = cloudflare_zero_trust_tunnel_cloudflared.nibrunner.id
   config = {
-    ingress = concat([
-      for hostname in sort(tolist(local.nibrunner_hostnames)) : {
-        hostname = hostname
-        service  = "http://127.0.0.1:8080"
-      }
-    ], [{ service = "http_status:404" }])
+    # Customer hostnames must reach nibrunner unchanged so it can select their app.
+    ingress = [{ service = "http://127.0.0.1:8080" }]
   }
 }
 
