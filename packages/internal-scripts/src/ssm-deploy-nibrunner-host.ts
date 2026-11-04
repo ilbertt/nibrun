@@ -24,8 +24,10 @@ const configuration = (await Bun.file(join(hostDirectory, 'config.toml.template'
   .replaceAll('{{GUEST_IMAGE_DIRECTORY}}', JSON.stringify(guestDirectory))
   .replaceAll('{{FILESYSTEM_SOCKET}}', JSON.stringify(NIBRUNNER_FILESYSTEM_SOCKET));
 const installer = await Bun.file(join(hostDirectory, 'deploy/on_box_deploy.sh')).text();
-const tlsInstaller = await Bun.file(join(hostDirectory, 'deploy/install_tls.sh')).text();
-const originPullCa = await Bun.file(join(hostDirectory, 'cloudflare-origin-pull-ca.pem')).text();
+const tunnelInstaller = await Bun.file(join(hostDirectory, 'deploy/install_tunnel.sh')).text();
+const tunnelUnit = await Bun.file(
+  join(hostDirectory, 'systemd/nibrun-nibrunner-tunnel.service'),
+).text();
 const bridgeInstaller = await Bun.file(join(hostDirectory, 'deploy/install_bridge.sh')).text();
 const bridgeUnit = await Bun.file(
   join(hostDirectory, 'systemd/nibrun-nibrunner-bridge.service'),
@@ -51,8 +53,8 @@ const script = [
   'umask 077',
   writeRemoteFile({ name: 'config.toml', content: configuration }),
   writeRemoteFile({ name: 'on_box_deploy.sh', content: installer }),
-  writeRemoteFile({ name: 'install_tls.sh', content: tlsInstaller }),
-  writeRemoteFile({ name: 'origin-pull-ca.pem', content: originPullCa }),
+  writeRemoteFile({ name: 'install_tunnel.sh', content: tunnelInstaller }),
+  writeRemoteFile({ name: 'nibrun-nibrunner-tunnel.service', content: tunnelUnit }),
   writeRemoteFile({ name: 'install_bridge.sh', content: bridgeInstaller }),
   writeRemoteFile({ name: 'nibrun-nibrunner-bridge.service', content: bridgeUnit }),
   writeRemoteFile({ name: 'bridge.env', content: `${environmentFile}\n` }),
@@ -62,8 +64,7 @@ const script = [
     NIBRUNNER_GUEST_IMAGE_URL: requiredEnv('NIBRUNNER_GUEST_IMAGE_URL'),
     NIBRUNNER_GUEST_IMAGE_SHA256: requiredEnv('NIBRUNNER_GUEST_IMAGE_SHA256'),
     AWS_REGION: requiredEnv('AWS_REGION'),
-    NIBRUNNER_ORIGIN_TLS_CERT_PARAMETER: requiredEnv('NIBRUNNER_ORIGIN_TLS_CERT_PARAMETER'),
-    NIBRUNNER_ORIGIN_TLS_KEY_PARAMETER: requiredEnv('NIBRUNNER_ORIGIN_TLS_KEY_PARAMETER'),
+    NIBRUNNER_CLOUDFLARED_TOKEN_PARAMETER: requiredEnv('NIBRUNNER_CLOUDFLARED_TOKEN_PARAMETER'),
     AGENT_VERSION: agentVersion,
     AGENT_URL: requiredEnv('AGENT_URL'),
     AGENT_SHA256: requiredEnv('AGENT_SHA256'),
@@ -71,6 +72,7 @@ const script = [
   })}`,
   'bash on_box_deploy.sh',
   'bash install_bridge.sh',
+  'bash install_tunnel.sh',
   'NIBRUNNER_DEPLOY',
 ].join('\n');
 

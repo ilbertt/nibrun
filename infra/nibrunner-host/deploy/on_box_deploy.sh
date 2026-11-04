@@ -14,8 +14,6 @@ fi
 modprobe kvm_intel
 test -c /dev/kvm
 
-bash install_tls.sh
-
 marker=/opt/nibrun/nibrunner-host/installed-binary.sha256
 if ! cmp -s config.toml /etc/nibrunner/config.toml ||
   [ ! -f "$marker" ] || [ "$(cat "$marker")" != "$NIBRUNNER_BINARY_SHA256" ] ||
@@ -23,7 +21,7 @@ if ! cmp -s config.toml /etc/nibrunner/config.toml ||
   work=$(mktemp -d)
   trap 'rm -rf "$work"' EXIT
   apt-get update -q
-  DEBIAN_FRONTEND=noninteractive apt-get install -y -q nftables e2fsprogs nbd-client fuse3 kmod passwd curl ca-certificates
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -q nftables e2fsprogs nbd-client fuse3 kmod passwd curl ca-certificates awscli
   curl -fsSL --retry 3 \
     "https://github.com/ilbertt/nibrunner/releases/download/${NIBRUNNER_VERSION}/nibrunnerd-linux-x64" \
     -o "$work/nibrunnerd"
