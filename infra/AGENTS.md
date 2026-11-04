@@ -16,6 +16,20 @@ Terraform creates proxied CNAME records for `nibrunner_domain` and its wildcard,
 to the Tunnel. CI supplies the domain through `NIBRUNNER_ORIGIN_DOMAIN`. The Terraform token
 needs Zone Read and DNS Edit on this zone as well as Cloudflare Tunnel Edit.
 
+For custom domains in the nibrunner zone, Terraform creates `fallback.<nibrunner_domain>` as
+a proxied Tunnel CNAME and registers it as the Cloudflare for SaaS fallback origin. It manages
+Full (strict) SSL and disables Authenticated Origin Pulls on that zone. The Terraform token
+also needs Zone Settings Edit and SSL and Certificates Edit there.
+
+The Tunnel forwards every hostname to nibrunner's loopback HTTP proxy, preserving the Host
+header. Nibrunner serves only hostnames in its desired state. A custom-domain SSL exception
+rule is unnecessary because the local origin uses HTTP inside the encrypted Tunnel.
+
+Cloudflare for SaaS activation and its billing setup are account prerequisites, completed in
+the dashboard before applying. Terraform does not create customer-owned hostnames. Those must
+be registered in the nibrunner zone by the application; the shared production API currently
+uses the separate legacy app-host zone, whose custom-domain configuration remains separate.
+
 The host fetches its Tunnel token directly from SSM. systemd passes it through `LoadCredential`
 to an unprivileged `cloudflared` process; CI and RunCommand receive only the parameter name.
 The signed Cloudflare APT repository supplies stable `cloudflared` updates on every deploy.
