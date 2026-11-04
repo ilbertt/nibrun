@@ -13,7 +13,9 @@ only. The separate legacy app-host fleet still uses its existing origin proxy an
 
 Terraform routes `nibrunner_domain` and its wildcard to that Tunnel, adopting an existing single
 A, AAAA or CNAME record per name during the plan. Consolidate multiple address records before
-cutover. CI keeps reading the existing `NIBRUNNER_ORIGIN_DOMAIN` repository variable. The
+cutover. The provider replaces imported A/AAAA records when converting them to CNAMEs; the
+destruction guard permits only this imported, proxied conversion within the same name and zone.
+CI keeps reading the existing `NIBRUNNER_ORIGIN_DOMAIN` repository variable. The
 Terraform token needs Zone Read and DNS Edit on this zone as well as Cloudflare Tunnel Edit.
 Merge and deploy tunnel provisioning before the cutover, then wait for the host deploy's
 Tunnel readiness gate before retiring its origin certificate. The DNS cutover happens before
