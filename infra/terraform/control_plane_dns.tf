@@ -17,9 +17,9 @@ data "cloudflare_zones" "control_plane" {
 locals {
   control_plane_zone_ids = {
     for hostname in local.control_plane_hostnames : hostname => one([
-      for zone in data.cloudflare_zones.control_plane.result : zone
+      for zone in data.cloudflare_zones.control_plane.result : zone.id
       if hostname == zone.name || endswith(hostname, ".${zone.name}")
-    ]).id
+    ])
   }
 }
 
