@@ -2,11 +2,15 @@ data "aws_ssm_parameter" "ubuntu_2604_ami" {
   name = "/aws/service/canonical/ubuntu/server/26.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
 }
 
+data "aws_ec2_instance_type" "nibrunner_host" {
+  instance_type = "r8id.xlarge"
+}
+
 # Keep this engine separate: the legacy deploy starts the shared ZeroFS writer,
 # and a second writer against that prefix fences the machine serving existing apps.
 resource "aws_instance" "nibrunner_host" {
   ami                    = data.aws_ssm_parameter.ubuntu_2604_ami.value
-  instance_type          = "r8id.xlarge"
+  instance_type          = data.aws_ec2_instance_type.nibrunner_host.instance_type
   subnet_id              = aws_subnet.app.id
   vpc_security_group_ids = [aws_security_group.nibrunner_host.id]
   iam_instance_profile   = aws_iam_instance_profile.nibrunner_host.name
@@ -15,6 +19,8 @@ resource "aws_instance" "nibrunner_host" {
   ipv6_address_count          = 1
 
   cpu_options {
+    core_count            = data.aws_ec2_instance_type.nibrunner_host.default_cores
+    threads_per_core      = 1
     nested_virtualization = "enabled"
   }
 

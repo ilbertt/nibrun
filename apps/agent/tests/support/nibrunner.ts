@@ -17,13 +17,23 @@ export function nibrunnerReport(overrides: Partial<NibrunnerReport> = {}): Nibru
     state: 'ready',
     capacity: { vcpuCount: 4, memoryMib: 8192, cacheBytes: 1000 },
     allocatable: { vcpuCount: 3, memoryMib: 7936, cacheBytes: 900 },
-    versions: { agent: '2026.10.7', guestImage: 'guest', firecracker: 'v1.16.1', zerofs: 'none' },
-    volumes: [{ volumeId: VOLUME_ID, appId: APP_ID, state: 'ready', sizeBytes: VOLUME_SIZE_BYTES }],
+    versions: { agent: '2026.11.1', guestImage: 'guest', firecracker: 'v1.16.1', zerofs: 'none' },
+    cron: null,
+    volumes: [
+      {
+        volumeId: VOLUME_ID,
+        appId: APP_ID,
+        state: 'ready',
+        sizeBytes: VOLUME_SIZE_BYTES,
+        usage: null,
+      },
+    ],
     instances: [
       {
         appId: APP_ID,
         deploymentId: DEPLOYMENT_ID,
         state: 'running',
+        compute: null,
         hostPort: FIRST_HOST_PORT,
         layerDigests: [ARTIFACT_DIGEST],
         restartCount: 0,

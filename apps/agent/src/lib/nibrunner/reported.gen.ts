@@ -1,5 +1,5 @@
 /**
- * Generated from https://raw.githubusercontent.com/ilbertt/nibrunner/v2026.11.0/crates/protocol/schema/reported.schema.json
+ * Generated from https://raw.githubusercontent.com/ilbertt/nibrunner/v2026.11.1/crates/protocol/schema/reported.schema.json
  * Run bun run --filter @repo/internal-scripts generate-nibrunner-types; do not edit.
  */
 
@@ -28,20 +28,26 @@ export type VolumeId = string;
 /**
  * an identifier
  */
+export type AppId = string;
+/**
+ * an identifier
+ */
+export type DeploymentId = string;
+export type CronCommand = string;
+/**
+ * Only complete `${NAME}` references are filled in for NAME in NIBRUN_HOSTNAME, NIBRUN_HTTP_PORT. Bare names, incomplete references and other dollar signs remain literal; complete references to unknown `NIBRUN_` names are refused.
+ */
+export type TenantValue = string;
+export type CronSchedule = string;
+/**
+ * an identifier
+ */
 export type ExportId = string;
 export type ExportState = 'pending' | 'preparing' | 'ready' | 'failed' | 'expired';
 /**
  * an identifier
  */
 export type HostId = string;
-/**
- * an identifier
- */
-export type AppId = string;
-/**
- * an identifier
- */
-export type DeploymentId = string;
 /**
  * an IPv4 address
  */
@@ -93,6 +99,7 @@ export interface HostReportedState {
   allocatable: HostCapacity;
   capacity: HostCapacity1;
   checkpoints: ReportedCheckpoint[];
+  cron: CronListing[] | null;
   exports: ReportedExport[];
   hostId: HostId;
   instances: ReportedInstance[];
@@ -135,6 +142,25 @@ export interface ReportedCheckpoint {
   volumeId: VolumeId;
   [k: string]: unknown;
 }
+export interface CronListing {
+  appId: AppId;
+  deploymentId: DeploymentId;
+  enabled: boolean;
+  jobs: RegisteredCronJob[];
+  timeZone: string;
+  [k: string]: unknown;
+}
+export interface RegisteredCronJob {
+  command: CronCommand;
+  environment?: TenantEnvironment | null;
+  jobId: string;
+  nextRunAt: Timestamp | null;
+  schedule: CronSchedule;
+  [k: string]: unknown;
+}
+export interface TenantEnvironment {
+  [k: string]: TenantValue;
+}
 export interface ReportedExport {
   checkpointId?: CheckpointId | null;
   exportId: ExportId;
@@ -146,6 +172,7 @@ export interface ReportedExport {
 }
 export interface ReportedInstance {
   appId: AppId;
+  compute: ComputeUsage | null;
   /**
    * When the instance first became what the document asks of it, for the `deploymentId` and
    * `desiredState` it now carries. Absent while it is still on its way there, and for a
@@ -172,6 +199,13 @@ export interface ReportedInstance {
   restartCount: number;
   startedAt?: Timestamp | null;
   state: InstanceState;
+  [k: string]: unknown;
+}
+export interface ComputeUsage {
+  cpuShare?: number | null;
+  measuredAt: Timestamp;
+  memoryTotalBytes: number;
+  memoryUsedBytes: number;
   [k: string]: unknown;
 }
 /**
@@ -204,6 +238,13 @@ export interface ReportedVolume {
   sizeBytes: number;
   state: VolumeState;
   storagePrefix?: ObjectKey | null;
+  usage: FilesystemUsage | null;
   volumeId: VolumeId;
+  [k: string]: unknown;
+}
+export interface FilesystemUsage {
+  measuredAt: Timestamp;
+  totalBytes: number;
+  usedBytes: number;
   [k: string]: unknown;
 }

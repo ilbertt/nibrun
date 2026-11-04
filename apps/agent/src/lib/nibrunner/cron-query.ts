@@ -8,18 +8,34 @@ import {
 import { Type } from '@sinclair/typebox';
 import { Duration, Effect } from 'effect';
 import type { ControlPlaneClient } from '#lib/control/client.ts';
-import type { HostReportedState as NibrunnerReport } from '#lib/nibrunner/reported.gen.ts';
+import type {
+  CronListing,
+  HostReportedState as NibrunnerReport,
+  RegisteredCronJob,
+} from '#lib/nibrunner/reported.gen.ts';
 import { decode } from '#lib/protocol.ts';
 
 const ListingsSchema = Type.Array(CronListingSchema);
 const IDLE_POLL_FLOOR = '5 seconds';
 const UNAVAILABLE = 'Cron registrations are not available for this deployment.';
 
+function normalizedJob(value: RegisteredCronJob) {
+  return {
+    ...value,
+    environment: value.environment ?? undefined,
+    nextRunAt: value.nextRunAt ?? undefined,
+  };
+}
+
+function normalizedListing(value: CronListing) {
+  return { ...value, jobs: value.jobs.map(normalizedJob) };
+}
+
 export function nibrunnerCronListings(value: NibrunnerReport) {
   return decode(function listings() {
     return value.cron === undefined || value.cron === null
       ? []
-      : parseMessage({ schema: ListingsSchema, value: value.cron });
+      : parseMessage({ schema: ListingsSchema, value: value.cron.map(normalizedListing) });
   });
 }
 

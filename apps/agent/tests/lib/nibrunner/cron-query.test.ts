@@ -9,6 +9,7 @@ import { Value } from '@sinclair/typebox/value';
 import { Effect } from 'effect';
 import { makeControlPlaneClient } from '#lib/control/client.ts';
 import { nibrunnerCronListings, pollNibrunnerCron } from '#lib/nibrunner/cron-query.ts';
+import type { CronListing } from '#lib/nibrunner/reported.gen.ts';
 import { APP_ID, DEPLOYMENT_ID, HOST_ID, POLL_SETTINGS_FIXTURE } from '#tests/support/fixtures.ts';
 import { nibrunnerReport } from '#tests/support/nibrunner.ts';
 import { runScoped } from '#tests/support/run.ts';
@@ -39,11 +40,32 @@ const listing = Value.Parse(CronListingSchema, {
     },
   ],
 });
+const nativeListing: CronListing = {
+  ...listing,
+  jobs: [{ ...listing.jobs[0]!, nextRunAt: null }],
+};
 
 test('native cron observations keep registered IDs, environment and suspended jobs', async () => {
-  const observed = await runScoped(nibrunnerCronListings(nibrunnerReport({ cron: [listing] })));
+  const observed = await runScoped(
+    nibrunnerCronListings(nibrunnerReport({ cron: [nativeListing] })),
+  );
   expect(observed).toEqual([listing]);
   expect(await runScoped(nibrunnerCronListings(nibrunnerReport()))).toEqual([]);
+});
+
+test('nullable native cron fields are omitted from API responses', async () => {
+  const raw = nibrunnerReport({
+    cron: [{ ...nativeListing, jobs: [{ ...nativeListing.jobs[0]!, environment: null }] }],
+  });
+  const original = structuredClone(raw);
+  const observed = await runScoped(nibrunnerCronListings(raw));
+  expect(JSON.parse(JSON.stringify(observed))).toEqual([
+    {
+      ...listing,
+      jobs: [{ jobId: 'cron-job', schedule: '@daily', command: 'echo task' }],
+    },
+  ]);
+  expect(raw).toEqual(original);
 });
 
 test('malformed cron observations fail without exposing registration secrets', async () => {
@@ -51,7 +73,7 @@ test('malformed cron observations fail without exposing registration secrets', a
     Effect.flip(
       nibrunnerCronListings(
         nibrunnerReport({
-          cron: [{ ...listing, timeZone: 'tenant-secret' }],
+          cron: [{ ...nativeListing, timeZone: 'tenant-secret' }],
         }),
       ),
     ),
