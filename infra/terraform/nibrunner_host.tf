@@ -88,6 +88,28 @@ resource "aws_iam_role_policy_attachment" "nibrunner_host_ssm_core" {
 
 data "aws_iam_policy_document" "nibrunner_host" {
   statement {
+    sid       = "TunnelTokenRead"
+    actions   = ["ssm:GetParameter"]
+    resources = [aws_ssm_parameter.nibrunner_cloudflared_token.arn]
+  }
+
+  statement {
+    sid       = "TunnelTokenDecryptViaSsm"
+    actions   = ["kms:Decrypt"]
+    resources = ["*"]
+    condition {
+      test     = "StringEquals"
+      variable = "kms:ViaService"
+      values   = ["ssm.${data.aws_region.current.region}.amazonaws.com"]
+    }
+    condition {
+      test     = "StringEquals"
+      variable = "kms:EncryptionContext:PARAMETER_ARN"
+      values   = [aws_ssm_parameter.nibrunner_cloudflared_token.arn]
+    }
+  }
+
+  statement {
     sid       = "AgentBinaryRead"
     actions   = ["s3:GetObject"]
     resources = ["${aws_s3_bucket.deploy.arn}/agent/*"]
@@ -126,7 +148,7 @@ resource "aws_iam_instance_profile" "nibrunner_host" {
 resource "aws_ssm_parameter" "nibrunner_origin_tls_cert" {
   name  = "${var.ssm_secret_prefix}/nibrunner_origin_tls_cert"
   type  = "SecureString"
-  value = base64encode(cloudflare_origin_ca_certificate.origin["nibrunner"].certificate)
+  value = base64encode(cloudflare_origin_ca_certificate.nibrunner.certificate)
 
   tags = {
     Name = "${local.resource_name_prefix}-nibrunner-origin-tls-cert"
@@ -136,10 +158,10 @@ resource "aws_ssm_parameter" "nibrunner_origin_tls_cert" {
 resource "aws_ssm_parameter" "nibrunner_origin_tls_key" {
   name  = "${var.ssm_secret_prefix}/nibrunner_origin_tls_key"
   type  = "SecureString"
-  value = base64encode(tls_private_key.origin["nibrunner"].private_key_pem_pkcs8)
+  value = base64encode(tls_private_key.nibrunner.private_key_pem_pkcs8)
 
   # Failed issuance must leave the existing certificate/key pair in SSM intact.
-  depends_on = [cloudflare_origin_ca_certificate.origin["nibrunner"]]
+  depends_on = [cloudflare_origin_ca_certificate.nibrunner]
 
   tags = {
     Name = "${local.resource_name_prefix}-nibrunner-origin-tls-key"
