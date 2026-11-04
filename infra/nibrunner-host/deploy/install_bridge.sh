@@ -14,7 +14,7 @@ if [ -e /var/lib/nibrun/host-id ]; then
   exit 1
 fi
 if [ ! -e /var/lib/nibrunner/bridge/host-id ] && [ -e /var/lib/nibrunner/desired.json ]; then
-  echo "commission the existing engine state before registering the bridge" >&2
+  echo "refusing to register a bridge over existing unmanaged engine state" >&2
   exit 1
 fi
 systemctl is-active --quiet nibrunnerd.service

@@ -39,8 +39,3 @@ resource "aws_ssm_parameter" "cloudflared_token" {
     Name = "${local.resource_name_prefix}-cloudflared-token"
   }
 }
-
-output "cloudflared_tunnel_hostname" {
-  description = "CNAME target for the control-plane hostnames."
-  value       = local.control_plane_tunnel_hostname
-}

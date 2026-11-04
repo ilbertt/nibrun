@@ -21,16 +21,8 @@ variable "data_volume_size" {
   description = "Persistent data EBS volume size in GB. Backs Postgres. Survives instance replacement."
 }
 
-# Not m7i-flex, which this was and which nested virtualisation was verified on: a
-# flex instance sustains 40% of its vCPUs and bursts above that on credit, and a
-# host whose whole job is packing microVMs has nothing to spare when the credit
-# runs out.
-#
-# m8id rather than m7i because it is the cheaper of the two on spot and carries a
-# 118 GB NVMe instance store, which is what /data is: see
-# infra/app-host/deploy/ensure_ephemeral_data.sh. That makes the instance store
-# load-bearing rather than a bonus — a type without one has no /data, and
-# nibrun-zerofs.service is ordered behind the unit that would fail to mount it.
+# Local NVMe storage backs /data. ensure_ephemeral_data.sh fails without it,
+# so changing the host size must retain an instance store.
 variable "app_host_instance_type" {
   type        = string
   default     = "m8id.large"
@@ -104,7 +96,7 @@ variable "import_retention_days" {
 variable "internal_port" {
   type        = number
   default     = 19080
-  description = "Port the control plane serves /internal on, reachable from app hosts over the VPC and from nowhere else. Plain HTTP: the security group is the boundary, and an origin certificate names hostnames rather than the private address an agent dials."
+  description = "Port the control plane serves /internal on over plain HTTP, reachable only from app hosts and nibrunner through their VPC security groups."
 
   # Not 8080, which Dozzle already publishes in the same compose stack — the
   # edge could not bind it and the deploy died on `compose up`. Chosen against

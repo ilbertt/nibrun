@@ -1,6 +1,6 @@
 variable "nibrunner_domain" {
   type        = string
-  description = "Domain routed to the nibrunner host. CI retains the existing NIBRUNNER_ORIGIN_DOMAIN repository variable."
+  description = "Domain routed to the nibrunner host. CI supplies NIBRUNNER_ORIGIN_DOMAIN."
 
   validation {
     condition     = can(regex("^[a-z0-9][a-z0-9.-]*\\.[a-z]{2,}$", var.nibrunner_domain))
@@ -49,9 +49,4 @@ resource "aws_ssm_parameter" "nibrunner_cloudflared_token" {
 
 output "nibrunner_cloudflared_token_parameter" {
   value = aws_ssm_parameter.nibrunner_cloudflared_token.name
-}
-
-output "nibrunner_tunnel_hostname" {
-  description = "CNAME target for the nibrunner domain and its wildcard."
-  value       = local.nibrunner_tunnel_hostname
 }

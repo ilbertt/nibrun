@@ -2,8 +2,8 @@ data "aws_ssm_parameter" "ubuntu_2604_ami" {
   name = "/aws/service/canonical/ubuntu/server/26.04/stable/current/amd64/hvm/ebs-gp3/ami-id"
 }
 
-# Commission separately: the legacy deploy starts the shared ZeroFS writer, and
-# a second writer against that prefix fences the machine serving existing apps.
+# Keep this engine separate: the legacy deploy starts the shared ZeroFS writer,
+# and a second writer against that prefix fences the machine serving existing apps.
 resource "aws_instance" "nibrunner_host" {
   ami                    = data.aws_ssm_parameter.ubuntu_2604_ami.value
   instance_type          = "r8id.xlarge"
@@ -49,7 +49,8 @@ resource "aws_instance" "nibrunner_host" {
 }
 
 resource "aws_security_group" "nibrunner_host" {
-  name        = "${local.resource_name_prefix}-nibrunner-host"
+  name = "${local.resource_name_prefix}-nibrunner-host"
+  # Changing this deployed description would replace the security group.
   description = "nibrunner commissioning host; SSM access only"
   vpc_id      = aws_vpc.app.id
 
@@ -139,6 +140,6 @@ resource "aws_iam_instance_profile" "nibrunner_host" {
 }
 
 output "nibrunner_host_instance_id" {
-  description = "SSM target for commissioning nibrunner before admitting app deployments."
+  description = "SSM deployment target for the nibrunner engine and its control-plane bridge."
   value       = aws_instance.nibrunner_host.id
 }

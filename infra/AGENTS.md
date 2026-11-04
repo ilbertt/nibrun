@@ -1,8 +1,9 @@
 # infra
 
 One AWS stack: the control plane runs Compose, app hosts and the nibrunner host run tenant
-microVMs, and the port relay forwards non-HTTP tenant traffic. `deploy/` is shell rather than TypeScript because those scripts run *on* a box and
-an instance has no Bun; everything CI runs lives in `@repo/internal-scripts`.
+microVMs, and the port relay forwards non-HTTP tenant traffic. `deploy/` is shell rather than
+TypeScript because those scripts run *on* a box and an instance has no Bun; everything CI runs
+lives in `@repo/internal-scripts`.
 
 The Terraform explains itself — read it rather than a description of it here.
 
@@ -12,12 +13,8 @@ hostname so nibrunner can route each app. Public instance addresses support outb
 only. The separate legacy app-host fleet still uses its existing origin proxy and port relay.
 
 Terraform creates proxied CNAME records for `nibrunner_domain` and its wildcard, both pointing
-to the Tunnel. The domain starts without existing DNS records.
-CI keeps reading the existing `NIBRUNNER_ORIGIN_DOMAIN` repository variable. The
-Terraform token needs Zone Read and DNS Edit on this zone as well as Cloudflare Tunnel Edit.
-Merge and deploy tunnel provisioning before the cutover, then wait for the host deploy's
-Tunnel readiness gate before retiring its origin certificate. The DNS cutover happens before
-the SSM deploy, so the commissioning domain can be briefly unavailable during that deploy.
+to the Tunnel. CI supplies the domain through `NIBRUNNER_ORIGIN_DOMAIN`. The Terraform token
+needs Zone Read and DNS Edit on this zone as well as Cloudflare Tunnel Edit.
 
 The host fetches its Tunnel token directly from SSM. systemd passes it through `LoadCredential`
 to an unprivileged `cloudflared` process; CI and RunCommand receive only the parameter name.
@@ -32,8 +29,8 @@ transit, so nothing can drift.
 
 ## First run
 
-AWS bootstrap and the initial DNS/origin configuration below are manual. The control-plane
-Tunnel is provisioned by Terraform.
+AWS account bootstrap and the app-host DNS settings below are manual. Terraform provisions
+both Tunnels and their DNS records.
 
 ```sh
 # Console → CloudFormation → upload bootstrap/github-oidc-bootstrap.yaml, once.
@@ -51,7 +48,6 @@ a rebuilt account to names its predecessor still holds for ~90 days.
 DNS, every record **proxied** (orange cloud):
 
 - Terraform manages the four control-plane hostnames as CNAMEs to the control-plane Tunnel.
-  Existing records must be adopted explicitly before applying this configuration.
 - `*.<app_domain>` A → `app_host_public_ips`. One record covers the whole fleet, so there is
   nothing per app in DNS.
 
@@ -67,14 +63,7 @@ SSM-managed secrets. Certificate rotation requires deploying a second certificat
 revoking the first; `prevent_destroy` blocks revocation during an ordinary apply.
 
 The control plane and nibrunner use Tunnels and need no origin certificates or Authenticated
-Origin Pulls. After the cutover deploy passes its readiness gate, merge the retirement layer to revoke
-its old certificate and delete its TLS key, CSR and SSM parameters. The Terraform destruction
-guard permits deletion of those five nibrunner resources and the two old control-plane TLS
-parameters; replacements and other resources
-still require `ALLOWED_TERRAFORM_DESTROY_ADDRESSES` or an explicit destructive deploy. Keep the
-Terraform token's SSL and Certificates Edit permission on the nibrunner zone until that
-retirement deploy finishes. The host removes its old on-disk TLS files only after the Tunnel
-is ready. Historical `moved` and `removed` blocks preserve upgrades from the pre-Tunnel state.
+Origin Pulls. The control plane publishes only its VPC control and log-ingest listeners.
 
 Sign-in needs a GitHub OAuth App whose callback URL is
 `https://<api_hostname>/api/auth/callback/github`.

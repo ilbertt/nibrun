@@ -69,7 +69,3 @@ rather than an I/O error — the guest's ext4 only remounts read-only if the res
 timeout. So `BindsTo` converts a recoverable stall into a fleet-wide outage, and kills VMs
 mid-write rather than at a durability point. The agent behaves correctly either way; this is a
 blast-radius decision nobody has made.
-
-**Nothing mounts `[servers.ninep]`.** An app's disk is a sparse file the agent creates inside the
-ZeroFS filesystem, so volume provisioning cannot work until a unit mounts that socket where the
-agent looks for it, ordered after `nibrun-zerofs.service` and before `nibrun-agent.service`.

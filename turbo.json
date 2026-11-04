@@ -1,13 +1,6 @@
 {
   "$schema": "https://turborepo.dev/schema.json",
   "tasks": {
-    "@repo/internal-scripts#test": {
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/infra/nibrunner-host/**",
-        "$TURBO_ROOT$/infra/app-host/deploy/prune_agent_versions.sh"
-      ]
-    },
     "@repo/agent#check:types": {
       "dependsOn": ["^check:types"],
       "inputs": [
