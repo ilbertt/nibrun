@@ -26,9 +26,9 @@ export function terraformInit() {
   ]);
 }
 
-// The data volume holds Postgres and the artifacts bucket holds users' uploaded
-// binaries, so an unnoticed replace is unrecoverable. Allowlist an address in
-// ALLOWED_TERRAFORM_DESTROY_ADDRESSES rather than loosening this.
+// The relay is stateless and keeps its Elastic IP when a reviewed OS pin replaces
+// it. Everything else still requires ALLOWED_TERRAFORM_DESTROY_ADDRESSES: the data
+// volume holds Postgres and the artifacts bucket holds users' uploaded binaries.
 export async function failOnUnexpectedDestroys(planFile: string) {
   const plan = await terraform(['show', '-json', planFile]).quiet().json();
 
@@ -39,11 +39,21 @@ export async function failOnUnexpectedDestroys(planFile: string) {
       .filter(Boolean),
   );
 
+  const resourceChanges: ResourceChange[] = plan.resource_changes ?? [];
+  for (const resource of resourceChanges) {
+    if (
+      resource.address === 'aws_instance.port_relay' &&
+      resource.change.actions.includes('create')
+    ) {
+      allowed.add(resource.address);
+    }
+  }
+
   const destroyed = [
     ...new Set(
-      (plan.resource_changes ?? [])
-        .filter((change: ResourceChange) => change.change.actions.includes('delete'))
-        .map((change: ResourceChange) => change.address),
+      resourceChanges
+        .filter((change) => change.change.actions.includes('delete'))
+        .map((change) => change.address),
     ),
   ].sort() as string[];
 

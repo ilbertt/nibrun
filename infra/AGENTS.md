@@ -128,6 +128,12 @@ pulls with no registry credentials.
 
 `workflow_dispatch` takes `allow_destroy` for the times a plan legitimately replaces something.
 
+Manage host OS patches through Terraform and reviewed pull requests. The port relay pins its
+Amazon Linux AMI name in `terraform/port_relay.tf`; bump it to adopt a patched OS. This replaces
+the stateless relay while retaining its Elastic IP, interrupting existing connections. The
+Terraform destruction guard permits this resource's replacement and continues to protect the
+stateful hosts. Do not patch or reboot hosts directly outside this workflow.
+
 Compose pulls service images on each deploy. Keep compatible moving tags such as
 `caddy:2.11-alpine`, `postgres:18-alpine` and `alpine:3.24` where upstream publishes them;
 an exact patch tag requires an explicit bump to receive the next patch release. Image builds
