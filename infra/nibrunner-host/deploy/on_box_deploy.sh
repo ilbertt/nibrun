@@ -11,6 +11,8 @@ if [ -e /var/lib/nibrun/host-id ]; then
   exit 1
 fi
 
+install -m 0644 apt.conf /etc/apt/apt.conf.d/99nibrun-lock-timeout
+
 modprobe kvm_intel
 test -c /dev/kvm
 
