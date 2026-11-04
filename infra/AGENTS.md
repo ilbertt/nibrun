@@ -12,6 +12,9 @@ ingress rules. Its HTTP proxy listens on `127.0.0.1:8080`; `cloudflared` preserv
 hostname so nibrunner can route each app. Public instance addresses support outbound traffic
 only. The separate legacy app-host fleet still uses its existing origin proxy and port relay.
 
+Nibrunner requires inactive host SMT and KSM with no retained shared pages. Its EC2 CPU options
+use one thread per core; changing these options stops and starts the instance before deployment.
+
 Terraform creates proxied CNAME records for `nibrunner_domain` and its wildcard, both pointing
 to the Tunnel. CI supplies the domain through `NIBRUNNER_ORIGIN_DOMAIN`. The Terraform token
 needs Zone Read and DNS Edit on this zone as well as Cloudflare Tunnel Edit.

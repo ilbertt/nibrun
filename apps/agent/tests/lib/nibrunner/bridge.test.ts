@@ -101,6 +101,7 @@ function fixture(initialDesired: HostDesiredState) {
       capacity,
       allocatable: capacity,
       versions: { agent: '2026.10.7', firecracker: 'v1.16.1', guestImage: 'guest', zerofs: 'none' },
+      cron: null,
       instances: [],
       volumes: [],
       checkpoints: [],
@@ -167,6 +168,7 @@ test.each(['running', 'on-request', 'stopped', 'replaced', 'stale', 'unaccepted'
             appId: APP_ID,
             deploymentId: state === 'replaced' ? NEXT_DEPLOYMENT_ID : DEPLOYMENT_ID,
             state: state === 'on-request' ? 'idle' : 'running',
+            compute: null,
             restartCount: 0,
           },
         ];
