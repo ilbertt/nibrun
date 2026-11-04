@@ -9,7 +9,7 @@ data "cloudflare_zones" "control_plane" {
           if hostname == zone.name || endswith(hostname, ".${zone.name}")
         ]) == 1
       ])
-      error_message = "Each control-plane hostname must match exactly one visible Cloudflare zone. Grant the Terraform token Zone Read on those zones; the cutover also requires DNS Edit there."
+      error_message = "Each control-plane hostname must match exactly one visible Cloudflare zone. Grant the Terraform token Zone Read and DNS Edit on those zones."
     }
   }
 }

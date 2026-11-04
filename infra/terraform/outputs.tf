@@ -1,11 +1,6 @@
 # Outputs that feed the deploy carry the exact name the environment variable
 # has, all the way to the .env the box writes — nothing is renamed in transit.
 
-output "public_ip" {
-  description = "Control-plane Elastic IP for outbound traffic."
-  value       = aws_eip.app.public_ip
-}
-
 output "api_hostname" {
   value = var.api_hostname
 }
@@ -73,10 +68,6 @@ output "deploy_bucket" {
   value       = aws_s3_bucket.deploy.bucket
 }
 
-output "instance_id" {
-  value = aws_instance.app.id
-}
-
 # Private, not the elastic IP: agents reach the api inside the VPC, and control
 # traffic never leaves it.
 output "control_plane_internal_url" {
@@ -118,10 +109,6 @@ output "vpc_ipv6_cidr_block" {
 output "app_host_deploy_group" {
   description = "SSM targeting tag for app hosts. Distinct from deploy_group so a deploy reaches one machine class without touching the other."
   value       = local.app_host_deploy_group
-}
-
-output "app_host_instance_ids" {
-  value = aws_instance.app_host[*].id
 }
 
 output "app_host_public_ips" {

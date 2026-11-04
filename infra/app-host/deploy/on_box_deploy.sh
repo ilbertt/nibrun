@@ -459,12 +459,8 @@ chmod 0755 /etc/caddy /etc/caddy/rendered
 
 log "Installing systemd units"
 units_changed=0
-# Modes are set on the installed path rather than on the staged copy, because a
-# unit whose content has not moved never has one installed — and every unit
-# already on the fleet was written under the umask above, so correcting only
-# what changes would leave them at 0600 forever. systemd loads them either way
-# and says so on every reload; none of them holds a secret, and the environment
-# files they name keep their own mode.
+# Unit files are public configuration; their modes must not depend on the
+# deploy's umask or whether their content changed.
 for unit in systemd/*.service; do
   installed="/etc/systemd/system/$(basename "$unit")"
   cp "$unit" "$installed.new"

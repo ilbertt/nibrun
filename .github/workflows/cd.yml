@@ -5,11 +5,6 @@ on:
     branches: [main]
   workflow_dispatch:
     inputs:
-      operation:
-        description: "Deploy normally or rebuild the empty nibrunner host from CI"
-        type: choice
-        options: [deploy, reset-nibrunner-host]
-        default: deploy
       allow_destroy:
         description: "Apply even if the plan destroys or replaces resources"
         type: boolean
@@ -30,7 +25,6 @@ env:
 
 jobs:
   api-images:
-    if: inputs.operation != 'reset-nibrunner-host'
     name: api-images (${{ matrix.name }})
     runs-on: ubuntu-latest
     env:
@@ -122,7 +116,6 @@ jobs:
         run: bun run --filter @repo/internal-scripts terraform-apply
 
   deploy-api:
-    if: inputs.operation != 'reset-nibrunner-host'
     needs: [api-images, terraform]
     runs-on: ubuntu-latest
     env:
@@ -195,7 +188,6 @@ jobs:
         run: bun run --filter @repo/internal-scripts publish-agent-binary
 
   deploy-app-hosts:
-    if: inputs.operation != 'reset-nibrunner-host'
     needs: [terraform, publish-agent]
     runs-on: ubuntu-latest
     env:
@@ -284,35 +276,16 @@ jobs:
           role-to-assume: ${{ fromJSON(needs.terraform.outputs.values).github_deploy_role_arn }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Reset the empty nibrunner host via SSM
-        if: inputs.operation == 'reset-nibrunner-host'
-        timeout-minutes: 5
-        run: bun run --filter @repo/internal-scripts ssm-reset-nibrunner-host
-
       - name: Deploy nibrunner and its bridge via SSM
         timeout-minutes: 20
         env:
           AGENT_AWS_REGION: ${{ env.AWS_REGION }}
         run: bun run --filter @repo/internal-scripts ssm-deploy-nibrunner-host
 
-      - name: Configure credentials for retiring commissioning parameters
-        if: inputs.operation == 'reset-nibrunner-host'
-        uses: ./.github/actions/aws-credentials
-        with:
-          role-to-assume: ${{ vars.AWS_TERRAFORM_APPLY_ROLE_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Retire commissioning parameters after deployment
-        if: inputs.operation == 'reset-nibrunner-host'
-        env:
-          SSM_SECRET_PREFIX: ${{ fromJSON(needs.terraform.outputs.values).ssm_secret_prefix }}
-        run: bun run --filter @repo/internal-scripts retire-nibrunner-commissioning-parameters
-
   # Nothing may depend on this job. Publishing is not adopting, so no deploy
   # consumes what it produces, and a kernel rebuild takes three quarters of an
   # hour — waiting on it would hold up shipping an agent for no gain.
   build-guest-image:
-    if: inputs.operation != 'reset-nibrunner-host'
     needs: terraform
     runs-on: ubuntu-latest
     permissions:

@@ -237,8 +237,6 @@ done
 # reload — leaving the old certificate served until something restarts it.
 log "Reloading Caddy"
 $compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --force
-rm -rf caddy/tls
-rm -f caddy/cloudflare-origin-pull-ca.pem
 
 prune_unused_images
 

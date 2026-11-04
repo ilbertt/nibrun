@@ -75,8 +75,6 @@ const script = [
   'bash on_box_deploy.sh',
   'bash install_bridge.sh',
   'bash install_tunnel.sh',
-  'rm -rf /etc/nibrunner/tls',
-  'rm -f install_tls.sh origin-pull-ca.pem',
   'NIBRUNNER_DEPLOY',
 ].join('\n');
 

@@ -4,42 +4,6 @@ locals {
   }
 }
 
-moved {
-  from = tls_private_key.origin["nibrunner"]
-  to   = tls_private_key.nibrunner
-}
-
-moved {
-  from = tls_cert_request.origin["nibrunner"]
-  to   = tls_cert_request.nibrunner
-}
-
-moved {
-  from = cloudflare_origin_ca_certificate.origin["nibrunner"]
-  to   = cloudflare_origin_ca_certificate.nibrunner
-}
-
-removed {
-  from = tls_private_key.nibrunner
-  lifecycle {
-    destroy = true
-  }
-}
-
-removed {
-  from = tls_cert_request.nibrunner
-  lifecycle {
-    destroy = true
-  }
-}
-
-removed {
-  from = cloudflare_origin_ca_certificate.nibrunner
-  lifecycle {
-    destroy = true
-  }
-}
-
 resource "tls_private_key" "origin" {
   for_each    = local.origin_certificate_domains
   algorithm   = "ECDSA"

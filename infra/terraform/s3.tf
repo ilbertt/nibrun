@@ -215,7 +215,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "artifacts" {
 #
 # **A prefix here is one host, not one app.** v1 runs a single ZeroFS per app
 # host, so every tenant placed on that host shares its prefix — see the topology
-# note in `apps/agent/src/volumes/topology.ts`. Deleting one app is removing its
+# note in `apps/agent/src/lib/volumes/topology.ts`. Deleting one app is removing its
 # device file from inside that filesystem, which is what the agent's volume
 # teardown does. Deleting the prefix destroys every tenant on the host.
 #
