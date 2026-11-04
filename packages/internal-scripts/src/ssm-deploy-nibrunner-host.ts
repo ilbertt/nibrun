@@ -23,7 +23,10 @@ const configuration = (await Bun.file(join(hostDirectory, 'config.toml.template'
   .replaceAll('{{VPC_IPV6_CIDR_BLOCK}}', requiredEnv('VPC_IPV6_CIDR_BLOCK'))
   .replaceAll('{{GUEST_IMAGE_DIRECTORY}}', JSON.stringify(guestDirectory))
   .replaceAll('{{FILESYSTEM_SOCKET}}', JSON.stringify(NIBRUNNER_FILESYSTEM_SOCKET))
-  .replaceAll('{{FALLBACK_DOMAIN}}', JSON.stringify(requiredEnv('NIBRUNNER_FALLBACK_DOMAIN')))
+  .replaceAll(
+    '{{FALLBACK_ORIGIN_HOST}}',
+    JSON.stringify(requiredEnv('NIBRUNNER_FALLBACK_ORIGIN_HOST')),
+  )
   .replaceAll('{{FALLBACK_REDIRECT}}', JSON.stringify(requiredEnv('NIBRUNNER_FALLBACK_REDIRECT')));
 const installer = await Bun.file(join(hostDirectory, 'deploy/on_box_deploy.sh')).text();
 const aptConfiguration = await Bun.file(join(hostDirectory, 'apt.conf')).text();

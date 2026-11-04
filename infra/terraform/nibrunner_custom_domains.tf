@@ -30,7 +30,7 @@ resource "cloudflare_custom_hostname_fallback_origin" "nibrunner" {
   ]
 }
 
-output "nibrunner_fallback_domain" {
+output "nibrunner_fallback_origin_host" {
   value = cloudflare_dns_record.nibrunner_fallback.name
 }
 

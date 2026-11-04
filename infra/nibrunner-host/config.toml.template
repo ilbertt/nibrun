@@ -33,7 +33,7 @@ listen_address = "127.0.0.1"
 port = 8080
 
 [proxy.http.fallback]
-domain = {{FALLBACK_DOMAIN}}
+origin_host = {{FALLBACK_ORIGIN_HOST}}
 redirect = {{FALLBACK_REDIRECT}}
 
 [metrics]
