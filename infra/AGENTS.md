@@ -1,7 +1,7 @@
 # infra
 
-AWS, one stack, two machine classes: the control plane runs the compose stack, app hosts run
-tenant microVMs. `deploy/` is shell rather than TypeScript because those scripts run *on* a box and
+One AWS stack: the control plane runs Compose, app hosts and the nibrunner host run tenant
+microVMs, and the port relay forwards non-HTTP tenant traffic. `deploy/` is shell rather than TypeScript because those scripts run *on* a box and
 an instance has no Bun; everything CI runs lives in `@repo/internal-scripts`.
 
 The Terraform explains itself — read it rather than a description of it here.
@@ -56,19 +56,19 @@ DNS, every record **proxied** (orange cloud):
 App-host origins use A records only. Cloudflare serves visitors over IPv6 from its own edge;
 the Tunnel needs no public origin address. App-host addresses outlive a replacement.
 
-Then, **in the control-plane and legacy app-host zones**: SSL/TLS **Full (strict)** and **Authenticated Origin Pulls → Global** on.
+Then, **in the legacy app-host zone**: SSL/TLS **Full (strict)** and **Authenticated Origin Pulls → Global** on.
 Turn AOP on *before* the first deploy carrying a proxy — Caddy requires its client certificate,
-and without it every visitor gets a `525`. The control-plane Origin Certificate remains a
-manual input while its direct HTTPS path is retained. Terraform issues an ECC origin
+and without it every visitor gets a `525`. Terraform issues an ECC origin
 certificate and key for legacy app hosts, covering the domain and wildcard, into
 the existing SSM parameters. The key remains in encrypted Terraform state like the existing
 SSM-managed secrets. Certificate rotation requires deploying a second certificate before
 revoking the first; `prevent_destroy` blocks revocation during an ordinary apply.
 
-The nibrunner domain uses the Tunnel and needs no origin certificate or Authenticated Origin
-Pulls. After the cutover deploy passes its readiness gate, merge the retirement layer to revoke
+The control plane and nibrunner use Tunnels and need no origin certificates or Authenticated
+Origin Pulls. After the cutover deploy passes its readiness gate, merge the retirement layer to revoke
 its old certificate and delete its TLS key, CSR and SSM parameters. The Terraform destruction
-guard permits deletion of those five exact retired resources; replacements and other resources
+guard permits deletion of those five nibrunner resources and the two old control-plane TLS
+parameters; replacements and other resources
 still require `ALLOWED_TERRAFORM_DESTROY_ADDRESSES` or an explicit destructive deploy. Keep the
 Terraform token's SSL and Certificates Edit permission on the nibrunner zone until that
 retirement deploy finishes. The host removes its old on-disk TLS files only after the Tunnel
@@ -78,8 +78,7 @@ Sign-in needs a GitHub OAuth App whose callback URL is
 `https://<api_hostname>/api/auth/callback/github`.
 
 Umami uses the `UMAMI_HOSTNAME` repository variable (`umami.nibrun.com` for this deployment).
-Include that hostname in the control-plane Origin Certificate; an existing `*.nibrun.com`
-certificate already covers it. Its admin credentials are seeded before the public proxy starts.
+Its admin credentials are seeded before the public proxy starts.
 
 For Umami's region and city data, enable **Rules → Settings → Managed Transforms → Add visitor
 location headers** in the control-plane zone. Caddy forwards Cloudflare's headers to Umami, which

@@ -1,9 +1,11 @@
 import { expect, test } from 'bun:test';
 import { terraformDestroys } from '#shared/terraform-destroys.ts';
 
-test('permits retiring nibrunner TLS while protecting the legacy fleet and persisted data', function permitsOnlyRetiredTls() {
+test('permits retiring tunnel origin TLS while protecting the legacy fleet and persisted data', function permitsOnlyRetiredTls() {
   const result = terraformDestroys({
     resourceChanges: [
+      'aws_ssm_parameter.caddy_tls_cert',
+      'aws_ssm_parameter.caddy_tls_key',
       'aws_ssm_parameter.nibrunner_origin_tls_cert',
       'aws_ssm_parameter.nibrunner_origin_tls_key',
       'cloudflare_origin_ca_certificate.nibrunner',
@@ -12,11 +14,13 @@ test('permits retiring nibrunner TLS while protecting the legacy fleet and persi
       'aws_ebs_volume.data',
       'cloudflare_origin_ca_certificate.origin["app_host"]',
       'aws_ssm_parameter.cloudflared_token',
+      'aws_ssm_parameter.app_host_caddy_tls_key',
     ].map((address) => ({ address, change: { actions: ['delete'] } })),
     allowedAddresses: new Set(),
   });
   expect(result.unexpected).toEqual([
     'aws_ebs_volume.data',
+    'aws_ssm_parameter.app_host_caddy_tls_key',
     'aws_ssm_parameter.cloudflared_token',
     'cloudflare_origin_ca_certificate.origin["app_host"]',
   ]);
@@ -27,6 +31,10 @@ test('does not let a retirement exemption permit replacement or wildcard matches
     resourceChanges: [
       {
         address: 'cloudflare_origin_ca_certificate.nibrunner',
+        change: { actions: ['delete', 'create'] },
+      },
+      {
+        address: 'aws_ssm_parameter.caddy_tls_key',
         change: { actions: ['delete', 'create'] },
       },
       {

@@ -1,4 +1,6 @@
-const RETIRED_NIBRUNNER_TLS_ADDRESSES = new Set([
+const RETIRED_ORIGIN_TLS_ADDRESSES = new Set([
+  'aws_ssm_parameter.caddy_tls_cert',
+  'aws_ssm_parameter.caddy_tls_key',
   'aws_ssm_parameter.nibrunner_origin_tls_cert',
   'aws_ssm_parameter.nibrunner_origin_tls_key',
   'cloudflare_origin_ca_certificate.nibrunner',
@@ -30,7 +32,7 @@ export function terraformDestroys({
             !allowedAddresses.has(resource.address) &&
             !(
               resource.change.actions.length === 1 &&
-              RETIRED_NIBRUNNER_TLS_ADDRESSES.has(resource.address)
+              RETIRED_ORIGIN_TLS_ADDRESSES.has(resource.address)
             ),
         )
         .map((resource) => resource.address),

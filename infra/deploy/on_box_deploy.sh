@@ -68,22 +68,7 @@ UMAMI_TWO_FACTOR_ENCRYPTION_KEY="$(secret umami_two_factor_encryption_key)"
 UMAMI_ADMIN_USERNAME="$(secret umami_admin_username)"
 UMAMI_ADMIN_PASSWORD="$(secret umami_admin_password)"
 
-# Everything written from here on carries a secret: the PEMs below, then .env.
 umask 077
-
-# The origin certificate Caddy serves. Held base64-encoded in SSM because a PEM
-# is multi-line and `--output text` mangles that, with no jq here to read the
-# JSON form instead; Terraform does the encoding (ssm.tf).
-write_pem() {
-  secret "$1" | base64 -d > "$2"
-}
-
-# Inside caddy/ because that whole directory is what gets mounted, and outside
-# the bundle's own files, which the next deploy overwrites.
-log "Writing the origin TLS material"
-mkdir -p caddy/tls
-write_pem caddy_tls_cert caddy/tls/origin.crt
-write_pem caddy_tls_key caddy/tls/origin.key
 
 # Every key here is a compose substitution variable; docker-compose.yml maps each
 # onto the name the image expects. Values fixed by the compose topology
@@ -252,6 +237,8 @@ done
 # reload — leaving the old certificate served until something restarts it.
 log "Reloading Caddy"
 $compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --force
+rm -rf caddy/tls
+rm -f caddy/cloudflare-origin-pull-ca.pem
 
 prune_unused_images
 

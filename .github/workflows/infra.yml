@@ -78,8 +78,6 @@ jobs:
           TF_VAR_www_hostname: ${{ vars.WWW_HOSTNAME }}
           TF_VAR_api_github_client_id: ${{ vars.API_GITHUB_CLIENT_ID }}
           TF_VAR_api_github_client_secret: ${{ secrets.API_GITHUB_CLIENT_SECRET }}
-          TF_VAR_caddy_tls_cert: ${{ vars.CADDY_TLS_CERT }}
-          TF_VAR_caddy_tls_key: ${{ secrets.CADDY_TLS_KEY }}
           TF_VAR_nibrunner_domain: ${{ vars.NIBRUNNER_ORIGIN_DOMAIN }}
           TF_VAR_cloudflare_account_id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           TF_VAR_cloudflare_terraform_api_token: ${{ secrets.CLOUDFLARE_TERRAFORM_API_TOKEN }}

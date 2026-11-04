@@ -7,7 +7,7 @@
 #   - Postgres is bind-backed by the persistent disk mounted at /data, so it
 #     survives instance replacement.
 #   - A backup sidecar streams a nightly dump off the box.
-#   - Caddy fronts the api and terminates TLS; local talks to the api directly.
+#   - Cloudflare Tunnel reaches Caddy over Docker networking; local talks to the api directly.
 
 services:
   umami:
@@ -25,11 +25,8 @@ services:
       postgres-db:
         condition: service_healthy
 
-  # The public edge, and the only container publishing a port off loopback. It
-  # terminates the Cloudflare-to-origin TLS leg; the api keeps its own loopback
-  # binding and its address on the compose network, and neither goes through
-  # here. Only 443: the zone is Full (strict), so Cloudflare never reaches the
-  # origin over 80, and there is no ACME challenge to answer.
+  # Cloudflared reaches Caddy over Docker networking. Only the fleet's private
+  # control and log listeners are published on the host.
   #
   # No depends_on: it makes compose restart Caddy whenever an upstream is
   # recreated, which every deploy does to the api, taking the edge down for the
@@ -38,8 +35,8 @@ services:
   # recreate.
   #
   # Nothing here changes between deploys, so the container is left running and
-  # the edge never blinks; new config, re-issued certificates and the log
-  # dashboard's password hash all arrive through the mounted directory and the
+  # the edge never blinks; new config and the log dashboard's password hash
+  # arrive through the mounted directory and the
   # reload in on_box_deploy.sh rather than a recreate. The whole directory is
   # mounted, not the files in it, so replacing a file cannot leave the container
   # holding the old inode.
@@ -53,11 +50,7 @@ services:
     container_name: caddy
     restart: always
     ports:
-      - "443:443"
-      # Both admitted from the app hosts' security group only; see
-      # infra/caddy/Caddyfile. On every interface like 443 above: the security
-      # group is the boundary, and AWS enforces it before a packet reaches the
-      # instance.
+      # The security group admits only the fleet's control and log sources.
       - "${INTERNAL_PORT}:${INTERNAL_PORT}"
       - "${LOG_INGEST_PORT}:${LOG_INGEST_PORT}"
     healthcheck:
@@ -83,8 +76,7 @@ services:
     networks:
       - nibrun
 
-  # No published ports. The named Tunnel reaches Caddy's private HTTP listener;
-  # the existing HTTPS path stays available until DNS has been verified.
+  # The named Tunnel reaches Caddy without publishing a public host port.
   cloudflared:
     image: cloudflare/cloudflared:2026.10.5
     container_name: cloudflared
@@ -106,8 +98,7 @@ services:
 
   # Local reaches Dozzle over loopback and needs no login; here it is behind a
   # public hostname, so it grows one. Simple auth over forward-proxy because the
-  # edge has no identity to forward — Authenticated Origin Pulls proves the
-  # request came from Cloudflare, not who is making it.
+  # Tunnel authenticates the connector, while Dozzle authenticates its visitors.
   #
   # The user list is built into dozzle/data by on_box_deploy.sh, which hashes
   # the password it reads from SSM. Mounting the directory rather than the file

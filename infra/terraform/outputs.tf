@@ -2,7 +2,7 @@
 # has, all the way to the .env the box writes — nothing is renamed in transit.
 
 output "public_ip" {
-  description = "Control-plane Elastic IP retained for outbound traffic and direct-origin rollback."
+  description = "Control-plane Elastic IP for outbound traffic."
   value       = aws_eip.app.public_ip
 }
 

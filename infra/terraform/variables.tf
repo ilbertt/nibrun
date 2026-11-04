@@ -131,11 +131,9 @@ variable "vpc_ipv4_cidr_block" {
   description = "IPv4 CIDR block for the VPC."
 }
 
-# No default, deliberately: the domain is not bought yet, and a placeholder
-# would silently become what everything points at.
 variable "api_hostname" {
   type        = string
-  description = "Public hostname the api is served on. Point an A record at the elastic IP."
+  description = "Public hostname the api is served on. Terraform routes it through Cloudflare Tunnel."
 
   # CI passes the API_HOSTNAME repository variable straight through, and an unset
   # variable arrives as an empty string. Fail the plan rather than deploy an api
@@ -146,12 +144,9 @@ variable "api_hostname" {
   }
 }
 
-# Named on the origin certificate alongside api_hostname — one certificate, both
-# names, so the proxy has a single pair to serve. Adding a name here means
-# reissuing that certificate, not adding a second one.
 variable "dozzle_hostname" {
   type        = string
-  description = "Public hostname the container logs are served on. Point an A record at the elastic IP."
+  description = "Public hostname the container logs are served on. Terraform routes it through Cloudflare Tunnel."
 
   # An unset repository variable arrives empty, and Caddy reads an empty site
   # address as a catch-all — which would put the logs on the api's hostname.
@@ -161,11 +156,9 @@ variable "dozzle_hostname" {
   }
 }
 
-# The third name on the origin certificate. Same reasoning as dozzle_hostname,
-# and the same consequence for leaving it empty.
 variable "victorialogs_hostname" {
   type        = string
-  description = "Public hostname the fleet's logs are queried on. Point an A record at the elastic IP."
+  description = "Public hostname the fleet's logs are queried on. Terraform routes it through Cloudflare Tunnel."
 
   validation {
     condition     = trimspace(var.victorialogs_hostname) != ""
@@ -220,37 +213,6 @@ variable "api_github_client_secret" {
   validation {
     condition     = trimspace(var.api_github_client_secret) != ""
     error_message = "api_github_client_secret must not be empty."
-  }
-}
-
-# The Cloudflare Origin Certificate the proxy serves, and its key. Issued by
-# hand like the OAuth App credentials, and split the same way: the certificate
-# is handed to every client that connects, so it enters from a repository
-# variable, while the key enters from a repository secret. Both are the PEM
-# exactly as Cloudflare issues it; the base64 the box decodes is applied on the
-# way into SSM, in ssm.tf, so nobody has to encode anything by hand.
-variable "caddy_tls_cert" {
-  type        = string
-  description = "PEM of the Cloudflare Origin Certificate. CI passes the CADDY_TLS_CERT repository variable through."
-
-  # An unset repository variable arrives as an empty string, and the failure
-  # would otherwise surface as a broken handshake on the box, not a failed plan.
-  validation {
-    condition     = strcontains(var.caddy_tls_cert, "BEGIN CERTIFICATE")
-    error_message = "caddy_tls_cert must be a PEM certificate."
-  }
-}
-
-variable "caddy_tls_key" {
-  type        = string
-  sensitive   = true
-  description = "PEM of the Cloudflare Origin Certificate's private key. CI passes the CADDY_TLS_KEY repository secret through."
-
-  # Matches both the PKCS#8 and SEC1 headers, so an ECC key is as acceptable as
-  # an RSA one.
-  validation {
-    condition     = strcontains(var.caddy_tls_key, "PRIVATE KEY")
-    error_message = "caddy_tls_key must be a PEM private key."
   }
 }
 

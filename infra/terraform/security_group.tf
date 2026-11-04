@@ -3,22 +3,6 @@ resource "aws_security_group" "instance" {
   description = "nibrun instance"
   vpc_id      = aws_vpc.app.id
 
-  # The entire public surface: Caddy, terminating TLS. No port 80 — the zone is
-  # Full (strict), so Cloudflare always reaches the origin over 443, and there is
-  # no ACME challenge to answer because the certificate is a Cloudflare Origin
-  # Certificate.
-  #
-  # Restrict sources before TLS processing; Authenticated Origin Pulls still
-  # authenticates the edge after the security group admits the connection.
-  ingress {
-    description      = "HTTPS from Cloudflare"
-    from_port        = 443
-    to_port          = 443
-    protocol         = "tcp"
-    cidr_blocks      = local.cloudflare_ipv4_cidrs
-    ipv6_cidr_blocks = local.cloudflare_ipv6_cidrs
-  }
-
   # The agents' channel. Scoped to the app hosts' security group rather than a
   # CIDR, so it admits the fleet and widens by itself as the fleet grows, while
   # admitting nothing else in the subnet. The paths behind it are the ones the
