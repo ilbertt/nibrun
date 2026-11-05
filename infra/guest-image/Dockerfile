@@ -25,7 +25,7 @@ ARG FIRECRACKER_CONFIG_SHA256
 ARG SOURCE_DATE_EPOCH
 
 RUN apt-get install -y --no-install-recommends \
-      bc bison build-essential ca-certificates curl file flex libelf-dev libssl-dev xz-utils
+      bc bison build-essential ca-certificates curl file flex libelf-dev libssl-dev patch xz-utils
 
 WORKDIR /build/linux
 RUN curl -fsSL --retry 5 -o /tmp/linux.tar.xz \
@@ -35,6 +35,9 @@ RUN curl -fsSL --retry 5 -o /tmp/linux.tar.xz \
     rm /tmp/linux.tar.xz
 
 COPY kernel/ /build/config/
+
+RUN patch --batch --forward --fuzz=0 -p1 \
+      < /build/config/patches/ext4-fix-null-folio-dereference-in-mballoc.patch
 
 RUN echo "${FIRECRACKER_CONFIG_SHA256}  /build/config/firecracker-ci-x86_64-6.1.config" \
       | sha256sum -c -; \
