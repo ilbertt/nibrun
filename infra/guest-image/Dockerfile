@@ -10,12 +10,13 @@ ARG DEBIAN_SNAPSHOT
 SHELL ["/bin/sh", "-ec"]
 # http, not https: the slim base carries no CA bundle yet, and apt verifies the
 # archive's own signature regardless of transport.
-RUN rm -f /etc/apt/sources.list.d/debian.sources; \
+RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\n' >/etc/apt/apt.conf.d/80-nibrun-network; \
+    rm -f /etc/apt/sources.list.d/debian.sources; \
     { \
       echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT} trixie main"; \
       echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/${DEBIAN_SNAPSHOT} trixie-security main"; \
     } >/etc/apt/sources.list; \
-    apt-get -o Acquire::Retries=5 update
+    apt-get -o APT::Update::Error-Mode=any update
 
 
 FROM debian-snapshot AS kernel-builder
