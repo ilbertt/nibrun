@@ -1,14 +1,19 @@
-max_apps = 4
+max_apps = 256
 max_concurrent_vm_starts = 2
 
 [cron]
 max_jobs_per_app = 10
 time_zone = "UTC"
 
+[host_storage]
+device = "{{HOST_STORAGE_DEVICE}}"
+mount_point = "/data"
+filesystem = "xfs"
+
 [paths]
 state_dir = "/var/lib/nibrunner"
 runtime_dir = "/run/nibrunner"
-snapshot_dir = "/var/lib/nibrunner/snapshots"
+snapshot_dir = "/data/nibrunner-vm"
 guest_image_dir = {{GUEST_IMAGE_DIRECTORY}}
 desired_state_file = "/var/lib/nibrunner/desired.json"
 versions_file = "/var/lib/nibrunner/versions.json"
@@ -17,8 +22,23 @@ versions_file = "/var/lib/nibrunner/versions.json"
 store_url = "/var/lib/nibrunner/artifact-store"
 
 [volumes]
-backend = "local-file"
+backend = "zerofs"
 storage_prefix = "volumes"
+
+[volumes.zerofs]
+binary = "/opt/nibrunner/bin/zerofs"
+config_file = "/etc/zerofs/config.toml"
+mount_path = "/mnt/zerofs"
+nbd_socket_path = "/run/zerofs/nbd.sock"
+ninep_socket_path = "/run/zerofs/9p.sock"
+rpc_socket_path = "/run/zerofs/rpc.sock"
+storage_url = {{ZEROFS_STORAGE_URL}}
+cache_dir = "/data/zerofs"
+cache_disk_gib = 128
+cache_memory_gib = 2
+checkpoint_runtime_dir = "/run/zerofs-checkpoint"
+checkpoint_config_file = "/etc/zerofs/checkpoint.toml"
+checkpoint_cache_dir = "/data/zerofs-checkpoint"
 
 [exports]
 store_url = "/var/lib/nibrunner/export-store"
@@ -42,3 +62,6 @@ port = 9100
 
 [filesystem]
 socket = {{FILESYSTEM_SOCKET}}
+
+[logs]
+keep_mib_per_app = 64
