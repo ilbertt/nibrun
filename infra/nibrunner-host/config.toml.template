@@ -32,6 +32,10 @@ denied_egress_addresses_v6 = ["{{VPC_IPV6_CIDR_BLOCK}}"]
 listen_address = "127.0.0.1"
 port = 8080
 
+[proxy.http.fallback]
+origin_host = {{FALLBACK_ORIGIN_HOST}}
+redirect = {{FALLBACK_REDIRECT}}
+
 [metrics]
 listen_address = "127.0.0.1"
 port = 9100

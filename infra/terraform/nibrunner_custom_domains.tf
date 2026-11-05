@@ -29,3 +29,11 @@ resource "cloudflare_custom_hostname_fallback_origin" "nibrunner" {
     cloudflare_authenticated_origin_pulls_settings.nibrunner,
   ]
 }
+
+output "nibrunner_fallback_origin_host" {
+  value = cloudflare_dns_record.nibrunner_fallback.name
+}
+
+output "nibrunner_fallback_redirect" {
+  value = "https://${var.www_hostname}"
+}

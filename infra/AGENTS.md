@@ -25,8 +25,12 @@ Full (strict) SSL and disables Authenticated Origin Pulls on that zone. The Terr
 also needs Zone Settings Edit and SSL and Certificates Edit there.
 
 The Tunnel forwards every hostname to nibrunner's loopback HTTP proxy, preserving the Host
-header. Nibrunner serves only hostnames in its desired state. A custom-domain SSL exception
+header. Nibrunner forwards only app hostnames in its desired state. A custom-domain SSL exception
 rule is unnecessary because the local origin uses HTTP inside the encrypted Tunnel.
+
+Direct requests for the configured fallback hostname receive a temporary redirect to
+`https://<www_hostname>`. Terraform supplies both values to `[proxy.http.fallback]`; customer
+Host headers continue to select their app.
 
 Cloudflare for SaaS activation and its billing setup are account prerequisites, completed in
 the dashboard before applying. Terraform does not create customer-owned hostnames. Those must
