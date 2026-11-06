@@ -17,7 +17,6 @@ docker_build() {
     --platform=linux/amd64 \
     --build-context "runtime=$staging" \
     --build-arg BUILDER_IMAGE="$DEBIAN_IMAGE" \
-    --build-arg DEBIAN_SNAPSHOT="$DEBIAN_SNAPSHOT" \
     --build-arg KERNEL_VERSION="$KERNEL_VERSION" \
     --build-arg KERNEL_SHA256="$KERNEL_SHA256" \
     --build-arg FIRECRACKER_CONFIG_SHA256="$FIRECRACKER_CONFIG_SHA256" \
@@ -84,7 +83,6 @@ cat >"$dist/manifest.json" <<EOF
     "firecracker_commit": "$FIRECRACKER_COMMIT",
     "firecracker_config_sha256": "$FIRECRACKER_CONFIG_SHA256",
     "debian_image": "$DEBIAN_IMAGE",
-    "debian_snapshot": "$DEBIAN_SNAPSHOT",
     "source_date_epoch": $SOURCE_DATE_EPOCH,
     "rootfs_packages": {$(packages_json)},
     "init_sha256": "$(sha256_file "$staging/init")",

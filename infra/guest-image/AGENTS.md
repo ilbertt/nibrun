@@ -1,6 +1,6 @@
 # guest-image
 
-The Firecracker guest: an uncompressed kernel ELF and a glibc rootfs, built reproducibly in a
+The Firecracker guest: an uncompressed kernel ELF and a glibc rootfs, built in a
 container and published under a version of their own. Docker is the only host dependency. Not a
 workspace package — same shape as `pg-backup/`. Every pinned input and the reason for it is in
 `versions.env`.
@@ -155,8 +155,11 @@ knowing before someone "fixes" it.
 CI has no x86 runner with `/dev/kvm`, so this boot is a manual step today. It should become a
 gate on publishing.
 
-**The version is deterministic and verified.** Byte-identical artifacts hold **on one machine**:
+The build normalizes timestamps, filesystem identifiers and kernel build metadata.
+Byte-identical artifacts were verified with fixed package versions **on one machine**:
 two independent full kernel compiles, from source trees edited between them in ways that left
 the generated `.config` unchanged, produced the same `vmlinux` sha256. **Across machines it is
-untested** — everything known to make it so is in place, but no runner-versus-laptop comparison
-has been run. Treat that half as intended, not proven.
+untested**. Debian packages now come from the base image's standard repositories, so clean
+rebuilds can receive package updates and produce different bytes. The manifest records the
+rootfs package versions; publishing reuses an existing image version, and adoption remains
+a separate pull request.
