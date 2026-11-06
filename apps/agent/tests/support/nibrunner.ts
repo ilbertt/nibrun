@@ -1,4 +1,5 @@
 import type { HostReportedState as NibrunnerReport } from '#lib/nibrunner/reported.gen.ts';
+import type { TenantLogEvent } from '#lib/nibrunner/tenant-log.gen.ts';
 import { ARTIFACT_DIGEST } from '#tests/support/artifacts.ts';
 import {
   APP_ID,
@@ -9,6 +10,19 @@ import {
   VOLUME_ID,
   VOLUME_SIZE_BYTES,
 } from '#tests/support/fixtures.ts';
+
+export function nibrunnerTenantLog(): Extract<TenantLogEvent, { kind: 'data' }> {
+  return {
+    appId: APP_ID,
+    deploymentId: DEPLOYMENT_ID,
+    sourceId: 'nibrunner-source',
+    sequence: 0,
+    observedAt: OBSERVED_AT,
+    kind: 'data',
+    stream: 'stdout',
+    text: 'tenant output',
+  };
+}
 
 export function nibrunnerReport(overrides: Partial<NibrunnerReport> = {}): NibrunnerReport {
   return {
