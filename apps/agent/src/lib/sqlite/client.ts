@@ -1,6 +1,7 @@
 import { Buffer } from 'node:buffer';
 import { Agent, request } from 'node:http';
 import { createConnection, type Socket } from 'node:net';
+import type { Duplex } from 'node:stream';
 import { type GuestPath, SqliteOutcomeSchema } from '@repo/protocol';
 import {
   HranaErrorSchema,
@@ -21,7 +22,7 @@ import {
 } from '#lib/sqlite/errors.ts';
 import { connectRequest } from '#lib/vm/vsock.ts';
 
-const GUEST_SQLITE_VSOCK_PORT = 51005;
+export const GUEST_SQLITE_VSOCK_PORT = 51005;
 const RESPONSE_TIMEOUT = Duration.seconds(10);
 const MAX_HANDSHAKE_BYTES = 64;
 const MAX_VSOCK_PORT = 0xffffffff;
@@ -183,6 +184,12 @@ export function connectGuestSqlite({ socketPath }: { socketPath: string }) {
       (held) => Effect.sync(() => held.destroy()),
     );
     yield* connect(socket);
+    return yield* makeGuestSqliteClient({ socket });
+  });
+}
+
+export function makeGuestSqliteClient({ socket }: { socket: Duplex }) {
+  return Effect.gen(function* () {
     const agent = new Agent({ keepAlive: true, maxSockets: 1, maxFreeSockets: 1 });
     let attached = false;
     agent.createConnection = function connection() {
@@ -193,13 +200,13 @@ export function connectGuestSqlite({ socketPath }: { socketPath: string }) {
       socket.resume();
       return socket;
     };
-    yield* Effect.addFinalizer(() => Effect.sync(() => agent.destroy()));
     const serial = yield* Effect.makeSemaphore(1);
     let prefix: string | undefined;
     const close = Effect.sync(() => {
       agent.destroy();
       socket.destroy();
     });
+    yield* Effect.addFinalizer(() => close);
     function exchange({
       method,
       path,
