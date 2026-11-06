@@ -51,9 +51,10 @@ Only the tenant binary needs glibc, which is why the rootfs carries it.
 ## Building
 
 `bun run build` produces `dist/init`, which `infra/guest-image` copies to `/init` and hashes into
-its own version — so the toolchain is pinned in `versions.env` and the binary is stripped and
-build-id-free, to keep a rebuild byte-identical. A change that is not reproducible turns every
-guest-image build into a new version.
+its own version. `versions.env` pins the base image and downloaded source archives; Debian
+packages use the base image's standard repositories so clean rebuilds can receive package
+updates. The binary is stripped and build-id-free, but package updates may change its bytes
+and therefore the guest-image version.
 
 ## Testing
 

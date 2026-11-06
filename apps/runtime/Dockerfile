@@ -7,14 +7,8 @@
 ARG BUILDER_IMAGE
 
 FROM ${BUILDER_IMAGE} AS toolchain
-ARG DEBIAN_SNAPSHOT
 SHELL ["/bin/sh", "-ec"]
-# http, not https: the slim base carries no CA bundle, and apt verifies the
-# archive's own signature regardless of transport.
 RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\n' >/etc/apt/apt.conf.d/80-nibrun-network; \
-    rm -f /etc/apt/sources.list.d/debian.sources; \
-    echo "deb [check-valid-until=no] http://snapshot-cloudflare.debian.org/archive/debian/${DEBIAN_SNAPSHOT} trixie main" \
-      >/etc/apt/sources.list; \
     apt-get -o APT::Update::Error-Mode=any update; \
     apt-get install -y --no-install-recommends binutils file musl-dev musl-tools unzip make bzip2
 
