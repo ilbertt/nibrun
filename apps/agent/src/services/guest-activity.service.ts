@@ -50,36 +50,35 @@ export class GuestActivity extends Effect.Service<GuestActivity>()('GuestActivit
       return Effect.acquireUseRelease(acquire(appId), use, () => release(appId));
     }
 
-    function run<A, E, R>({ appId, effect }: { appId: AppId; effect: Effect.Effect<A, E, R> }) {
-      return withActivity({
-        appId,
-        use: (activity) =>
-          Effect.scoped(
-            activity.gate
-              .withPermits(1)(
-                Effect.acquireRelease(
-                  Effect.flatMap(Deferred.make<void>(), (drained) =>
-                    Ref.update(activity.running, (current) => ({
-                      count: current.count + 1,
-                      drained: current.count === 0 ? drained : current.drained,
-                    })),
-                  ),
-                  () =>
-                    Effect.gen(function* () {
-                      yield* state.markActive({ appId, nowMs: yield* Clock.currentTimeMillis });
-                      const drained = yield* Ref.modify(activity.running, (current) => [
-                        current.count === 1 ? Option.some(current.drained) : Option.none(),
-                        { ...current, count: current.count - 1 },
-                      ]);
-                      if (Option.isSome(drained)) {
-                        yield* Deferred.succeed(drained.value, undefined);
-                      }
-                    }),
-                ),
-              )
-              .pipe(Effect.andThen(effect)),
+    function hold(appId: AppId) {
+      return Effect.gen(function* () {
+        const activity = yield* Effect.acquireRelease(acquire(appId), () => release(appId));
+        yield* activity.gate.withPermits(1)(
+          Effect.acquireRelease(
+            Effect.flatMap(Deferred.make<void>(), (drained) =>
+              Ref.update(activity.running, (current) => ({
+                count: current.count + 1,
+                drained: current.count === 0 ? drained : current.drained,
+              })),
+            ),
+            () =>
+              Effect.gen(function* () {
+                yield* state.markActive({ appId, nowMs: yield* Clock.currentTimeMillis });
+                const drained = yield* Ref.modify(activity.running, (current) => [
+                  current.count === 1 ? Option.some(current.drained) : Option.none(),
+                  { ...current, count: current.count - 1 },
+                ]);
+                if (Option.isSome(drained)) {
+                  yield* Deferred.succeed(drained.value, undefined);
+                }
+              }),
           ),
+        );
       });
+    }
+
+    function run<A, E, R>({ appId, effect }: { appId: AppId; effect: Effect.Effect<A, E, R> }) {
+      return Effect.scoped(Effect.andThen(hold(appId), effect));
     }
 
     function whenIdle<E, R>({
@@ -123,7 +122,7 @@ export class GuestActivity extends Effect.Service<GuestActivity>()('GuestActivit
       });
     }
 
-    return { run, whenIdle, exclusively };
+    return { hold, run, whenIdle, exclusively };
   }),
   dependencies: [AgentState.Default],
 }) {}
