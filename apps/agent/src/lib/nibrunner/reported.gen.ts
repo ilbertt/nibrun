@@ -1,5 +1,5 @@
 /**
- * Generated from https://raw.githubusercontent.com/ilbertt/nibrunner/v2026.11.2/crates/protocol/schema/reported.schema.json
+ * Generated from https://raw.githubusercontent.com/ilbertt/nibrunner/v2026.11.3/crates/protocol/schema/reported.schema.json
  * Run bun run --filter @repo/internal-scripts generate-nibrunner-types; do not edit.
  */
 
