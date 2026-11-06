@@ -1,5 +1,5 @@
 /**
- * Generated from https://raw.githubusercontent.com/ilbertt/nibrunner/v2026.11.2/crates/nibrunnerd/filesystem.openapi.json
+ * Generated from https://raw.githubusercontent.com/ilbertt/nibrunner/v2026.11.3/crates/nibrunnerd/filesystem.openapi.json
  * Run bun run --filter @repo/internal-scripts generate-nibrunner-types; do not edit.
  */
 
