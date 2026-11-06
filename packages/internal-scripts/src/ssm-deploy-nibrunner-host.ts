@@ -45,6 +45,7 @@ const bridgeUnit = await Bun.file(
 const bridgeEnvironment = {
   AGENT_ENGINE: 'nibrunner',
   AGENT_CONTROL_PLANE_URL: requiredEnv('AGENT_CONTROL_PLANE_URL'),
+  AGENT_LOG_INGEST_URL: requiredEnv('AGENT_LOG_INGEST_URL'),
   AGENT_ARTIFACT_BUCKET: requiredEnv('AGENT_ARTIFACT_BUCKET'),
   AGENT_IMPORT_BUCKET: requiredEnv('AGENT_IMPORT_BUCKET'),
   AGENT_AWS_REGION: requiredEnv('AGENT_AWS_REGION'),
