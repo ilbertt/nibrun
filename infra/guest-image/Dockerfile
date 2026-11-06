@@ -1,25 +1,17 @@
 # syntax=docker/dockerfile:1
 #
-# Three independent artifacts, one apt pin. Build with --target kernel, --target
+# Three independent artifacts, one base image. Build with --target kernel, --target
 # rootfs or --target stub-init; BuildKit only runs the stage you ask for.
 
 ARG BUILDER_IMAGE
 
-FROM ${BUILDER_IMAGE} AS debian-snapshot
-ARG DEBIAN_SNAPSHOT
+FROM ${BUILDER_IMAGE} AS debian
 SHELL ["/bin/sh", "-ec"]
-# http, not https: the slim base carries no CA bundle yet, and apt verifies the
-# archive's own signature regardless of transport.
 RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\n' >/etc/apt/apt.conf.d/80-nibrun-network; \
-    rm -f /etc/apt/sources.list.d/debian.sources; \
-    { \
-      echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT} trixie main"; \
-      echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/${DEBIAN_SNAPSHOT} trixie-security main"; \
-    } >/etc/apt/sources.list; \
     apt-get -o APT::Update::Error-Mode=any update
 
 
-FROM debian-snapshot AS kernel-builder
+FROM debian AS kernel-builder
 ARG KERNEL_VERSION
 ARG KERNEL_SHA256
 ARG FIRECRACKER_CONFIG_SHA256
@@ -66,7 +58,7 @@ COPY --from=kernel-builder /build/linux/vmlinux /vmlinux
 COPY --from=kernel-builder /build/linux/.config /kernel.config
 
 
-FROM debian-snapshot AS rootfs-builder
+FROM debian AS rootfs-builder
 ARG SOURCE_DATE_EPOCH
 ARG ROOTFS_UUID
 ARG ROOTFS_HASH_SEED
@@ -92,7 +84,7 @@ COPY --from=rootfs-builder /out/ /
 # A throwaway stand-in for apps/runtime's /init, so the rootfs can be built and
 # checked before that component exists. It changes the computed version, so an
 # image built with it can never be mistaken for a publishable one.
-FROM debian-snapshot AS stub-init-builder
+FROM debian AS stub-init-builder
 RUN apt-get install -y --no-install-recommends binutils gcc libc6-dev
 COPY rootfs/stub-init.c /stub-init.c
 RUN gcc -static -Os -o /init /stub-init.c; \
