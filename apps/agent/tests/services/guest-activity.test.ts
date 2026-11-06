@@ -31,6 +31,27 @@ function heldRun(activity: GuestActivity) {
 }
 
 describe('cron idle protection', () => {
+  test('a scoped hold protects the guest until its scope closes', () =>
+    run(
+      Effect.gen(function* () {
+        const activity = yield* GuestActivity;
+        const slept = yield* Ref.make(0);
+        const sleep = activity.whenIdle({
+          appId: APP_ID,
+          effect: Ref.update(slept, (count) => count + 1),
+        });
+        yield* Effect.scoped(
+          Effect.gen(function* () {
+            yield* activity.hold(APP_ID);
+            yield* sleep;
+            expect(yield* Ref.get(slept)).toBe(0);
+          }),
+        );
+        yield* sleep;
+        expect(yield* Ref.get(slept)).toBe(1);
+      }),
+    ));
+
   test('every overlapping run keeps its app awake until the last one finishes', () =>
     run(
       Effect.gen(function* () {
