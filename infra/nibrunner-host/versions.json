@@ -1,5 +1,5 @@
 {
-  "version": "v2026.11.1",
-  "binarySha256": "672d8ac31c295a2af05f4aa79a1d2c11e89289074be50dab68854f5660e1aaed",
-  "guestManifestSha256": "5ba2ec8aa90cf014a024298288f2dde524056d755cb0f5915d9ef01a73d58a7d"
+  "version": "v2026.11.2",
+  "binarySha256": "81d24e49bd81e12b3996fba3a65f895fc0af4923cc8024175683acc54921d1a3",
+  "guestManifestSha256": "eb01144044f17bfeb56dd0331ef94420cee6c5b06536d8c4d260b4c96ceceb44"
 }
