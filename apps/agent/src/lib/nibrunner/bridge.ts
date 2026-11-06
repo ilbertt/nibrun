@@ -22,8 +22,10 @@ import { decode } from '#lib/protocol.ts';
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import type { NibrunnerBridgeConfig } from '#services/nibrunner-bridge-config.service.ts';
 import { NibrunnerFilesystem } from '#services/nibrunner-filesystem.service.ts';
+import { NibrunnerLogs } from '#services/nibrunner-logs.service.ts';
 
 const REPORT_MAX_AGE_MS = 30_000;
+const LOG_IDLE_POLL = '500 millis';
 
 export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
   control,
@@ -34,6 +36,7 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
 }) {
   const store = yield* ArtifactStore;
   const filesystem = yield* NibrunnerFilesystem;
+  const logs = yield* NibrunnerLogs;
   const initial = yield* readNibrunnerReport(config.reportedStateFile);
   const sessions = yield* makeSessionHolder({
     control,
@@ -158,11 +161,24 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
     Effect.tapErrorTag('ControlPlaneError', sessions.onExpired),
   );
 
+  const logOnce = Effect.gen(function* () {
+    const desired = Option.getOrUndefined(yield* Ref.get(latest));
+    if (desired === undefined) {
+      return false;
+    }
+    const session = yield* sessions.current;
+    return yield* logs.send({
+      hostId: session.hostId,
+      appIds: [...desired.instances, ...desired.volumes].map((app) => app.appId),
+    });
+  }).pipe(Effect.tapErrorTag('ControlPlaneError', sessions.onExpired));
+
   return {
     pollOnce,
     reportOnce,
     filesystemOnce,
     cronOnce,
+    logOnce,
     run: Effect.all(
       [
         supervised({
@@ -187,6 +203,13 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
         supervised({
           once: cronOnce,
           onFailure: () => Effect.logWarning('nibrunner cron query failed'),
+          schedule: CONTROL_PLANE_BACKOFF,
+        }),
+        supervised({
+          once: logOnce.pipe(
+            Effect.flatMap((sent) => (sent ? Effect.void : Effect.sleep(LOG_IDLE_POLL))),
+          ),
+          onFailure: () => Effect.logWarning('nibrunner tenant log delivery failed'),
           schedule: CONTROL_PLANE_BACKOFF,
         }),
       ],
