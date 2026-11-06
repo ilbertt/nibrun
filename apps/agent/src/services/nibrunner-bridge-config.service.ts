@@ -17,6 +17,7 @@ export class NibrunnerBridgeConfig extends Effect.Service<NibrunnerBridgeConfig>
         awsRegion: yield* Config.nonEmptyString('AGENT_AWS_REGION'),
         filesystemSocket: NIBRUNNER_FILESYSTEM_SOCKET,
         hostIdFile: path.join(stateDir, 'bridge', 'host-id'),
+        logCursorsFile: path.join(stateDir, 'bridge', 'log-cursors.sqlite'),
         desiredStateFile: path.join(stateDir, 'desired.json'),
         reportedStateFile: path.join(stateDir, 'reported.json'),
         artifactStoreDir: path.join(stateDir, 'artifact-store'),

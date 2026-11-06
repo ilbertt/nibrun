@@ -81,6 +81,7 @@ function fixture(initialDesired: HostDesiredState) {
     const config = NibrunnerBridgeConfig.make({
       controlPlaneUrl: baseUrl,
       hostIdFile: `${directory}/bridge/host-id`,
+      logCursorsFile: `${directory}/bridge/log-cursors.sqlite`,
       desiredStateFile: `${directory}/desired.json`,
       reportedStateFile: `${directory}/reported.json`,
       artifactStoreDir: `${directory}/artifact-store`,
