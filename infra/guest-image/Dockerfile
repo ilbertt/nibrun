@@ -10,12 +10,13 @@ ARG DEBIAN_SNAPSHOT
 SHELL ["/bin/sh", "-ec"]
 # http, not https: the slim base carries no CA bundle yet, and apt verifies the
 # archive's own signature regardless of transport.
-RUN rm -f /etc/apt/sources.list.d/debian.sources; \
+RUN printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\n' >/etc/apt/apt.conf.d/80-nibrun-network; \
+    rm -f /etc/apt/sources.list.d/debian.sources; \
     { \
       echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian/${DEBIAN_SNAPSHOT} trixie main"; \
       echo "deb [check-valid-until=no] http://snapshot.debian.org/archive/debian-security/${DEBIAN_SNAPSHOT} trixie-security main"; \
     } >/etc/apt/sources.list; \
-    apt-get -o Acquire::Retries=5 update
+    apt-get -o APT::Update::Error-Mode=any update
 
 
 FROM debian-snapshot AS kernel-builder
@@ -25,7 +26,7 @@ ARG FIRECRACKER_CONFIG_SHA256
 ARG SOURCE_DATE_EPOCH
 
 RUN apt-get install -y --no-install-recommends \
-      bc bison build-essential ca-certificates curl file flex libelf-dev libssl-dev xz-utils
+      bc bison build-essential ca-certificates curl file flex libelf-dev libssl-dev patch xz-utils
 
 WORKDIR /build/linux
 RUN curl -fsSL --retry 5 -o /tmp/linux.tar.xz \
@@ -35,6 +36,9 @@ RUN curl -fsSL --retry 5 -o /tmp/linux.tar.xz \
     rm /tmp/linux.tar.xz
 
 COPY kernel/ /build/config/
+
+RUN patch --batch --forward --fuzz=0 -p1 \
+      < /build/config/patches/ext4-fix-null-folio-dereference-in-mballoc.patch
 
 RUN echo "${FIRECRACKER_CONFIG_SHA256}  /build/config/firecracker-ci-x86_64-6.1.config" \
       | sha256sum -c -; \

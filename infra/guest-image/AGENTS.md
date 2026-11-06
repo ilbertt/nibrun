@@ -97,6 +97,20 @@ suppresses bus scanning while x86_64 ACPI init still needs the symbol.
 
 ## Building
 
+### Temporary ext4 backport
+
+`kernel/patches/ext4-fix-null-folio-dereference-in-mballoc.patch` vendors
+[Elliot Berman's upstream fix](https://lore.kernel.org/r/20261102-ext4-ntfs3-null-folio-v1-1-4fd91ee23a4a@elliotjb.com)
+for the Linux 6.1.191 ext4 regression. Its folio conversion assumes error pointers where
+6.1 returns NULL, so ordinary page-cache eviction can panic the guest on its next block
+allocation. Keeping 6.1.191 with this correction preserves its security fixes.
+
+Recheck this patch whenever `KERNEL_VERSION` changes and remove it once the chosen release
+includes the correction. The build rejects an already-applied patch and disallows fuzz;
+`version.sh` includes the vendored patch in the image's content hash.
+
+### Commands
+
 ```sh
 ./build.sh                          # needs apps/runtime/dist/init
 GUEST_IMAGE_STUB_INIT=1 ./build.sh  # throwaway /init, for working on the image alone
