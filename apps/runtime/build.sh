@@ -3,9 +3,8 @@
 # toolchain and the target architecture live in the container, so a developer Mac
 # and an ubuntu-latest runner build the same binary.
 #
-# infra/guest-image copies what this produces to /init in the rootfs, and hashes it
-# into that image's version — which is why the toolchain is pinned in versions.env
-# and why the binary is stripped and carries no build id.
+# infra/guest-image hashes the resulting binary into its version, including any
+# changes caused by Debian toolchain updates.
 set -euo pipefail
 
 runtime_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
@@ -20,7 +19,6 @@ mkdir -p "$dist"
 docker build \
   --platform=linux/amd64 \
   --build-arg BUILDER_IMAGE="$BUILDER_IMAGE" \
-  --build-arg DEBIAN_SNAPSHOT="$DEBIAN_SNAPSHOT" \
   --build-arg SQLITE_ARCHIVE="$SQLITE_ARCHIVE" \
   --build-arg SQLITE_SHA256="$SQLITE_SHA256" \
   --build-arg JANSSON_VERSION="$JANSSON_VERSION" \
