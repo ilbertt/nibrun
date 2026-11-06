@@ -34,6 +34,14 @@ resource "aws_security_group" "instance" {
     security_groups = [aws_security_group.app_host.id]
   }
 
+  ingress {
+    description     = "Log ingest from nibrunner"
+    from_port       = var.log_ingest_port
+    to_port         = var.log_ingest_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.nibrunner_host.id]
+  }
+
   # The relay's journal, which is the only thing that machine emits and the only
   # way anything would notice it stop. Its own rule rather than widening the app
   # hosts' above: the relay is the one machine here reachable from the internet,
