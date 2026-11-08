@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { compile } from 'json-schema-to-typescript';
+import { nibrunnerTenantLogSchema } from '#shared/nibrunner-schema.ts';
 import { repoRoot } from '#shared/paths.ts';
 import versions from '../../../infra/nibrunner-host/versions.json' with { type: 'json' };
 
@@ -9,6 +10,7 @@ const SCHEMAS = {
   desired: 'crates/protocol/schema/desired.schema.json',
   reported: 'crates/protocol/schema/reported.schema.json',
   filesystem: 'crates/nibrunnerd/filesystem.openapi.json',
+  'tenant-log': 'crates/protocol/schema/tenant-log.schema.json',
 } as const;
 
 function filesystemSchema(value: unknown) {
@@ -36,7 +38,9 @@ async function generate(schemaName: keyof typeof SCHEMAS) {
   const schema =
     schemaName === 'filesystem'
       ? filesystemSchema(document)
-      : (document as Parameters<typeof compile>[0]);
+      : schemaName === 'tenant-log'
+        ? nibrunnerTenantLogSchema(document)
+        : (document as Parameters<typeof compile>[0]);
   if (!schema.title) {
     throw new Error(`Nibrunner schema has no root type title: ${source}`);
   }
