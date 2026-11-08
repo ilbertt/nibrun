@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { createConnection } from 'node:net';
 import { FileSystem } from '@effect/platform';
 import {
   AppIdSchema,
@@ -7,10 +8,15 @@ import {
   type FilesystemQueryResponse,
   FilesystemQueryResultSchema,
   FilesystemQuerySchema,
+  GuestPathSchema,
   type HostDesiredState,
   HostIdSchema,
   type HostReportedState,
   HostReportedStateSchema,
+  type SqliteQueryRequest,
+  type SqliteQueryResponse,
+  type SqliteQueryResult,
+  SqliteQueryResultSchema,
   TimestampSchema,
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
@@ -23,6 +29,7 @@ import { readNibrunnerDesired, writeNibrunnerDesired } from '#lib/nibrunner/stat
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { NibrunnerBridgeConfig } from '#services/nibrunner-bridge-config.service.ts';
 import { NibrunnerFilesystem } from '#services/nibrunner-filesystem.service.ts';
+import { NibrunnerGuestConnections } from '#services/nibrunner-guest-connections.service.ts';
 import { NibrunnerLogs } from '#services/nibrunner-logs.service.ts';
 import { artifactStore } from '#tests/support/artifacts.ts';
 import {
@@ -35,6 +42,7 @@ import {
 } from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 import { serving, servingUnix } from '#tests/support/server.ts';
+import { sqliteQuery } from '#tests/support/sqlite-sessions.ts';
 
 const run = provided(platform);
 const SESSION_LIFETIME_MS = 300_000;
@@ -48,37 +56,54 @@ function fixture(initialDesired: HostDesiredState) {
     const world = {
       desired: initialDesired,
       query: { result: 'none' } as FilesystemQueryResponse,
+      sqliteQuery: { result: 'none' } as SqliteQueryResponse,
+    };
+    const sqliteRequests: SqliteQueryRequest[] = [];
+    const sqliteResults: SqliteQueryResult[] = [];
+    const guest: { connect: NibrunnerGuestConnections['connect'] } = {
+      connect: () => Effect.dieMessage('No guest connection was expected'),
     };
     const filesystemRequests: FilesystemQueryRequest[] = [];
     const reports: HostReportedState[] = [];
     const registrations: string[] = [];
     const logRequests: Array<Parameters<NibrunnerLogs['send']>[0]> = [];
     const { baseUrl } = yield* serving(async (request) => {
-      const path = new URL(request.url).pathname;
-      if (path.endsWith('/session')) {
-        const body = (await request.json()) as { hostId: string };
-        registrations.push(body.hostId);
-        expect((await Bun.file(`${directory}/bridge/host-id`).text()).trim()).toBe(body.hostId);
-        return Response.json({
-          hostId: HOST_ID,
-          sessionToken: 'token',
-          expiresAt: new Date(Date.now() + SESSION_LIFETIME_MS).toISOString(),
-          poll: POLL_SETTINGS_FIXTURE,
-        });
+      const route = new URL(request.url).pathname.split('/').at(-1);
+      switch (route) {
+        case 'session': {
+          const body = (await request.json()) as { hostId: string };
+          registrations.push(body.hostId);
+          expect((await Bun.file(`${directory}/bridge/host-id`).text()).trim()).toBe(body.hostId);
+          return Response.json({
+            hostId: HOST_ID,
+            sessionToken: 'token',
+            expiresAt: new Date(Date.now() + SESSION_LIFETIME_MS).toISOString(),
+            poll: POLL_SETTINGS_FIXTURE,
+          });
+        }
+        case 'desired-state': {
+          return Response.json(world.desired);
+        }
+        case 'filesystem-query': {
+          filesystemRequests.push((await request.json()) as FilesystemQueryRequest);
+          return Response.json(world.query);
+        }
+        case 'filesystem-query-result': {
+          Value.Parse(FilesystemQueryResultSchema, await request.json());
+          return Response.json({});
+        }
+        case 'sqlite-query': {
+          sqliteRequests.push((await request.json()) as SqliteQueryRequest);
+          return Response.json(world.sqliteQuery);
+        }
+        case 'sqlite-query-result': {
+          sqliteResults.push(Value.Parse(SqliteQueryResultSchema, await request.json()));
+          return Response.json({});
+        }
+        default:
+          reports.push(Value.Parse(HostReportedStateSchema, await request.json()));
+          return Response.json({});
       }
-      if (path.endsWith('/desired-state')) {
-        return Response.json(world.desired);
-      }
-      if (path.endsWith('/filesystem-query')) {
-        filesystemRequests.push((await request.json()) as FilesystemQueryRequest);
-        return Response.json(world.query);
-      }
-      if (path.endsWith('/filesystem-query-result')) {
-        Value.Parse(FilesystemQueryResultSchema, await request.json());
-        return Response.json({});
-      }
-      reports.push(Value.Parse(HostReportedStateSchema, await request.json()));
-      return Response.json({});
     });
     const config = NibrunnerBridgeConfig.make({
       controlPlaneUrl: baseUrl,
@@ -121,10 +146,19 @@ function fixture(initialDesired: HostDesiredState) {
       registrations,
       filesystemRequests,
       logRequests,
+      sqliteRequests,
+      sqliteResults,
+      guest,
       create: makeNibrunnerBridge({
         config,
         control: makeControlPlaneClient({ baseUrl }),
       }).pipe(
+        Effect.provideService(
+          NibrunnerGuestConnections,
+          NibrunnerGuestConnections.make({
+            connect: (request) => guest.connect(request),
+          }),
+        ),
         Effect.provideService(
           NibrunnerLogs,
           NibrunnerLogs.make({
@@ -229,6 +263,131 @@ test.each(['running', 'on-request', 'stopped', 'replaced', 'stale', 'unaccepted'
     );
   },
 );
+
+function sqliteAnswer(results: readonly SqliteQueryResult[]) {
+  return Effect.sync(() => results.length).pipe(
+    Effect.repeat({ schedule: Schedule.spaced('5 millis'), until: (length) => length > 0 }),
+    Effect.timeout('2 seconds'),
+  );
+}
+
+function sqliteInstance(state: string) {
+  return desiredInstance({
+    desiredState: state === 'idle' ? 'on-request' : state === 'stopped' ? 'stopped' : 'running',
+  });
+}
+
+function sqliteObservedState(state: string): NibrunnerReport['instances'][number]['state'] {
+  return state === 'idle' ? 'idle' : state === 'failed' ? 'failed' : 'running';
+}
+
+test.each([
+  'running',
+  'idle',
+  'stopped',
+  'replaced',
+  'stale',
+  'unaccepted',
+  'failed',
+  'unpolled',
+] as const)('SQLite polls advertise only current usable deployments: %s', async (state) => {
+  await run(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const instance = sqliteInstance(state);
+      const setup = yield* fixture(desiredState({ instances: [instance] }));
+      const report: NibrunnerReport = JSON.parse(
+        yield* fs.readFileString(setup.config.reportedStateFile),
+      );
+      report.instances = [
+        {
+          appId: APP_ID,
+          deploymentId: state === 'replaced' ? NEXT_DEPLOYMENT_ID : DEPLOYMENT_ID,
+          state: sqliteObservedState(state),
+          compute: null,
+          restartCount: 0,
+        },
+      ];
+      if (state === 'stale') {
+        report.reportedAt = '1970-01-01T00:00:00Z';
+      }
+      if (state === 'unaccepted') {
+        report.acceptedDigest = null;
+      }
+      yield* fs.writeFileString(setup.config.reportedStateFile, JSON.stringify(report));
+      setup.world.sqliteQuery = { result: 'query', query: sqliteQuery({ type: 'close' }) };
+      const bridge = yield* setup.create.pipe(Effect.provide(artifactStore()));
+      if (state !== 'unpolled') {
+        yield* bridge.pollOnce;
+      }
+      yield* bridge.sqliteOnce;
+      yield* sqliteAnswer(setup.sqliteResults);
+      expect(setup.sqliteRequests).toEqual([
+        {
+          servedDeployments:
+            state === 'running' || state === 'idle'
+              ? [{ appId: APP_ID, deploymentId: DEPLOYMENT_ID }]
+              : [],
+        },
+      ]);
+      expect(setup.sqliteResults[0]?.outcome.status).toBe('failed');
+    }),
+  );
+});
+
+test('a stop closes the SQLite session before publishing the engine withdrawal', async () => {
+  await run(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const setup = yield* fixture(desiredState({ instances: [desiredInstance()] }));
+      const report: NibrunnerReport = JSON.parse(
+        yield* fs.readFileString(setup.config.reportedStateFile),
+      );
+      report.instances = [
+        {
+          appId: APP_ID,
+          deploymentId: DEPLOYMENT_ID,
+          state: 'running',
+          compute: null,
+          restartCount: 0,
+        },
+      ];
+      yield* fs.writeFileString(setup.config.reportedStateFile, JSON.stringify(report));
+      const closedBeforeWithdrawal: string[] = [];
+      yield* servingUnix({
+        socketPath: setup.config.filesystemSocket,
+        handler: () => Response.json({}),
+      });
+      setup.guest.connect = () =>
+        Effect.acquireRelease(
+          Effect.sync(() => createConnection({ path: setup.config.filesystemSocket })),
+          (socket) =>
+            Effect.gen(function* () {
+              socket.destroy();
+              const held = yield* readNibrunnerDesired({
+                path: setup.config.desiredStateFile,
+                hostId: HOST_ID,
+              });
+              closedBeforeWithdrawal.push(held.instances[0]?.desiredState ?? 'removed');
+            }).pipe(Effect.provideService(FileSystem.FileSystem, fs), Effect.orDie),
+        );
+      setup.world.sqliteQuery = {
+        result: 'query',
+        query: sqliteQuery({ type: 'open', path: Value.Parse(GuestPathSchema, '/app.db') }),
+      };
+      const bridge = yield* setup.create.pipe(Effect.provide(artifactStore()));
+      yield* bridge.pollOnce;
+      yield* bridge.sqliteOnce;
+      yield* sqliteAnswer(setup.sqliteResults);
+      expect(setup.sqliteResults[0]?.outcome).toEqual({ status: 'opened' });
+      setup.world.desired = desiredState({
+        instances: [desiredInstance({ desiredState: 'stopped' })],
+      });
+      yield* bridge.pollOnce;
+      expect(closedBeforeWithdrawal).toEqual(['running']);
+    }),
+  );
+});
 
 test('stops and removals bypass a blocked download without omitting an unrelated running app', async () => {
   await run(
