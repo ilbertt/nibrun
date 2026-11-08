@@ -52,7 +52,7 @@ const fixture = Effect.gen(function* () {
     return new Response('', { status: world.status });
   });
   const store = makeLogStoreClient({ baseUrl });
-  const cursors = yield* makeNibrunnerLogCursors({ file: `${directory}/cursors.sqlite` });
+  const cursors = yield* makeNibrunnerLogCursors({ file: `${directory}/cursors.json` });
   const delivery = yield* makeNibrunnerLogDelivery({ directory, store, cursors });
   const file = `${directory}/${APP_ID}.jsonl`;
   return { fs, directory, file, store, cursors, delivery, requests, world };
