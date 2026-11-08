@@ -142,15 +142,15 @@ export const DEPLOY_PRESETS = {
   sharkord: {
     isRecommended: false,
     projectUrl: 'https://github.com/sharkord/sharkord',
-    version: 'v0.0.29',
+    version: 'v0.0.30',
     markdownContent: sharkordPage,
     category: DeployCategory.Communication,
     title: 'Sharkord',
     subtitle: 'A self-hosted chat server with voice, video and screen sharing.',
     deployLink: {
       name: 'sharkord',
-      binary: 'https://github.com/Sharkord/sharkord/releases/download/v0.0.29/sharkord-linux-x64',
-      sha256: '844b4114c93724975968966c2d6d4ad73584de71204a3ac6b7b18ef2827d1c6b',
+      binary: 'https://github.com/Sharkord/sharkord/releases/download/v0.0.30/sharkord-linux-x64',
+      sha256: '592be523368445259269fbd23e112ffbc8179443d038b89b90e92dae94f0ab64',
       port: 4991,
       'extra-public-port': true,
       env: [
@@ -459,7 +459,7 @@ export const DEPLOY_PRESETS = {
   webdav: {
     isRecommended: false,
     projectUrl: 'https://github.com/rclone/rclone',
-    version: 'v1.75.2',
+    version: 'v1.76.0',
     markdownContent: webdavPage,
     category: DeployCategory.FilesAndSharing,
     title: 'WebDAV',
@@ -467,8 +467,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'webdav',
       binary:
-        'https://github.com/rclone/rclone/releases/download/v1.75.2/rclone-v1.75.2-linux-amd64.zip',
-      sha256: '349ac8fba6ff65d6247043f1750cdcb518ec5d500ef91463a10d37c0ccdf3702',
+        'https://github.com/rclone/rclone/releases/download/v1.76.0/rclone-v1.76.0-linux-amd64.zip',
+      sha256: 'b00f00b3266c3764413afe599d3ec316f6f43b3e0ea8a0bc1d186d2133e46df7',
       port: 8080,
       arg: [
         'serve',
@@ -574,7 +574,7 @@ export const DEPLOY_PRESETS = {
   calnode: {
     isRecommended: false,
     projectUrl: 'https://github.com/Calnode/calnode',
-    version: 'v0.13.0',
+    version: 'v0.14.0',
     markdownContent: calnodePage,
     title: 'Calnode',
     subtitle: 'A scheduling and booking app with calendar integrations, an API and an MCP server.',
@@ -582,8 +582,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'calnode',
       binary:
-        'https://github.com/Calnode/calnode/releases/download/v0.13.0/calnode_0.13.0_linux_amd64.tar.gz',
-      sha256: '82b98e3e51d76723df27a7f50f75a3079249142570b1c8058734c1dc805fb3da',
+        'https://github.com/Calnode/calnode/releases/download/v0.14.0/calnode_0.14.0_linux_amd64.tar.gz',
+      sha256: '54b702fa54c7e27df0b11a932595b13834b83985c9359f3b6dd33c6f3d9ed2b2',
       port: 3000,
       env: [
         `BASE_URL=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}`,
