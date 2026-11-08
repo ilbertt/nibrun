@@ -10,7 +10,6 @@ import {
   Scope,
   SynchronizedRef,
 } from 'effect';
-import { connectGuestSqlite } from '#lib/sqlite/client.ts';
 import {
   SQLITE_MAX_GUEST_SESSIONS,
   SQLITE_MAX_HOST_SESSIONS,
@@ -24,46 +23,16 @@ import {
   SqliteSessionUnavailable,
   sqliteFailure,
 } from '#lib/sqlite/sessions.ts';
-import { guestVsockPath } from '#lib/vm/vsock.ts';
-import { AgentState } from '#services/agent-state.service.ts';
-import { AppWaker } from '#services/app-waker.service.ts';
-import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
-import { GuestActivity } from '#services/guest-activity.service.ts';
-import { VmManager } from '#services/vm-manager.service.ts';
+
+import { SqliteGuest } from '#services/sqlite-guest.service.ts';
 
 export class SqliteSessions extends Effect.Service<SqliteSessions>()('SqliteSessions', {
   scoped: Effect.gen(function* () {
-    const state = yield* AgentState;
-    const cache = yield* DesiredStateCache;
-    const activity = yield* GuestActivity;
-    const waker = yield* AppWaker;
-    const vms = yield* VmManager;
+    const guest = yield* SqliteGuest;
     const registry = yield* SynchronizedRef.make<SqliteRegistry>({
       deployments: new Map(),
       sessions: new Map(),
     });
-
-    function available(query: SqliteQuery) {
-      return Effect.gen(function* () {
-        const wanted = Option.getOrUndefined(yield* cache.latest)?.instances.find(
-          (instance) => instance.appId === query.appId,
-        );
-        const snapshot = yield* state.snapshot;
-        const record = snapshot.records.get(query.appId);
-        if (
-          !snapshot.isolated ||
-          wanted?.deploymentId !== query.deploymentId ||
-          wanted.desiredState === 'stopped' ||
-          record?.deploymentId !== query.deploymentId ||
-          !record.desiredRunning ||
-          (record.state !== 'idle' &&
-            (record.stopRequested || !['running', 'starting', 'unhealthy'].includes(record.state)))
-        ) {
-          return yield* new SqliteSessionUnavailable();
-        }
-        return record;
-      });
-    }
 
     function remove(sessionId: SqliteSessionId) {
       return SynchronizedRef.modify(registry, (current) => {
@@ -161,30 +130,16 @@ export class SqliteSessions extends Effect.Service<SqliteSessions>()('SqliteSess
           }
           const path = query.operation.path;
           const session = yield* reserve(query);
-          const opening = activity.run({
-            appId: query.appId,
-            effect: Effect.gen(function* () {
-              const record = yield* available(query);
-              if (record.state === 'idle') {
-                yield* waker
-                  .wake(query.appId)
-                  .pipe(Effect.mapError(() => new SqliteSessionUnavailable()));
-              }
-              yield* available(query);
-              const client = yield* connectGuestSqlite({
-                socketPath: guestVsockPath({ workingDir: vms.workingDir(query.appId) }),
-              });
-              yield* Scope.addFinalizer(session.scope, client.close);
-              yield* client.open(path);
-              yield* Deferred.succeed(session.ready, client);
-              yield* Effect.never;
-            }).pipe(
-              Effect.onError((cause) => Deferred.failCause(session.ready, cause)),
-              Effect.onInterrupt(() =>
-                Deferred.fail(session.ready, new SqliteSessionUnavailable()),
-              ),
-            ),
-          });
+          const opening = Effect.gen(function* () {
+            const client = yield* guest.connect(query);
+            yield* Scope.addFinalizer(session.scope, client.close);
+            yield* client.open(path);
+            yield* Deferred.succeed(session.ready, client);
+            yield* Effect.never;
+          }).pipe(
+            Effect.onError((cause) => Deferred.failCause(session.ready, cause)),
+            Effect.onInterrupt(() => Deferred.fail(session.ready, new SqliteSessionUnavailable())),
+          );
           yield* Effect.forkIn(Effect.scoped(restore(opening)), session.scope);
           yield* Effect.forkIn(restore(expire(query)), session.scope);
           return yield* restore(Deferred.await(session.ready)).pipe(
@@ -198,7 +153,7 @@ export class SqliteSessions extends Effect.Service<SqliteSessions>()('SqliteSess
 
     function held(query: SqliteQuery) {
       return Effect.gen(function* () {
-        yield* available(query);
+        yield* guest.available(query);
         const now = yield* Clock.currentTimeMillis;
         return yield* SynchronizedRef.modifyEffect(registry, (current) => {
           const session = current.sessions.get(query.sessionId);
@@ -279,11 +234,5 @@ export class SqliteSessions extends Effect.Service<SqliteSessions>()('SqliteSess
     );
     return { request, syncDeployments };
   }),
-  dependencies: [
-    AgentState.Default,
-    DesiredStateCache.Default,
-    GuestActivity.Default,
-    AppWaker.Default,
-    VmManager.Default,
-  ],
+  dependencies: [SqliteGuest.Default],
 }) {}
