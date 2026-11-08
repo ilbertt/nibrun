@@ -1,5 +1,8 @@
 import { join } from 'node:path';
-import { NIBRUNNER_FILESYSTEM_SOCKET } from '@repo/global-constants';
+import {
+  NIBRUNNER_FILESYSTEM_SOCKET,
+  NIBRUNNER_GUEST_CONNECTIONS_SOCKET,
+} from '@repo/global-constants';
 import { requireMainWorkflow } from '#shared/actions.ts';
 import { requiredEnv } from '#shared/env.ts';
 import { repoRoot } from '#shared/paths.ts';
@@ -24,6 +27,7 @@ const configuration = (await Bun.file(join(hostDirectory, 'config.toml.template'
   .replaceAll('{{GUEST_IMAGE_DIRECTORY}}', JSON.stringify(guestDirectory))
   .replaceAll('{{ZEROFS_STORAGE_URL}}', JSON.stringify(requiredEnv('NIBRUNNER_ZEROFS_STORAGE_URL')))
   .replaceAll('{{FILESYSTEM_SOCKET}}', JSON.stringify(NIBRUNNER_FILESYSTEM_SOCKET))
+  .replaceAll('{{GUEST_CONNECTIONS_SOCKET}}', JSON.stringify(NIBRUNNER_GUEST_CONNECTIONS_SOCKET))
   .replaceAll(
     '{{FALLBACK_ORIGIN_HOST}}',
     JSON.stringify(requiredEnv('NIBRUNNER_FALLBACK_ORIGIN_HOST')),
