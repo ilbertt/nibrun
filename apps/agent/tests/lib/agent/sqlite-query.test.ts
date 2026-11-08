@@ -9,7 +9,8 @@ import {
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { Deferred, Effect, Fiber, Layer, Option, Ref, TestClock, TestContext } from 'effect';
-import { MAX_ACTIVE_SQLITE_QUERIES, sqliteQueryLoop } from '#lib/agent/sqlite-query.ts';
+import { sqliteQueryLoop } from '#lib/agent/sqlite-query.ts';
+import { MAX_ACTIVE_SQLITE_QUERIES } from '#lib/sqlite/query-poll.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
 import { ControlPlane } from '#services/control-plane.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
