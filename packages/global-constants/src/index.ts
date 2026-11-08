@@ -10,7 +10,7 @@ export {
   GITHUB_REPO_URL,
 } from '#github.ts';
 export { LLMS_TXT_PATH } from '#llms.ts';
-export { NIBRUNNER_FILESYSTEM_SOCKET } from '#nibrunner.ts';
+export { NIBRUNNER_FILESYSTEM_SOCKET, NIBRUNNER_GUEST_CONNECTIONS_SOCKET } from '#nibrunner.ts';
 export {
   ANONYMOUS_APP_LIFETIME_MINUTES,
   CUSTOM_DOMAIN_PRICING_NOTICE,
