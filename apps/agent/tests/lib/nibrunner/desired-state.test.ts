@@ -81,6 +81,7 @@ test('native exports retain configuration but use private local keys without the
       appId: item.appId,
       volumeId: item.volumeId,
       desiredState: item.desiredState,
+      format: 'directory',
       environment: item.environment,
       objectKey: `${item.exportId}.export`,
     },
@@ -102,6 +103,7 @@ test('only the oldest pending export reaches the engine while acknowledgements r
     absent.exportId,
     oldest.exportId,
   ]);
+  expect(converted.exports.every((item) => item.format === 'directory')).toBe(true);
   const next = nibrunnerDesiredState({
     desired: desiredState({ exports: [queued, absent, { ...oldest, desiredState: 'absent' }] }),
     revision: 'acknowledged',
