@@ -1,5 +1,6 @@
 import { join } from 'node:path';
 import {
+  NIBRUNNER_EXPORTS_DIRECTORY,
   NIBRUNNER_FILESYSTEM_SOCKET,
   NIBRUNNER_GUEST_CONNECTIONS_SOCKET,
 } from '@repo/global-constants';
@@ -25,6 +26,11 @@ const configuration = (await Bun.file(join(hostDirectory, 'config.toml.template'
   .replaceAll('{{VPC_IPV4_CIDR_BLOCK}}', requiredEnv('VPC_IPV4_CIDR_BLOCK'))
   .replaceAll('{{VPC_IPV6_CIDR_BLOCK}}', requiredEnv('VPC_IPV6_CIDR_BLOCK'))
   .replaceAll('{{GUEST_IMAGE_DIRECTORY}}', JSON.stringify(guestDirectory))
+  .replaceAll('{{EXPORTS_DIRECTORY}}', JSON.stringify(NIBRUNNER_EXPORTS_DIRECTORY))
+  .replaceAll(
+    '{{EXPORTS_STAGING_DIRECTORY}}',
+    JSON.stringify(join(NIBRUNNER_EXPORTS_DIRECTORY, 'staging')),
+  )
   .replaceAll('{{ZEROFS_STORAGE_URL}}', JSON.stringify(requiredEnv('NIBRUNNER_ZEROFS_STORAGE_URL')))
   .replaceAll('{{FILESYSTEM_SOCKET}}', JSON.stringify(NIBRUNNER_FILESYSTEM_SOCKET))
   .replaceAll('{{GUEST_CONNECTIONS_SOCKET}}', JSON.stringify(NIBRUNNER_GUEST_CONNECTIONS_SOCKET))
@@ -43,15 +49,16 @@ const tunnelUnit = await Bun.file(
   join(hostDirectory, 'systemd/nibrun-nibrunner-tunnel.service'),
 ).text();
 const bridgeInstaller = await Bun.file(join(hostDirectory, 'deploy/install_bridge.sh')).text();
-const bridgeUnit = await Bun.file(
-  join(hostDirectory, 'systemd/nibrun-nibrunner-bridge.service'),
-).text();
+const bridgeUnit = await Bun.file(join(hostDirectory, 'systemd/nibrun-nibrunner-bridge.service'))
+  .text()
+  .then((unit) => unit.replaceAll('{{EXPORTS_DIRECTORY}}', NIBRUNNER_EXPORTS_DIRECTORY));
 const bridgeEnvironment = {
   AGENT_ENGINE: 'nibrunner',
   AGENT_CONTROL_PLANE_URL: requiredEnv('AGENT_CONTROL_PLANE_URL'),
   AGENT_LOG_INGEST_URL: requiredEnv('AGENT_LOG_INGEST_URL'),
   AGENT_ARTIFACT_BUCKET: requiredEnv('AGENT_ARTIFACT_BUCKET'),
   AGENT_IMPORT_BUCKET: requiredEnv('AGENT_IMPORT_BUCKET'),
+  AGENT_EXPORT_BUCKET: requiredEnv('AGENT_EXPORT_BUCKET'),
   AGENT_AWS_REGION: requiredEnv('AGENT_AWS_REGION'),
 };
 const environmentFile = Object.entries(bridgeEnvironment)

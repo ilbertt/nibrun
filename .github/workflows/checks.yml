@@ -41,6 +41,11 @@ jobs:
 
       - uses: ./.github/actions/prepare
 
+      - name: Install native test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y nbd-client nbdkit fuse3 openssl curl e2fsprogs util-linux libarchive-tools
+
       - name: Run Tests
         run: bun run test
 
@@ -48,8 +53,6 @@ jobs:
         env:
           NIBRUN_TEST_NBD: '1'
         run: |
-          sudo apt-get update
-          sudo apt-get install -y nbd-client nbdkit fuse3 openssl curl e2fsprogs util-linux
           sudo modprobe nbd nbds_max=1
           bun run --filter @repo/agent test tests/lib/volumes/nbd-stock.test.ts
 

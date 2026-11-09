@@ -14,7 +14,7 @@ NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/var/lib/nibrunner
+ReadWritePaths=/var/lib/nibrunner {{EXPORTS_DIRECTORY}}
 LogExtraFields=SOURCE=nibrunner-bridge
 
 [Install]
