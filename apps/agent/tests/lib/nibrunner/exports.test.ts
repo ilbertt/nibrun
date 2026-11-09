@@ -5,14 +5,8 @@ import { Deferred, Effect, Fiber, Layer } from 'effect';
 import { makeNibrunnerExports, nibrunnerExportKey } from '#lib/nibrunner/exports.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
 import { artifactStore } from '#tests/support/artifacts.ts';
-import {
-  desiredExport,
-  desiredState,
-  desiredVolume,
-  EXPORT_ID,
-  OBSERVED_AT,
-} from '#tests/support/fixtures.ts';
-import { nibrunnerExportArchive } from '#tests/support/nibrunner.ts';
+import { desiredExport, desiredState, EXPORT_ID, OBSERVED_AT } from '#tests/support/fixtures.ts';
+import { preparedNibrunnerExport } from '#tests/support/nibrunner.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
 const run = provided(
@@ -23,17 +17,13 @@ const PRIVATE_CAUSE = 'private credential and tenant content';
 const fixture = Effect.gen(function* () {
   const fs = yield* FileSystem.FileSystem;
   const directory = yield* temporaryDirectory;
-  const nativeArchive = nibrunnerExportArchive([
-    { path: 'data/app/data/app.db', body: 'committed data' },
-    { path: '.env', body: '' },
-  ]);
   const nativePath = `${directory}/${nibrunnerExportKey(EXPORT_ID)}`;
-  yield* fs.writeFile(nativePath, nativeArchive);
-  const desired = desiredState({ exports: [desiredExport()], volumes: [desiredVolume()] });
+  yield* preparedNibrunnerExport(nativePath);
+  yield* fs.writeFileString(`${nativePath}/.env`, '');
+  const desired = desiredState({ exports: [desiredExport()] });
   const native: ReportedExport = {
     exportId: EXPORT_ID,
     state: 'ready',
-    sizeBytes: nativeArchive.length,
     readyAt: OBSERVED_AT,
   };
   const uploaded: Array<{ objectKey: string; size: number }> = [];
@@ -83,7 +73,7 @@ test('native ready stays preparing until the complete nibrun bundle is uploaded'
   );
 });
 
-test('API acknowledgement reclaims the native archive and temporary work stays private and empty', async () => {
+test('API acknowledgement reclaims the prepared directory and temporary work stays private and empty', async () => {
   await run(
     Effect.gen(function* () {
       const { publisher, input, fs, directory, nativePath } = yield* fixture;
@@ -102,7 +92,7 @@ test('API acknowledgement reclaims the native archive and temporary work stays p
   );
 });
 
-test('a restart before acknowledgement can safely republish the retained native archive', async () => {
+test('a restart before acknowledgement can safely republish the retained prepared directory', async () => {
   await run(
     Effect.gen(function* () {
       const { publisher, create, input, uploaded, fs, directory } = yield* fixture;

@@ -1,6 +1,6 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { DesiredExport, ExportId, HostDesiredState, ReportedExport } from '@repo/protocol';
-import { Data, Effect, Ref } from 'effect';
+import { Effect, Ref } from 'effect';
 import { nowTimestamp } from '#lib/clock.ts';
 import type { makeExportUploader } from '#lib/exports/upload.ts';
 import { writeNibrunnerExportBundle } from '#lib/nibrunner/export-bundle.ts';
@@ -8,15 +8,10 @@ import type { ArtifactStore } from '#services/artifact-store.service.ts';
 import type { CommandRunner } from '#services/command-runner.service.ts';
 
 const PRIVATE_DIRECTORY_MODE = 0o700;
-
-export class NibrunnerExportUnavailable extends Data.TaggedError('NibrunnerExportUnavailable') {
-  override get message() {
-    return 'The native export or its volume is unavailable.';
-  }
-}
+const PREPARED_EXPORT_SUFFIX = '.export';
 
 export function nibrunnerExportKey(exportId: ExportId) {
-  return `${exportId}.tar.gz`;
+  return `${exportId}${PREPARED_EXPORT_SUFFIX}`;
 }
 
 export function nibrunnerExportReports({
@@ -69,38 +64,21 @@ export const makeNibrunnerExports = Effect.fn('makeNibrunnerExports')(function* 
     yield* fs.remove(path.join(workspace, name), { recursive: true, force: true });
   }
 
-  function archivePath(exportId: ExportId) {
+  function preparedPath(exportId: ExportId) {
     return path.join(directory, nibrunnerExportKey(exportId));
   }
 
-  function publish({
-    desired,
-    native,
-    maxDataBytes,
-  }: {
-    desired: DesiredExport;
-    native: ReportedExport;
-    maxDataBytes: number;
-  }) {
+  function publish({ desired, native }: { desired: DesiredExport; native: ReportedExport }) {
     return Effect.gen(function* () {
       const stagingDir = yield* fs.makeTempDirectoryScoped({
         directory: workspace,
         prefix: 'bundle-',
       });
-      const nativeArchivePath = archivePath(desired.exportId);
-      const stat = yield* fs.stat(nativeArchivePath);
-      if (
-        stat.type !== 'File' ||
-        (native.sizeBytes !== undefined && Number(stat.size) !== native.sizeBytes)
-      ) {
-        return yield* new NibrunnerExportUnavailable();
-      }
       const bundle = yield* writeNibrunnerExportBundle({
-        nativeArchivePath,
+        preparedDirectory: preparedPath(desired.exportId),
         artifact: desired.artifact,
         artifactBucket,
         stagingDir,
-        maxDataBytes,
       });
       yield* upload({ bundlePath: bundle.path, objectKey: desired.objectKey });
       yield* Effect.logInfo('nibrunner export published').pipe(
@@ -124,8 +102,8 @@ export const makeNibrunnerExports = Effect.fn('makeNibrunnerExports')(function* 
           .map((item) => nibrunnerExportKey(item.exportId)),
       );
       for (const name of yield* fs.readDirectory(directory)) {
-        if (name.endsWith('.tar.gz') && !retained.has(name)) {
-          yield* fs.remove(path.join(directory, name), { force: true });
+        if (name.endsWith(PREPARED_EXPORT_SUFFIX) && !retained.has(name)) {
+          yield* fs.remove(path.join(directory, name), { recursive: true, force: true });
         }
       }
     });
@@ -134,11 +112,9 @@ export const makeNibrunnerExports = Effect.fn('makeNibrunnerExports')(function* 
   function publishReady({
     desired,
     reported,
-    volumes,
   }: {
     desired: DesiredExport;
     reported: readonly ReportedExport[];
-    volumes: HostDesiredState['volumes'];
   }) {
     return Effect.gen(function* () {
       const native = reported.find(
@@ -147,12 +123,7 @@ export const makeNibrunnerExports = Effect.fn('makeNibrunnerExports')(function* 
       if (native === undefined || (yield* Ref.get(completed)).has(desired.exportId)) {
         return;
       }
-      const volume = volumes.find((item) => item.volumeId === desired.volumeId);
-      const writing =
-        volume === undefined
-          ? Effect.fail(new NibrunnerExportUnavailable())
-          : publish({ desired, native, maxDataBytes: volume.sizeBytes });
-      const report = yield* writing.pipe(
+      const report = yield* publish({ desired, native }).pipe(
         Effect.catchAll(() =>
           Effect.logWarning('nibrunner export publication failed').pipe(
             Effect.annotateLogs({ exportId: desired.exportId }),
@@ -191,7 +162,7 @@ export const makeNibrunnerExports = Effect.fn('makeNibrunnerExports')(function* 
           yield* reap(desired.exports);
           for (const item of desired.exports) {
             if (item.desiredState === 'present') {
-              yield* publishReady({ desired: item, reported, volumes: desired.volumes });
+              yield* publishReady({ desired: item, reported });
             }
           }
         }),

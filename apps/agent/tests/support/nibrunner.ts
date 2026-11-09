@@ -10,10 +10,13 @@ import {
   VOLUME_ID,
   VOLUME_SIZE_BYTES,
 } from '#tests/support/fixtures.ts';
-import { gzippedTarball, type TarballEntry, TYPE_DIRECTORY } from '#tests/support/tarball.ts';
-
-export function nibrunnerExportArchive(entries: readonly TarballEntry[]) {
-  return gzippedTarball([{ path: 'data/app/data', type: TYPE_DIRECTORY }, ...entries]);
+export function preparedNibrunnerExport(directory: string) {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    const data = `${directory}/data/app/data`;
+    yield* fs.makeDirectory(data, { recursive: true });
+    yield* fs.writeFileString(`${data}/app.db`, 'committed database');
+  });
 }
 
 export function nibrunnerTenantLog(): Extract<TenantLogEvent, { kind: 'data' }> {
@@ -68,3 +71,6 @@ export function nibrunnerReport(overrides: Partial<NibrunnerReport> = {}): Nibru
     ...overrides,
   };
 }
+
+import { FileSystem } from '@effect/platform';
+import { Effect } from 'effect';
