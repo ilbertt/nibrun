@@ -1,10 +1,15 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { AppId } from '@repo/protocol';
+import { Type } from '@sinclair/typebox';
 import { Data, Effect, Option } from 'effect';
 
 export const MAX_NIBRUNNER_LOG_READ_BYTES = 1_048_576;
 
-export type NibrunnerLogCursor = { fileId: string; offset: number };
+export const NibrunnerLogCursorSchema = Type.Object({
+  fileId: Type.String({ minLength: 1 }),
+  offset: Type.Integer({ minimum: 0, maximum: Number.MAX_SAFE_INTEGER }),
+});
+export type NibrunnerLogCursor = typeof NibrunnerLogCursorSchema.static;
 export type NibrunnerLogChunk = {
   cursor: NibrunnerLogCursor;
   lines: readonly string[];
