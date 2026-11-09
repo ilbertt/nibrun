@@ -268,6 +268,7 @@ jobs:
       NIBRUNNER_GUEST_IMAGE_URL: ${{ needs.publish-nibrunner-guest-image.outputs.url }}
       NIBRUNNER_GUEST_IMAGE_SHA256: ${{ needs.publish-nibrunner-guest-image.outputs.sha256 }}
       AGENT_CONTROL_PLANE_URL: ${{ fromJSON(needs.terraform.outputs.values).control_plane_internal_url }}
+      AGENT_LOG_INGEST_URL: ${{ fromJSON(needs.terraform.outputs.values).log_ingest_url }}
       AGENT_ARTIFACT_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).artifacts_bucket }}
       AGENT_IMPORT_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).imports_bucket }}
     steps:
