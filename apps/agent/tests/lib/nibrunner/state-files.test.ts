@@ -7,8 +7,9 @@ import {
   readNibrunnerReport,
   writeNibrunnerDesired,
 } from '#lib/nibrunner/state-files.ts';
-import { desiredExport, desiredState, HOST_ID, OBSERVED_AT } from '#tests/support/fixtures.ts';
+import { desiredState, desiredVolume, HOST_ID, OBSERVED_AT } from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
+import { s3Storage } from '#tests/support/s3-storage.ts';
 
 const run = provided(platform);
 
@@ -42,7 +43,7 @@ test('unsupported desired state leaves the authoritative engine document intact'
       const result = yield* Effect.either(
         writeNibrunnerDesired({
           path,
-          desired: desiredState({ exports: [desiredExport()] }),
+          desired: desiredState({ volumes: [desiredVolume({ storage: s3Storage() })] }),
         }),
       );
       expect(result._tag).toBe('Left');

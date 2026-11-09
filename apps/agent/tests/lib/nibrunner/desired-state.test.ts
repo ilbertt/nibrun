@@ -1,4 +1,6 @@
 import { expect, test } from 'bun:test';
+import { ExportIdSchema, SecretStringSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { emptyDataArchive } from '#lib/nibrunner/artifact.ts';
 import { nibrunnerDesiredState } from '#lib/nibrunner/desired-state.ts';
 import { UnsupportedNibrunnerFeature } from '#lib/nibrunner/failure.ts';
@@ -55,7 +57,7 @@ test('host ownership, explicit volume deletion and checkpoint identity remain au
   expect(nibrunnerDesiredState({ desired: desiredState(), revision: 'empty' }).volumes).toEqual([]);
 });
 
-test('private storage and exports are refused instead of falling back to another backend', () => {
+test('private storage is refused instead of falling back to another backend', () => {
   const privateVolume = desiredVolume({ storage: s3Storage() });
   expect(function translateStorage() {
     nibrunnerDesiredState({
@@ -63,10 +65,48 @@ test('private storage and exports are refused instead of falling back to another
       revision: 'private',
     });
   }).toThrow(UnsupportedNibrunnerFeature);
-  expect(function translateExport() {
-    nibrunnerDesiredState({
-      desired: desiredState({ exports: [desiredExport()] }),
-      revision: 'export',
-    });
-  }).toThrow('exports');
+});
+
+test('native exports retain configuration but use private local keys without the executable', () => {
+  const item = desiredExport({
+    environment: { DATABASE_PATH: Value.Parse(SecretStringSchema, 'data/app.db') },
+  });
+  const converted = nibrunnerDesiredState({
+    desired: desiredState({ exports: [item] }),
+    revision: 'export',
+  });
+  expect(converted.exports).toEqual([
+    {
+      exportId: item.exportId,
+      appId: item.appId,
+      volumeId: item.volumeId,
+      desiredState: item.desiredState,
+      environment: item.environment,
+      objectKey: `${item.exportId}.tar.gz`,
+    },
+  ]);
+});
+
+test('only the oldest pending export reaches the engine while acknowledgements remain visible', () => {
+  const oldest = desiredExport({ exportId: Value.Parse(ExportIdSchema, 'export-1') });
+  const queued = desiredExport({ exportId: Value.Parse(ExportIdSchema, 'export-2') });
+  const absent = desiredExport({
+    exportId: Value.Parse(ExportIdSchema, 'export-0'),
+    desiredState: 'absent',
+  });
+  const converted = nibrunnerDesiredState({
+    desired: desiredState({ exports: [queued, absent, oldest] }),
+    revision: 'queued',
+  });
+  expect(converted.exports.map((item) => item.exportId)).toEqual([
+    absent.exportId,
+    oldest.exportId,
+  ]);
+  const next = nibrunnerDesiredState({
+    desired: desiredState({ exports: [queued, absent, { ...oldest, desiredState: 'absent' }] }),
+    revision: 'acknowledged',
+  });
+  expect(next.exports.filter((item) => item.desiredState === 'present')).toMatchObject([
+    { exportId: queued.exportId },
+  ]);
 });
