@@ -1,5 +1,5 @@
 import type { HostDesiredState } from '@repo/protocol';
-import { Clock, Effect, Fiber, Option, Ref } from 'effect';
+import { Clock, Context, Effect, Fiber, Layer, Option, Ref } from 'effect';
 import { CONTROL_PLANE_BACKOFF } from '#lib/agent/backoff.ts';
 import { supervised } from '#lib/agent/loop.ts';
 import type { ControlPlaneClient } from '#lib/control/client.ts';
@@ -8,6 +8,7 @@ import { nibrunnerCronListings, pollNibrunnerCron } from '#lib/nibrunner/cron-qu
 import { pollNibrunnerFilesystem } from '#lib/nibrunner/filesystem-query.ts';
 import { nibrunnerQueryDeployments } from '#lib/nibrunner/query-deployments.ts';
 import { nibrunnerReportedState } from '#lib/nibrunner/reported-state.ts';
+import { makeNibrunnerSqliteGuest } from '#lib/nibrunner/sqlite-guest.ts';
 import { stageNibrunnerArtifacts } from '#lib/nibrunner/stage-artifacts.ts';
 import {
   ForeignNibrunnerDocument,
@@ -19,10 +20,13 @@ import {
 } from '#lib/nibrunner/state-files.ts';
 import { nibrunnerWithdrawals } from '#lib/nibrunner/withdrawals.ts';
 import { decode } from '#lib/protocol.ts';
+import { makeSqliteQueryPoll } from '#lib/sqlite/query-poll.ts';
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import type { NibrunnerBridgeConfig } from '#services/nibrunner-bridge-config.service.ts';
 import { NibrunnerFilesystem } from '#services/nibrunner-filesystem.service.ts';
 import { NibrunnerLogs } from '#services/nibrunner-logs.service.ts';
+import { SqliteGuest } from '#services/sqlite-guest.service.ts';
+import { SqliteSessions } from '#services/sqlite-sessions.service.ts';
 
 const REPORT_MAX_AGE_MS = 30_000;
 const LOG_IDLE_POLL = '500 millis';
@@ -63,6 +67,7 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
       return session.poll;
     }
     const wanted = yield* decode(() => nibrunnerDocument(desired));
+    yield* sqlite.syncDeployments(desired);
     const worker = yield* Ref.get(preparing);
     if (Option.isSome(worker)) {
       yield* Fiber.interrupt(worker.value);
@@ -115,6 +120,50 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
       admissionState: 'draining',
     });
     return { session, report, desired, value };
+  });
+
+  const sqliteDeployments = Effect.gen(function* () {
+    const wanted = Option.getOrUndefined(yield* Ref.get(latest));
+    if (wanted === undefined) {
+      return [];
+    }
+    const { desired, report } = yield* currentState;
+    return nibrunnerQueryDeployments({ desired, report }).filter(
+      (instance) =>
+        instance.desiredState !== 'stopped' &&
+        wanted.instances.some(
+          (candidate) =>
+            candidate.appId === instance.appId &&
+            candidate.deploymentId === instance.deploymentId &&
+            candidate.desiredState !== 'stopped',
+        ) &&
+        report.instances.some(
+          (candidate) =>
+            candidate.appId === instance.appId &&
+            candidate.deploymentId === instance.deploymentId &&
+            ['starting', 'running', 'idle', 'unhealthy'].includes(candidate.state),
+        ),
+    );
+  });
+  const sqliteGuest = yield* makeNibrunnerSqliteGuest({ deployments: sqliteDeployments });
+  const sqlite = Context.get(
+    yield* Layer.build(
+      SqliteSessions.DefaultWithoutDependencies.pipe(
+        Layer.provide(Layer.succeed(SqliteGuest, sqliteGuest)),
+      ),
+    ),
+    SqliteSessions,
+  );
+  const sqliteOnce = yield* makeSqliteQueryPoll({
+    control,
+    currentSession: sessions.current,
+    servedDeployments: sqliteDeployments.pipe(
+      Effect.map((instances) =>
+        instances.map(({ appId, deploymentId }) => ({ appId, deploymentId })),
+      ),
+    ),
+    onExpired: sessions.onExpired,
+    sessions: sqlite,
   });
 
   const reportOnce = Effect.gen(function* () {
@@ -179,6 +228,7 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
     filesystemOnce,
     cronOnce,
     logOnce,
+    sqliteOnce,
     run: Effect.all(
       [
         supervised({
@@ -203,6 +253,11 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
         supervised({
           once: cronOnce,
           onFailure: () => Effect.logWarning('nibrunner cron query failed'),
+          schedule: CONTROL_PLANE_BACKOFF,
+        }),
+        supervised({
+          once: sqliteOnce,
+          onFailure: () => Effect.logWarning('nibrunner SQLite query failed'),
           schedule: CONTROL_PLANE_BACKOFF,
         }),
         supervised({
