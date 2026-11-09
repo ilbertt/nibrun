@@ -23,6 +23,7 @@ import { readNibrunnerDesired, writeNibrunnerDesired } from '#lib/nibrunner/stat
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { NibrunnerBridgeConfig } from '#services/nibrunner-bridge-config.service.ts';
 import { NibrunnerFilesystem } from '#services/nibrunner-filesystem.service.ts';
+import { NibrunnerLogs } from '#services/nibrunner-logs.service.ts';
 import { artifactStore } from '#tests/support/artifacts.ts';
 import {
   APP_ID,
@@ -51,6 +52,7 @@ function fixture(initialDesired: HostDesiredState) {
     const filesystemRequests: FilesystemQueryRequest[] = [];
     const reports: HostReportedState[] = [];
     const registrations: string[] = [];
+    const logRequests: Array<Parameters<NibrunnerLogs['send']>[0]> = [];
     const { baseUrl } = yield* serving(async (request) => {
       const path = new URL(request.url).pathname;
       if (path.endsWith('/session')) {
@@ -80,8 +82,10 @@ function fixture(initialDesired: HostDesiredState) {
     });
     const config = NibrunnerBridgeConfig.make({
       controlPlaneUrl: baseUrl,
+      logIngestUrl: baseUrl,
       hostIdFile: `${directory}/bridge/host-id`,
       logCursorsFile: `${directory}/bridge/log-cursors.json`,
+      logsDirectory: `${directory}/logs`,
       desiredStateFile: `${directory}/desired.json`,
       reportedStateFile: `${directory}/reported.json`,
       artifactStoreDir: `${directory}/artifact-store`,
@@ -116,10 +120,21 @@ function fixture(initialDesired: HostDesiredState) {
       reports,
       registrations,
       filesystemRequests,
+      logRequests,
       create: makeNibrunnerBridge({
         config,
         control: makeControlPlaneClient({ baseUrl }),
       }).pipe(
+        Effect.provideService(
+          NibrunnerLogs,
+          NibrunnerLogs.make({
+            send: (request) =>
+              Effect.sync(() => {
+                logRequests.push(request);
+                return false;
+              }),
+          }),
+        ),
         Effect.provideService(
           NibrunnerFilesystem,
           NibrunnerFilesystem.make(
@@ -147,6 +162,23 @@ test('the bridge registers, polls and forwards draining reports across a process
       expect(setup.registrations).toHaveLength(2);
       expect(new Set(setup.registrations).size).toBe(1);
       expect(setup.registrations[0]).not.toBe(HOST_ID);
+    }),
+  );
+});
+
+test('log delivery includes stopped apps without waiting for a running guest report', async () => {
+  await run(
+    Effect.gen(function* () {
+      const setup = yield* fixture(
+        desiredState({ instances: [desiredInstance({ desiredState: 'stopped' })] }),
+      );
+      const bridge = yield* setup.create.pipe(Effect.provide(artifactStore()));
+      expect(yield* bridge.logOnce).toBe(false);
+      expect(setup.logRequests).toHaveLength(0);
+      yield* bridge.pollOnce;
+      yield* bridge.logOnce;
+      expect(setup.logRequests[0]?.hostId).toBe(HOST_ID);
+      expect(setup.logRequests[0]?.appIds).toContain(APP_ID);
     }),
   );
 });

@@ -6,6 +6,7 @@ import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { AwsCredentialProvider } from '#services/aws-credential-provider.service.ts';
 import { NibrunnerBridgeConfig } from '#services/nibrunner-bridge-config.service.ts';
 import { NibrunnerFilesystem } from '#services/nibrunner-filesystem.service.ts';
+import { NibrunnerLogs } from '#services/nibrunner-logs.service.ts';
 
 export class NibrunnerBridge extends Effect.Service<NibrunnerBridge>()('NibrunnerBridge', {
   effect: Effect.gen(function* () {
@@ -30,5 +31,6 @@ export class NibrunnerBridge extends Effect.Service<NibrunnerBridge>()('Nibrunne
     NibrunnerBridgeConfig.Default,
     AwsCredentialProvider.Default,
     NibrunnerFilesystem.Default,
+    NibrunnerLogs.Default,
   ],
 }) {}
