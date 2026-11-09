@@ -12,6 +12,7 @@ import { AgentState } from '#services/agent-state.service.ts';
 import { AppWaker } from '#services/app-waker.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
 import { GuestActivity } from '#services/guest-activity.service.ts';
+import { SqliteGuest } from '#services/sqlite-guest.service.ts';
 import { SqliteSessions } from '#services/sqlite-sessions.service.ts';
 import { VmManager } from '#services/vm-manager.service.ts';
 import { agentConfig } from '#tests/support/config.ts';
@@ -95,7 +96,9 @@ export function sqliteHost(responses: readonly Buffer[]) {
       ),
     );
     const services = yield* Layer.build(
-      SqliteSessions.DefaultWithoutDependencies.pipe(Layer.provide(dependencies)),
+      SqliteSessions.DefaultWithoutDependencies.pipe(
+        Layer.provide(SqliteGuest.DefaultWithoutDependencies.pipe(Layer.provide(dependencies))),
+      ),
     );
     const sessions = Context.get(services, SqliteSessions);
     yield* sessions.syncDeployments({ instances: [desiredInstance()] });
