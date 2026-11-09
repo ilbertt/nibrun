@@ -41,6 +41,7 @@ checkpoint_config_file = "/etc/zerofs/checkpoint.toml"
 checkpoint_cache_dir = "/data/zerofs-checkpoint"
 
 [exports]
+format = "directory"
 store_url = {{EXPORTS_DIRECTORY}}
 staging_dir = {{EXPORTS_STAGING_DIRECTORY}}
 

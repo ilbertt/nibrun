@@ -44,7 +44,7 @@ jobs:
       - name: Install native test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y nbd-client nbdkit fuse3 openssl curl e2fsprogs util-linux libarchive-tools
+          sudo apt-get install -y nbd-client nbdkit fuse3 openssl curl e2fsprogs util-linux
 
       - name: Run Tests
         run: bun run test

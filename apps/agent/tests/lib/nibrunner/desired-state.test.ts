@@ -82,7 +82,7 @@ test('native exports retain configuration but use private local keys without the
       volumeId: item.volumeId,
       desiredState: item.desiredState,
       environment: item.environment,
-      objectKey: `${item.exportId}.tar.gz`,
+      objectKey: `${item.exportId}.export`,
     },
   ]);
 });
