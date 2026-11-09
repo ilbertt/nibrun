@@ -308,17 +308,23 @@ describe('the environment the app was deployed with', () => {
 describe('the bundle keeps the name the binary was uploaded under', () => {
   test('the uploaded name is what lands in the archive', () => {
     expect(
-      bundleBinaryName(artifact({ filename: Value.Parse(FilenameSchema, 'pocketbase') })),
+      bundleBinaryName({
+        artifact: artifact({ filename: Value.Parse(FilenameSchema, 'pocketbase') }),
+        metadataFiles: [],
+      }),
     ).toEqual(Either.right('pocketbase'));
   });
 
   // The schema rejects all of these, so reaching here means a peer that did not honour it. The
   // bundle is extracted by a person on their own machine, so a name that escapes the archive
   // root is refused rather than corrected.
-  test.each(['../escape', 'nested/path', '.hidden', '..', '-rf'])(
+  test.each(['../escape', 'nested/path', '.hidden', '..', '-rf', '@binary', 'vitals[1]'])(
     'a name that is a path rather than a filename is refused: %s',
     (hostile) => {
-      const result = bundleBinaryName(artifact({ filename: hostile as Filename }));
+      const result = bundleBinaryName({
+        artifact: artifact({ filename: hostile as Filename }),
+        metadataFiles: [],
+      });
       expect(Either.isLeft(result) && result.left._tag).toBe('UnsafeFilename');
     },
   );

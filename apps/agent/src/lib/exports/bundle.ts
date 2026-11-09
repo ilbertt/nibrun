@@ -1,6 +1,6 @@
-import { basename } from 'node:path';
 import { FileSystem, Path } from '@effect/platform';
-import type { DesiredArtifact, TenantEnvironment } from '@repo/protocol';
+import { type DesiredArtifact, FilenameSchema, type TenantEnvironment } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Data, Duration, Effect, Either } from 'effect';
 import { BINARY_MODE, downloadAndVerify } from '#lib/vm/artifacts.ts';
 import { MKFS_ROOT_ENTRIES } from '#lib/volumes/ext4.ts';
@@ -8,12 +8,12 @@ import { AgentConfig } from '#services/agent-config.service.ts';
 import { stdoutOf } from '#services/command-runner.service.ts';
 
 const STAGING_MODE = 0o700;
-const DATA_DIRECTORY = 'data';
-const ENV_FILENAME = '.env';
-const CRONTAB_FILENAME = 'crontab';
+export const DATA_DIRECTORY = 'data';
+export const ENV_FILENAME = '.env';
+export const CRONTAB_FILENAME = 'crontab';
 /** Both files can carry tenant secrets, so only the owner may read them. */
 const PRIVATE_FILE_MODE = 0o600;
-const BUNDLE_NAME = 'bundle.tar.gz';
+export const BUNDLE_NAME = 'bundle.tar.gz';
 /**
  * A tenant filesystem is unbounded, and the default would abort a large export part-way.
  *
@@ -37,7 +37,7 @@ export class UnsafeFilename extends Data.TaggedError('UnsafeFilename')<{
   readonly filename: string;
 }> {
   override get message() {
-    return `${this.filename} is a path rather than a filename`;
+    return 'The binary filename is not safe for an export.';
   }
 }
 
@@ -75,11 +75,21 @@ const dumpFilesystem = ({ devicePath, destination }: { devicePath: string; desti
  * path inside an archive somebody extracts on their own machine, and the schema already
  * constrains it, so anything else came from a peer that did not honour the contract.
  */
-export function bundleBinaryName(artifact: DesiredArtifact): Either.Either<string, UnsafeFilename> {
+export function bundleBinaryName({
+  artifact,
+  metadataFiles,
+}: {
+  artifact: DesiredArtifact;
+  metadataFiles: readonly string[];
+}): Either.Either<string, UnsafeFilename> {
   const { filename } = artifact;
-  return filename !== basename(filename) || filename.startsWith('.') || filename.startsWith('-')
+  return !Value.Check(FilenameSchema, filename)
     ? Either.left(new UnsafeFilename({ filename }))
-    : Either.right(filename);
+    : Either.right(
+        [DATA_DIRECTORY, BUNDLE_NAME, ...metadataFiles].includes(filename)
+          ? `${filename}.binary`
+          : filename,
+      );
 }
 
 /**
@@ -144,11 +154,11 @@ export const writeBundle = Effect.fn('writeBundle')(function* ({
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const config = yield* AgentConfig;
-  const uploadedBinaryName = yield* bundleBinaryName(artifact);
-  const binaryName =
-    crontab !== undefined && uploadedBinaryName === CRONTAB_FILENAME
-      ? `${uploadedBinaryName}.binary`
-      : uploadedBinaryName;
+  const metadataFiles = [
+    ...(environment === undefined ? [] : [ENV_FILENAME]),
+    ...(crontab === undefined ? [] : [CRONTAB_FILENAME]),
+  ];
+  const binaryName = yield* bundleBinaryName({ artifact, metadataFiles });
 
   const binaryPath = path.join(stagingDir, binaryName);
   yield* downloadAndVerify({ artifact, destination: binaryPath, bucket: config.artifactBucket });
@@ -182,8 +192,7 @@ export const writeBundle = Effect.fn('writeBundle')(function* ({
       stagingDir,
       DATA_DIRECTORY,
       binaryName,
-      ...(environment === undefined ? [] : [ENV_FILENAME]),
-      ...(crontab === undefined ? [] : [CRONTAB_FILENAME]),
+      ...metadataFiles,
     ],
     timeout: DUMP_TIMEOUT,
   });
