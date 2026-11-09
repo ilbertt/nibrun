@@ -10,6 +10,11 @@ import {
   VOLUME_ID,
   VOLUME_SIZE_BYTES,
 } from '#tests/support/fixtures.ts';
+import { gzippedTarball, type TarballEntry, TYPE_DIRECTORY } from '#tests/support/tarball.ts';
+
+export function nibrunnerExportArchive(entries: readonly TarballEntry[]) {
+  return gzippedTarball([{ path: 'data/app/data', type: TYPE_DIRECTORY }, ...entries]);
+}
 
 export function nibrunnerTenantLog(): Extract<TenantLogEvent, { kind: 'data' }> {
   return {

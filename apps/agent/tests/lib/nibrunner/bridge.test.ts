@@ -116,6 +116,8 @@ function fixture(initialDesired: HostDesiredState) {
       artifactStoreDir: `${directory}/artifact-store`,
       artifactBucket: 'binaries',
       importBucket: 'imports',
+      exportBucket: 'exports',
+      exportsDirectory: `${directory}/exports`,
       awsRegion: 'eu-central-1',
       filesystemSocket: `${directory}/filesystem.sock`,
     });
