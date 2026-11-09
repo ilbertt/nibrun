@@ -1,5 +1,5 @@
 /**
- * Generated from https://raw.githubusercontent.com/ilbertt/nibrunner/v2026.11.4/crates/protocol/schema/desired.schema.json
+ * Generated from https://raw.githubusercontent.com/ilbertt/nibrunner/v2026.11.5/crates/protocol/schema/desired.schema.json
  * Run bun run --filter @repo/internal-scripts generate-nibrunner-types; do not edit.
  */
 
@@ -24,6 +24,7 @@ export type TenantValue = string;
  * an identifier
  */
 export type ExportId = string;
+export type ExportFormat = 'tar-gzip' | 'directory';
 /**
  * between 1 and 1024 characters
  */
@@ -191,6 +192,7 @@ export interface DesiredExport {
   desiredState: DesiredPresence;
   environment?: TenantEnvironment | null;
   exportId: ExportId;
+  format: ExportFormat;
   objectKey: ObjectKey;
   volumeId: VolumeId;
   [k: string]: unknown;
