@@ -174,6 +174,12 @@ data "aws_iam_policy_document" "nibrunner_host" {
     actions   = ["s3:GetObject"]
     resources = ["${aws_s3_bucket.imports.arn}/*"]
   }
+
+  statement {
+    sid       = "ExportsWrite"
+    actions   = ["s3:PutObject", "s3:AbortMultipartUpload"]
+    resources = ["${aws_s3_bucket.exports.arn}/exports/*"]
+  }
 }
 
 resource "aws_iam_role_policy" "nibrunner_host" {

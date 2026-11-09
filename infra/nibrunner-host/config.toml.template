@@ -41,8 +41,8 @@ checkpoint_config_file = "/etc/zerofs/checkpoint.toml"
 checkpoint_cache_dir = "/data/zerofs-checkpoint"
 
 [exports]
-store_url = "/var/lib/nibrunner/export-store"
-staging_dir = "/var/lib/nibrunner/exports"
+store_url = {{EXPORTS_DIRECTORY}}
+staging_dir = {{EXPORTS_STAGING_DIRECTORY}}
 
 [network]
 denied_egress_addresses_v4 = ["{{VPC_IPV4_CIDR_BLOCK}}"]

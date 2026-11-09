@@ -270,6 +270,7 @@ jobs:
       AGENT_CONTROL_PLANE_URL: ${{ fromJSON(needs.terraform.outputs.values).control_plane_internal_url }}
       AGENT_LOG_INGEST_URL: ${{ fromJSON(needs.terraform.outputs.values).log_ingest_url }}
       AGENT_ARTIFACT_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).artifacts_bucket }}
+      AGENT_EXPORT_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).exports_bucket }}
       AGENT_IMPORT_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).imports_bucket }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
