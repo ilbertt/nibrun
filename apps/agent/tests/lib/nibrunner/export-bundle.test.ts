@@ -8,6 +8,7 @@ import { tarEntries } from '#lib/volumes/tar.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
 import { ARTIFACT_BYTES, artifactStore } from '#tests/support/artifacts.ts';
 import { artifact } from '#tests/support/fixtures.ts';
+import { preparedNibrunnerExport } from '#tests/support/nibrunner.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
 const run = provided(
@@ -20,8 +21,7 @@ const fixture = Effect.gen(function* () {
   const directory = yield* temporaryDirectory;
   const preparedDirectory = `${directory}/prepared`;
   const data = `${preparedDirectory}/data/app/data`;
-  yield* fs.makeDirectory(data, { recursive: true });
-  yield* fs.writeFileString(`${data}/app.db`, 'committed database');
+  yield* preparedNibrunnerExport(preparedDirectory);
   return {
     fs,
     directory,

@@ -1,5 +1,5 @@
 import { Path } from '@effect/platform';
-import { NIBRUNNER_FILESYSTEM_SOCKET } from '@repo/global-constants';
+import { NIBRUNNER_EXPORTS_DIRECTORY, NIBRUNNER_FILESYSTEM_SOCKET } from '@repo/global-constants';
 import { Config, Effect } from 'effect';
 
 export class NibrunnerBridgeConfig extends Effect.Service<NibrunnerBridgeConfig>()(
@@ -15,6 +15,8 @@ export class NibrunnerBridgeConfig extends Effect.Service<NibrunnerBridgeConfig>
         logIngestUrl: yield* Config.nonEmptyString('AGENT_LOG_INGEST_URL'),
         artifactBucket: yield* Config.nonEmptyString('AGENT_ARTIFACT_BUCKET'),
         importBucket: yield* Config.nonEmptyString('AGENT_IMPORT_BUCKET'),
+        exportBucket: yield* Config.nonEmptyString('AGENT_EXPORT_BUCKET'),
+        exportsDirectory: NIBRUNNER_EXPORTS_DIRECTORY,
         awsRegion: yield* Config.nonEmptyString('AGENT_AWS_REGION'),
         filesystemSocket: NIBRUNNER_FILESYSTEM_SOCKET,
         hostIdFile: path.join(stateDir, 'bridge', 'host-id'),
