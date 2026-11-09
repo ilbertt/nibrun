@@ -23,6 +23,7 @@ import { decode } from '#lib/protocol.ts';
 import { makeSqliteQueryPoll } from '#lib/sqlite/query-poll.ts';
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import type { NibrunnerBridgeConfig } from '#services/nibrunner-bridge-config.service.ts';
+import { NibrunnerExports } from '#services/nibrunner-exports.service.ts';
 import { NibrunnerFilesystem } from '#services/nibrunner-filesystem.service.ts';
 import { NibrunnerLogs } from '#services/nibrunner-logs.service.ts';
 import { SqliteGuest } from '#services/sqlite-guest.service.ts';
@@ -30,6 +31,7 @@ import { SqliteSessions } from '#services/sqlite-sessions.service.ts';
 
 const REPORT_MAX_AGE_MS = 30_000;
 const LOG_IDLE_POLL = '500 millis';
+const EXPORT_IDLE_POLL = '500 millis';
 
 export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
   control,
@@ -41,6 +43,7 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
   const store = yield* ArtifactStore;
   const filesystem = yield* NibrunnerFilesystem;
   const logs = yield* NibrunnerLogs;
+  const exports = yield* NibrunnerExports;
   const initial = yield* readNibrunnerReport(config.reportedStateFile);
   const sessions = yield* makeSessionHolder({
     control,
@@ -168,8 +171,25 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
 
   const reportOnce = Effect.gen(function* () {
     const { session, report } = yield* currentState;
-    yield* control.sendReportedState({ sessionToken: session.sessionToken, report });
+    const desired = Option.getOrUndefined(yield* Ref.get(latest));
+    const published = yield* exports.reports({
+      desired: desired?.exports ?? [],
+      reported: report.exports,
+    });
+    yield* control.sendReportedState({
+      sessionToken: session.sessionToken,
+      report: { ...report, exports: published },
+    });
     return session.poll;
+  }).pipe(Effect.tapErrorTag('ControlPlaneError', sessions.onExpired));
+
+  const exportsOnce = Effect.gen(function* () {
+    const desired = Option.getOrUndefined(yield* Ref.get(latest));
+    if (desired === undefined) {
+      return;
+    }
+    const { report } = yield* currentState;
+    yield* exports.sync({ desired, reported: report.exports });
   }).pipe(Effect.tapErrorTag('ControlPlaneError', sessions.onExpired));
 
   const servedAppIds = Effect.gen(function* () {
@@ -228,6 +248,7 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
     filesystemOnce,
     cronOnce,
     logOnce,
+    exportsOnce,
     sqliteOnce,
     run: Effect.all(
       [
@@ -258,6 +279,11 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
         supervised({
           once: sqliteOnce,
           onFailure: () => Effect.logWarning('nibrunner SQLite query failed'),
+          schedule: CONTROL_PLANE_BACKOFF,
+        }),
+        supervised({
+          once: exportsOnce.pipe(Effect.andThen(Effect.sleep(EXPORT_IDLE_POLL))),
+          onFailure: () => Effect.logWarning('nibrunner export publication failed'),
           schedule: CONTROL_PLANE_BACKOFF,
         }),
         supervised({

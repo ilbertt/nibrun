@@ -4,6 +4,7 @@ import { FileSystem } from '@effect/platform';
 import {
   AppIdSchema,
   DeploymentIdSchema,
+  type ExportId,
   type FilesystemQueryRequest,
   type FilesystemQueryResponse,
   FilesystemQueryResultSchema,
@@ -13,6 +14,7 @@ import {
   HostIdSchema,
   type HostReportedState,
   HostReportedStateSchema,
+  type ReportedExport,
   type SqliteQueryRequest,
   type SqliteQueryResponse,
   type SqliteQueryResult,
@@ -20,14 +22,16 @@ import {
   TimestampSchema,
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { Deferred, Effect, Layer, Schedule } from 'effect';
+import { Deferred, Effect, Fiber, Layer, Schedule } from 'effect';
 import { makeControlPlaneClient } from '#lib/control/client.ts';
 import { makeNibrunnerBridge } from '#lib/nibrunner/bridge.ts';
+import { nibrunnerExportReports } from '#lib/nibrunner/exports.ts';
 import { makeNibrunnerFilesystem } from '#lib/nibrunner/filesystem.ts';
 import type { HostReportedState as NibrunnerReport } from '#lib/nibrunner/reported.gen.ts';
 import { readNibrunnerDesired, writeNibrunnerDesired } from '#lib/nibrunner/state-files.ts';
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { NibrunnerBridgeConfig } from '#services/nibrunner-bridge-config.service.ts';
+import { NibrunnerExports } from '#services/nibrunner-exports.service.ts';
 import { NibrunnerFilesystem } from '#services/nibrunner-filesystem.service.ts';
 import { NibrunnerGuestConnections } from '#services/nibrunner-guest-connections.service.ts';
 import { NibrunnerLogs } from '#services/nibrunner-logs.service.ts';
@@ -35,8 +39,11 @@ import { artifactStore } from '#tests/support/artifacts.ts';
 import {
   APP_ID,
   DEPLOYMENT_ID,
+  desiredExport,
   desiredInstance,
   desiredState,
+  desiredVolume,
+  EXPORT_ID,
   HOST_ID,
   POLL_SETTINGS_FIXTURE,
 } from '#tests/support/fixtures.ts';
@@ -67,6 +74,9 @@ function fixture(initialDesired: HostDesiredState) {
     const reports: HostReportedState[] = [];
     const registrations: string[] = [];
     const logRequests: Array<Parameters<NibrunnerLogs['send']>[0]> = [];
+    const exportRequests: Array<Parameters<NibrunnerExports['sync']>[0]> = [];
+    const publishedExports = new Map<ExportId, ReportedExport>();
+    const exportPublishing = { run: Effect.void };
     const { baseUrl } = yield* serving(async (request) => {
       const route = new URL(request.url).pathname.split('/').at(-1);
       switch (route) {
@@ -148,6 +158,9 @@ function fixture(initialDesired: HostDesiredState) {
       registrations,
       filesystemRequests,
       logRequests,
+      exportRequests,
+      publishedExports,
+      exportPublishing,
       sqliteRequests,
       sqliteResults,
       guest,
@@ -155,6 +168,19 @@ function fixture(initialDesired: HostDesiredState) {
         config,
         control: makeControlPlaneClient({ baseUrl }),
       }).pipe(
+        Effect.provideService(
+          NibrunnerExports,
+          NibrunnerExports.make({
+            sync: (request) =>
+              Effect.sync(() => exportRequests.push(request)).pipe(
+                Effect.andThen(Effect.suspend(() => exportPublishing.run)),
+              ),
+            reports: (request) =>
+              Effect.sync(() =>
+                nibrunnerExportReports({ ...request, published: publishedExports }),
+              ),
+          }),
+        ),
         Effect.provideService(
           NibrunnerGuestConnections,
           NibrunnerGuestConnections.make({
@@ -198,6 +224,60 @@ test('the bridge registers, polls and forwards draining reports across a process
       expect(setup.registrations).toHaveLength(2);
       expect(new Set(setup.registrations).size).toBe(1);
       expect(setup.registrations[0]).not.toBe(HOST_ID);
+    }),
+  );
+});
+
+test('export publication cannot block reports or expose an intermediate native archive', async () => {
+  await run(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const desired = desiredState({ exports: [desiredExport()], volumes: [desiredVolume()] });
+      const setup = yield* fixture(desired);
+      const native: NibrunnerReport = JSON.parse(
+        yield* fs.readFileString(setup.config.reportedStateFile),
+      );
+      native.exports = [
+        { exportId: EXPORT_ID, state: 'ready', sizeBytes: 123, readyAt: native.reportedAt },
+      ];
+      yield* fs.writeFileString(setup.config.reportedStateFile, JSON.stringify(native));
+      const bridge = yield* setup.create.pipe(Effect.provide(artifactStore()));
+      yield* bridge.reportOnce;
+      yield* bridge.exportsOnce;
+      expect(setup.reports[0]?.exports).toEqual([]);
+      expect(setup.exportRequests).toEqual([]);
+      yield* bridge.pollOnce;
+      const started = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      setup.exportPublishing.run = Deferred.succeed(started, undefined).pipe(
+        Effect.andThen(Deferred.await(release)),
+      );
+      const writing = yield* bridge.exportsOnce.pipe(Effect.forkScoped);
+      yield* Deferred.await(started);
+      yield* bridge.reportOnce;
+      expect(setup.reports[1]?.exports).toEqual([{ exportId: EXPORT_ID, state: 'preparing' }]);
+      expect(setup.exportRequests[0]?.desired).toEqual(desired);
+      expect(setup.exportRequests[0]?.reported).toMatchObject(native.exports);
+      const published: ReportedExport = {
+        exportId: EXPORT_ID,
+        state: 'ready',
+        sizeBytes: 456,
+        readyAt: Value.Parse(TimestampSchema, native.reportedAt),
+      };
+      setup.publishedExports.set(EXPORT_ID, published);
+      yield* Deferred.succeed(release, undefined);
+      yield* Fiber.join(writing);
+      yield* bridge.reportOnce;
+      expect(setup.reports[2]?.exports).toEqual([published]);
+      setup.world.desired = desiredState({
+        ...desired,
+        exports: [desiredExport({ desiredState: 'absent' })],
+      });
+      yield* bridge.pollOnce;
+      yield* bridge.exportsOnce;
+      yield* bridge.reportOnce;
+      expect(setup.exportRequests[1]?.desired.exports[0]?.desiredState).toBe('absent');
+      expect(setup.reports[3]?.exports).toEqual([]);
     }),
   );
 });

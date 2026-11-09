@@ -44,7 +44,7 @@ if ! cmp -s config.toml /etc/nibrunner/config.toml ||
   work=$(mktemp -d)
   trap 'rm -rf "$work"' EXIT
   apt-get update -q
-  DEBIAN_FRONTEND=noninteractive apt-get install -y -q nftables e2fsprogs xfsprogs util-linux mount nbd-client fuse3 kmod passwd curl ca-certificates awscli libarchive-tools
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -q nftables e2fsprogs xfsprogs util-linux mount nbd-client fuse3 kmod passwd curl ca-certificates awscli
   curl -fsSL --retry 3 \
     "https://github.com/ilbertt/nibrunner/releases/download/${NIBRUNNER_VERSION}/nibrunnerd-linux-x64" \
     -o "$work/nibrunnerd"
