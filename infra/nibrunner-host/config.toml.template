@@ -63,5 +63,8 @@ port = 9100
 [filesystem]
 socket = {{FILESYSTEM_SOCKET}}
 
+[guest_connections]
+socket = {{GUEST_CONNECTIONS_SOCKET}}
+
 [logs]
 keep_mib_per_app = 64
