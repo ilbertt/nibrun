@@ -180,7 +180,9 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
       sessionToken: session.sessionToken,
       report: { ...report, exports: published },
     });
-    return session.poll;
+    return report.state === 'registering'
+      ? { ...session.poll, reportIntervalMs: session.poll.minIntervalMs }
+      : session.poll;
   }).pipe(Effect.tapErrorTag('ControlPlaneError', sessions.onExpired));
 
   const exportsOnce = Effect.gen(function* () {
