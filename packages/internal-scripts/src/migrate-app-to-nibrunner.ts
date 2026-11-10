@@ -8,15 +8,32 @@ type App = {
   id: string;
   owner: string;
   slug: string;
+  hostname: string;
   deployment: string;
   host: string;
   artifact: string;
+  artifactDigest: string;
+  artifactBytes: number;
+  artifactKey: string;
   config: string;
   state: 'active' | 'suspended';
 };
 type Source = { host: string; bucket: string; bytes: number };
 type Destination = { host: string; bucket: string };
 type Copy = { digest: string; bytes: number; compressedBytes: number };
+const MIGRATION_POLL_MS = 250;
+const MIGRATION_COMMAND_TIMEOUT_MS = 30_000;
+const CUTOVER_BUDGET_MS = 12_000;
+const HTTP_NOT_FOUND = 404;
+let cutoverDeadline = Number.POSITIVE_INFINITY;
+
+function remainingCommandTime(): number {
+  const remaining = cutoverDeadline - Date.now();
+  if (remaining <= 0) {
+    throw new Error('Migration cutover budget exceeded');
+  }
+  return Math.min(remaining, MIGRATION_COMMAND_TIMEOUT_MS);
+}
 
 const { values } = parseArgs({
   options: {
@@ -44,18 +61,27 @@ const instances = [sourceInstance, targetInstance, controlInstance];
 if (new Set(instances).size !== instances.length) {
   throw new Error('Source, target and control instances must differ');
 }
-const transfer = `migrations/${appId}/${crypto.randomUUID()}.img.gz`;
+const transfer = `migrations/${appId}/${crypto.randomUUID()}.tar.gz`;
 
 async function remote({ instance, script }: { instance: string; script: string }): Promise<string> {
+  remainingCommandTime();
   const commandId = await sendCommand({
     instanceIds: [instance],
     script: `set -eu\numask 077\n${script}`,
     comment: `Migrate app ${appId}`,
   });
   console.log(`[${instance}] ${commandId}`);
-  const result = await waitForInvocation({ commandId, instanceId: instance });
+  const result = await waitForInvocation({
+    commandId,
+    instanceId: instance,
+    pollIntervalMs: MIGRATION_POLL_MS,
+    timeoutMs: Math.max(1, Math.min(MIGRATION_COMMAND_TIMEOUT_MS, cutoverDeadline - Date.now())),
+  });
   if (result?.Status !== 'Success') {
-    throw new Error(`Migration stopped: ${result?.StandardErrorContent ?? result?.Status}`);
+    await aws(['ssm', 'cancel-command', '--command-id', commandId, '--instance-ids', instance])
+      .nothrow()
+      .quiet();
+    throw new Error(`Migration stopped: ${result?.StandardErrorContent || result?.Status}`);
   }
   return result.StandardOutputContent.trim();
 }
@@ -80,6 +106,11 @@ function sql(statement: string): Promise<string> {
 }
 
 function cli(args: string[]): Promise<string> {
+  remainingCommandTime();
+  return runCli(args);
+}
+
+function runCli(args: string[]): Promise<string> {
   return $`bun run --filter @repo/cli nib ${args} --json`.cwd(repoRoot).quiet().text();
 }
 
@@ -87,11 +118,14 @@ async function readApp(): Promise<App> {
   const result = await sql(`BEGIN READ ONLY;
 SET LOCAL statement_timeout='10s';
 SELECT json_build_object('id',a.id,'owner',a.owner_id,'slug',a.slug,
-  'deployment',d.id,'host',d.host_id,'artifact',d.artifact_id,'config',d.config_id,'state',a.state)
+  'hostname',(SELECT hostname FROM nibrun.app_hostnames WHERE app_id=a.id AND kind='platform' AND state='active'),
+  'deployment',d.id,'host',d.host_id,'artifact',d.artifact_id,'config',d.config_id,'state',a.state,
+  'artifactDigest',ar.digest,'artifactBytes',ar.size_bytes,'artifactKey',ar.object_key)
 FROM nibrun.live_apps a
 JOIN nibrun.latest_app_deployments latest ON latest.app_id=a.id
 JOIN nibrun.deployments d ON d.id=latest.deployment_id
 JOIN nibrun.app_configs c ON c.id=d.config_id
+JOIN nibrun.artifacts ar ON ar.id=d.artifact_id
 WHERE a.id=${literal(appId)} AND a.state IN ('active','suspended') AND a.data_initialized_at IS NOT NULL
   AND a.volume_storage_migration_state IS DISTINCT FROM 'pending'
   AND NOT c.has_extra_public_port AND c.volume_storage_endpoint IS NULL
@@ -105,18 +139,32 @@ COMMIT;`);
   return app;
 }
 
+async function verifyLegacyForwarding(app: App): Promise<void> {
+  const domain = app.hostname.slice(app.hostname.indexOf('.') + 1);
+  const response = await fetch(`https://migration-check-${crypto.randomUUID()}.${domain}/`, {
+    redirect: 'manual',
+    signal: AbortSignal.timeout(MIGRATION_COMMAND_TIMEOUT_MS),
+  });
+  await response.arrayBuffer();
+  if (response.status !== HTTP_NOT_FOUND || response.headers.get('via') === null) {
+    throw new Error('Legacy ingress forwarding must be deployed before migrating apps');
+  }
+}
+
 async function inspectSource(app: App): Promise<Source> {
   return lastJson<Source>(
     await remote({
       instance: sourceInstance,
       script: `python3 - <<'PY'
-import json,pathlib,shlex
+import json,pathlib,shlex,shutil,subprocess
 app=${JSON.stringify(appId)}
+assert all(shutil.which(tool) for tool in ['dmsetup','losetup','e2image','e2fsck','tar'])
 d=json.loads(pathlib.Path('/var/lib/nibrun/desired-state.json').read_text())
 i=next(i for i in d['instances'] if i['appId']==app)
 assert d['hostId']==${JSON.stringify(app.host)} and i['deploymentId']==${JSON.stringify(app.deployment)}
 p=pathlib.Path('/mnt/zerofs/.nbd')/app
 assert p.is_file() and not p.is_symlink()
+subprocess.run(['modprobe','dm_snapshot'],check=True)
 env=dict(line.split('=',1) for line in pathlib.Path('/etc/nibrun/agent.env').read_text().splitlines() if '=' in line and not line.startswith('#'))
 print(json.dumps({'host':d['hostId'],'bucket':shlex.split(env['AGENT_EXPORT_BUCKET'])[0],'bytes':p.stat().st_size}))
 PY`,
@@ -124,12 +172,12 @@ PY`,
   );
 }
 
-async function inspectTarget(): Promise<Destination> {
+async function inspectTarget(app: App): Promise<Destination> {
   return lastJson<Destination>(
     await remote({
       instance: targetInstance,
       script: `python3 - <<'PY'
-import json,os,pathlib,shlex,subprocess
+import json,os,pathlib,shlex,subprocess,tempfile
 app=${JSON.stringify(appId)}
 d=json.loads(pathlib.Path('/var/lib/nibrunner/desired.json').read_text())
 assert not any(v['appId']==app for v in d['volumes'])
@@ -138,6 +186,19 @@ assert not (pathlib.Path('/mnt/zerofs/.nbd')/app).exists()
 assert os.path.ismount('/mnt/zerofs')
 subprocess.run(['systemctl','is-active','--quiet','nibrunnerd.service','nibrunner-zerofs.service','nibrun-nibrunner-bridge.service'],check=True)
 env=dict(line.split('=',1) for line in pathlib.Path('/etc/nibrunner/bridge.env').read_text().splitlines() if '=' in line and not line.startswith('#'))
+os.environ['AWS_DEFAULT_REGION']=shlex.split(env['AGENT_AWS_REGION'])[0]
+store=pathlib.Path('/var/lib/nibrunner/artifact-store')
+store.mkdir(parents=True,exist_ok=True,mode=0o700)
+artifact=store/${JSON.stringify(app.artifactDigest)}
+if not artifact.is_file():
+ with tempfile.TemporaryDirectory(prefix='.migration-',dir=store) as directory:
+  temporary=pathlib.Path(directory)/'artifact'
+  subprocess.run(['aws','s3','cp','--only-show-errors','s3://'+shlex.split(env['AGENT_ARTIFACT_BUCKET'])[0]+'/'+${JSON.stringify(app.artifactKey)},str(temporary)],check=True)
+  assert temporary.stat().st_size==${app.artifactBytes}
+  assert subprocess.check_output(['sha256sum',str(temporary)],text=True).split()[0]==${JSON.stringify(app.artifactDigest)}
+  os.replace(temporary,artifact)
+assert artifact.stat().st_size==${app.artifactBytes} and not artifact.is_symlink()
+assert subprocess.check_output(['sha256sum',str(artifact)],text=True).split()[0]==${JSON.stringify(app.artifactDigest)}
 print(json.dumps({'host':d['hostId'],'bucket':shlex.split(env['AGENT_IMPORT_BUCKET'])[0]}))
 PY`,
     }),
@@ -152,7 +213,7 @@ async function copySource({ app, source }: { app: App; source: Source }): Promis
 . /etc/zerofs/zerofs.env
 set +a
 python3 - <<'PY'
-import hashlib,json,os,pathlib,subprocess,time
+import hashlib,json,os,pathlib,subprocess,tempfile,time,uuid
 app=${JSON.stringify(appId)}
 for attempt in range(60):
  d=json.loads(pathlib.Path('/var/lib/nibrun/desired-state.json').read_text())
@@ -173,10 +234,35 @@ modified=image.stat().st_mtime_ns
 directory=pathlib.Path('/var/lib/nibrun/migrations')/app
 directory.mkdir(parents=True,exist_ok=True,mode=0o700)
 archive=directory/${JSON.stringify(transfer.split('/').at(-1))}
-with archive.open('xb') as output:
- subprocess.run(['gzip','-1','-c',str(image)],stdout=output,check=True)
- output.flush()
- os.fsync(output.fileno())
+device='/dev/nbd'+str(slot)
+assert int(subprocess.check_output(['blockdev','--getsize64',device],text=True))==${source.bytes}
+with open(device,'rb') as origin, image.open('rb') as original:
+ origin.seek(1128)
+ original.seek(1128)
+ assert origin.read(16)==original.read(16), 'Source device identity mismatch'
+with image.open('rb') as original:header=hashlib.sha256(original.read(2048)).hexdigest()
+with tempfile.TemporaryDirectory(prefix='migration-snapshot-',dir=directory) as work:
+ work=pathlib.Path(work)
+ cow=work/'cow'
+ with cow.open('xb') as output:output.truncate(256*1024*1024)
+ loop=subprocess.check_output(['losetup','--find','--show',str(cow)],text=True).strip()
+ name='nibrun-migration-'+uuid.uuid4().hex
+ mapper='/dev/mapper/'+name
+ try:
+  subprocess.run(['dmsetup','create',name,'--table',f'0 {${source.bytes}//512} snapshot {device} {loop} N 8'],check=True)
+  try:
+   recovery=subprocess.run(['e2fsck','-p','-E','journal_only',mapper],capture_output=True,text=True)
+   assert recovery.returncode in [0,1], 'Snapshot journal recovery failed'
+   snapshot=work/'volume.img'
+   subprocess.run(['e2image','-ra',mapper,str(snapshot)],check=True,timeout=10)
+   with snapshot.open('r+b') as output:output.truncate(${source.bytes})
+   with archive.open('xb') as output:
+    subprocess.run(['tar','--sparse','-czf','-','-C',str(work),'volume.img'],stdout=output,check=True,timeout=10)
+    output.flush()
+    os.fsync(output.fileno())
+  finally:subprocess.run(['dmsetup','remove',name],check=True)
+ finally:subprocess.run(['losetup','--detach',loop],check=True)
+with image.open('rb') as original:assert hashlib.sha256(original.read(2048)).hexdigest()==header, 'Source metadata changed'
 assert image.stat().st_mtime_ns==modified, 'Source volume changed during copy'
 properties=dict(line.split('=',1) for line in subprocess.check_output(['systemctl','show','nibrun-vm@'+app+'.service','--property=ActiveState,MainPID,ControlPID'],text=True).splitlines())
 assert properties['ActiveState'] in ['inactive','failed'] and properties['MainPID']=='0' and properties['ControlPID']=='0'
@@ -195,7 +281,7 @@ async function restoreTarget({ target, copy }: { target: Destination; copy: Copy
 . /etc/nibrunner/host.env
 set +a
 python3 - <<'PY'
-import gzip,hashlib,json,os,pathlib,stat,subprocess,tempfile
+import hashlib,json,os,pathlib,stat,subprocess,tempfile
 from itertools import chain
 def manifest(root):
  entries={}
@@ -220,23 +306,13 @@ assert os.path.ismount('/mnt/zerofs') and not destination.exists()
 d=json.loads(pathlib.Path('/var/lib/nibrunner/desired.json').read_text())
 assert d['hostId']==${JSON.stringify(target.host)} and not any(v['appId']==app for v in d['volumes'])
 with tempfile.TemporaryDirectory(prefix='nibrun-migration-',dir='/data') as directory:
- archive=pathlib.Path(directory)/'volume.img.gz'
+ archive=pathlib.Path(directory)/'volume.tar.gz'
  subprocess.run(['aws','s3','cp','--only-show-errors',${JSON.stringify(`s3://${target.bucket}/${transfer}`)},str(archive)],check=True)
  assert archive.stat().st_size==${copy.compressedBytes}
  assert subprocess.check_output(['sha256sum',str(archive)],text=True).split()[0]==${JSON.stringify(copy.digest)}
- staging=pathlib.Path(directory)/'legacy.img'
- with gzip.open(archive,'rb') as source, staging.open('xb') as output:
-  size=0
-  zeros=bytes(1024*1024)
-  while chunk:=source.read(1024*1024):
-   size+=len(chunk)
-   if size>${copy.bytes}:raise RuntimeError('Copied volume exceeds expected size')
-   if chunk==zeros:output.seek(len(chunk),1)
-   else:output.write(chunk)
-  output.truncate(size)
-  output.flush()
-  os.fsync(output.fileno())
- assert size==${copy.bytes}
+ subprocess.run(['bsdtar','-xpf',str(archive),'-C',str(directory),'volume.img'],check=True)
+ staging=pathlib.Path(directory)/'volume.img'
+ assert staging.is_file() and not staging.is_symlink() and staging.stat().st_size==${copy.bytes}
  result=subprocess.run(['e2fsck','-p',str(staging)])
  assert result.returncode in [0,1], 'Copied filesystem needs manual recovery'
  legacy=pathlib.Path(directory)/'legacy'
@@ -271,8 +347,8 @@ PY`,
 
 async function placeDeployment({ app, target }: { app: App; target: Destination }): Promise<void> {
   const result = await sql(`BEGIN;
-SET LOCAL lock_timeout='5s';
-SET LOCAL statement_timeout='20s';
+SET LOCAL lock_timeout='1s';
+SET LOCAL statement_timeout='3s';
 DO $migration$
 BEGIN
   PERFORM 1 FROM nibrun.apps WHERE id=${literal(appId)} AND owner_id=${literal(app.owner)} AND state='suspended' FOR UPDATE;
@@ -294,29 +370,66 @@ COMMIT;`);
   console.log(result);
 }
 
+async function copyAndPlace({
+  app,
+  source,
+  target,
+}: {
+  app: App;
+  source: Source;
+  target: Destination;
+}): Promise<void> {
+  const copy = await copySource({ app, source });
+  console.log(`Copied ${copy.bytes} bytes; compressed SHA-256 ${copy.digest}`);
+  remainingCommandTime();
+  await aws([
+    's3',
+    'cp',
+    `s3://${source.bucket}/exports/${transfer}`,
+    `s3://${target.bucket}/${transfer}`,
+    '--only-show-errors',
+  ]);
+  await restoreTarget({ target, copy });
+  await placeDeployment({ app, target });
+  if (app.state === 'active') {
+    await cli(['apps', 'resume', '--app', app.slug]);
+  }
+}
+
 const app = await readApp();
 const source = await inspectSource(app);
-const target = await inspectTarget();
+const target = await inspectTarget(app);
 if (source.host === target.host) {
   throw new Error('Source and target hosts must differ');
 }
+await verifyLegacyForwarding(app);
 console.log(`Suspending ${app.slug}; source volume will be retained on ${source.host}`);
-await cli(['apps', 'suspend', '--app', app.slug]);
-const copy = await copySource({ app, source });
-console.log(`Copied ${copy.bytes} bytes; compressed SHA-256 ${copy.digest}`);
-// The source can write exports and the destination can read imports; neither role needs broader access.
-await aws([
-  's3',
-  'cp',
-  `s3://${source.bucket}/exports/${transfer}`,
-  `s3://${target.bucket}/${transfer}`,
-  '--only-show-errors',
-]);
-await restoreTarget({ target, copy });
-await placeDeployment({ app, target });
-if (app.state === 'active') {
-  await cli(['apps', 'resume', '--app', app.slug]);
+const stoppedAt = Date.now();
+cutoverDeadline = stoppedAt + CUTOVER_BUDGET_MS;
+let watchdog: ReturnType<typeof setTimeout> | undefined;
+try {
+  await cli(['apps', 'suspend', '--app', app.slug]);
+  const { promise: expired, reject: rejectExpired } = Promise.withResolvers<never>();
+  watchdog = setTimeout(
+    function expire() {
+      rejectExpired(new Error('Migration cutover budget exceeded'));
+    },
+    Math.max(0, cutoverDeadline - Date.now()),
+  );
+  await Promise.race([copyAndPlace({ app, source, target }), expired]);
+} catch (error) {
+  cutoverDeadline = 0;
+  if (app.state === 'active') {
+    await runCli(['apps', 'resume', '--app', app.slug]);
+    console.log('App resumed after migration failure');
+  }
+  throw error;
+} finally {
+  clearTimeout(watchdog);
 }
+console.log(
+  `Volume handoff and activation completed in ${Date.now() - stoppedAt}ms; HTTP readiness and DNS cutover remain`,
+);
 console.log(
   `App placed on ${target.host}; activation preserved as ${app.state}. Verify data and DNS before removing the retained source volume.`,
 );
