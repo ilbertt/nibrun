@@ -35,7 +35,19 @@ if [ -z "$instance_store_device" ]; then
   echo "no EC2 instance-store device found for nibrunner host storage" >&2
   exit 1
 fi
+storage_filesystem=$(blkid --probe --output value --match-tag TYPE "$instance_store_device") || {
+  storage_probe_status=$?
+  if [ "$storage_probe_status" -ne 2 ]; then
+    exit "$storage_probe_status"
+  fi
+}
+case "$storage_filesystem" in
+  '') storage_filesystem=ext4 ;;
+  ext4|xfs) ;;
+  *) echo "unsupported instance-store filesystem: $storage_filesystem" >&2; exit 1 ;;
+esac
 sed -i "s|{{HOST_STORAGE_DEVICE}}|$instance_store_device|g" config.toml
+sed -i "s|{{HOST_STORAGE_FILESYSTEM}}|$storage_filesystem|g" config.toml
 
 marker=/opt/nibrun/nibrunner-host/installed-binary.sha256
 if ! cmp -s config.toml /etc/nibrunner/config.toml ||
