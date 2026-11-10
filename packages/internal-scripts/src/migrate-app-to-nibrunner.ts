@@ -20,12 +20,13 @@ type App = {
   state: 'active' | 'suspended';
 };
 type Source = { host: string; bucket: string; bytes: number };
-type Destination = { host: string; bucket: string };
+type Destination = { host: string };
 type Copy = { digest: string; bytes: number; compressedBytes: number };
 const MIGRATION_POLL_MS = 100;
 const MIGRATION_COMMAND_TIMEOUT_MS = 30_000;
 const CUTOVER_BUDGET_MS = 9_000;
 const HTTP_NOT_FOUND = 404;
+const ARCHIVE_DOWNLOAD_LIFETIME_SECONDS = 120;
 const HOST_MIGRATION_INITIATOR = 'system.host-migration' satisfies Deployment['initiatedBy'];
 let cutoverDeadline = Number.POSITIVE_INFINITY;
 
@@ -204,7 +205,7 @@ if not artifact.is_file():
   os.replace(temporary,artifact)
 assert artifact.stat().st_size==${app.artifactBytes} and not artifact.is_symlink()
 assert subprocess.check_output(['sha256sum',str(artifact)],text=True).split()[0]==${JSON.stringify(app.artifactDigest)}
-print(json.dumps({'host':d['hostId'],'bucket':shlex.split(env['AGENT_IMPORT_BUCKET'])[0]}))
+print(json.dumps({'host':d['hostId']}))
 PY`,
     }),
   );
@@ -227,24 +228,30 @@ for attempt in range(60):
  unit=subprocess.check_output(['systemctl','show','nibrun-vm@'+app+'.service','--property=ActiveState,MainPID,ControlPID'],text=True)
  properties=dict(line.split('=',1) for line in unit.splitlines())
  if i['desiredState']=='stopped' and properties['ActiveState'] in ['inactive','failed'] and properties['MainPID']=='0' and properties['ControlPID']=='0':break
- time.sleep(1)
+ time.sleep(${MIGRATION_POLL_MS}/1000)
 else:raise RuntimeError('Source VM did not stop')
 slot=json.loads(pathlib.Path('/var/lib/nibrun/slots.json').read_text())[app]
 assert isinstance(slot,int) and slot>=0
 subprocess.run(['blockdev','--flushbufs','/dev/nbd'+str(slot)],check=True)
+subprocess.run(['/opt/nibrun/bin/zerofs/zerofs','flush','-c','/etc/zerofs/config.toml'],check=True)
 image=pathlib.Path('/mnt/zerofs/.nbd')/app
 assert image.stat().st_size==${source.bytes}
-modified=image.stat().st_mtime_ns
 directory=pathlib.Path('/var/lib/nibrun/migrations')/app
 directory.mkdir(parents=True,exist_ok=True,mode=0o700)
 archive=directory/${JSON.stringify(transfer.split('/').at(-1))}
 device='/dev/nbd'+str(slot)
+def source_writes():
+ counters=(pathlib.Path('/sys/class/block')/pathlib.Path(device).name/'stat').read_text().split()
+ writes_completed,sectors_written=int(counters[4]),int(counters[6])
+ discards_completed,sectors_discarded=int(counters[11]),int(counters[13])
+ return writes_completed,sectors_written,discards_completed,sectors_discarded
+writes=source_writes()
 assert int(subprocess.check_output(['blockdev','--getsize64',device],text=True))==${source.bytes}
 with open(device,'rb') as origin, image.open('rb') as original:
  origin.seek(1128)
  original.seek(1128)
  assert origin.read(16)==original.read(16), 'Source device identity mismatch'
-with image.open('rb') as original:header=hashlib.sha256(original.read(2048)).hexdigest()
+with open(device,'rb') as original:header=hashlib.sha256(original.read(2048)).hexdigest()
 with tempfile.TemporaryDirectory(prefix='migration-snapshot-',dir=directory) as work:
  work=pathlib.Path(work)
  cow=work/'cow'
@@ -269,8 +276,8 @@ with tempfile.TemporaryDirectory(prefix='migration-snapshot-',dir=directory) as 
    finally:subprocess.run(['umount',str(mounted)],check=True)
   finally:subprocess.run(['dmsetup','remove','--deferred',name],check=True)
  finally:subprocess.run(['losetup','--detach',loop],check=True)
-with image.open('rb') as original:assert hashlib.sha256(original.read(2048)).hexdigest()==header, 'Source metadata changed'
-assert image.stat().st_mtime_ns==modified, 'Source volume changed during copy'
+with open(device,'rb') as original:assert hashlib.sha256(original.read(2048)).hexdigest()==header, 'Source metadata changed'
+assert source_writes()==writes, 'Source device received writes during copy'
 properties=dict(line.split('=',1) for line in subprocess.check_output(['systemctl','show','nibrun-vm@'+app+'.service','--property=ActiveState,MainPID,ControlPID'],text=True).splitlines())
 assert properties['ActiveState'] in ['inactive','failed'] and properties['MainPID']=='0' and properties['ControlPID']=='0'
 digest=subprocess.check_output(['sha256sum',str(archive)],text=True).split()[0]
@@ -281,7 +288,15 @@ PY`,
   );
 }
 
-async function restoreTarget({ target, copy }: { target: Destination; copy: Copy }): Promise<void> {
+async function restoreTarget({
+  target,
+  copy,
+  archiveUrl,
+}: {
+  target: Destination;
+  copy: Copy;
+  archiveUrl: string;
+}): Promise<void> {
   await remote({
     instance: targetInstance,
     script: `set -a
@@ -314,7 +329,8 @@ d=json.loads(pathlib.Path('/var/lib/nibrunner/desired.json').read_text())
 assert d['hostId']==${JSON.stringify(target.host)} and not any(v['appId']==app for v in d['volumes'])
 with tempfile.TemporaryDirectory(prefix='nibrun-migration-',dir='/data') as directory:
  archive=pathlib.Path(directory)/'volume.tar.gz'
- subprocess.run(['aws','s3','cp','--only-show-errors',${JSON.stringify(`s3://${target.bucket}/${transfer}`)},str(archive)],check=True)
+ download=subprocess.run(['curl','--fail','--silent','--max-time','10','--output',str(archive),${JSON.stringify(archiveUrl)}],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+ assert download.returncode==0, 'Volume archive download failed'
  assert archive.stat().st_size==${copy.compressedBytes}
  assert subprocess.check_output(['sha256sum',str(archive)],text=True).split()[0]==${JSON.stringify(copy.digest)}
  layout=pathlib.Path(directory)/'layout'
@@ -371,24 +387,19 @@ async function copyAndPlace({
   app,
   source,
   target,
+  archiveUrl,
 }: {
   app: App;
   source: Source;
   target: Destination;
+  archiveUrl: string;
 }): Promise<void> {
   const copy = await copySource({ app, source });
   console.log(
     `Copied app files from a ${copy.bytes}-byte volume; compressed SHA-256 ${copy.digest}`,
   );
   remainingCommandTime();
-  await aws([
-    's3',
-    'cp',
-    `s3://${source.bucket}/exports/${transfer}`,
-    `s3://${target.bucket}/${transfer}`,
-    '--only-show-errors',
-  ]);
-  await restoreTarget({ target, copy });
+  await restoreTarget({ target, copy, archiveUrl });
   await placeDeployment({ app, target });
 }
 
@@ -399,6 +410,19 @@ if (source.host === target.host) {
   throw new Error('Source and target hosts must differ');
 }
 await verifyLegacyForwarding(app);
+const signed = await aws([
+  's3',
+  'presign',
+  `s3://${source.bucket}/exports/${transfer}`,
+  '--expires-in',
+  String(ARCHIVE_DOWNLOAD_LIFETIME_SECONDS),
+])
+  .quiet()
+  .nothrow();
+if (signed.exitCode !== 0) {
+  throw new Error('Could not authorize the temporary archive download');
+}
+const archiveUrl = signed.stdout.toString().trim();
 console.log(`Suspending ${app.slug}; source volume will be retained on ${source.host}`);
 const stoppedAt = Date.now();
 cutoverDeadline = stoppedAt + CUTOVER_BUDGET_MS;
@@ -412,7 +436,7 @@ try {
     },
     Math.max(0, cutoverDeadline - Date.now()),
   );
-  await Promise.race([copyAndPlace({ app, source, target }), expired]);
+  await Promise.race([copyAndPlace({ app, source, target, archiveUrl }), expired]);
 } catch (error) {
   cutoverDeadline = 0;
   if (app.state === 'active') {
@@ -433,4 +457,3 @@ console.log(
   `App placed on ${target.host}; activation preserved as ${app.state}. Verify data and DNS before removing the retained source volume.`,
 );
 await aws(['s3', 'rm', `s3://${source.bucket}/exports/${transfer}`, '--only-show-errors']);
-await aws(['s3', 'rm', `s3://${target.bucket}/${transfer}`, '--only-show-errors']);
