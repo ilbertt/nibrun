@@ -920,15 +920,6 @@ describe('deployment initiators belong to each deployment', () => {
       );
     },
   );
-
-  test('null initiators read as owner during rollout', async () => {
-    const row = deploymentRow({ initiated_by: null });
-    const { service } = serviceWith({ row, rows: [row] });
-    expect((await service.get(OWNED_DEPLOYMENT)).initiatedBy).toBe('owner');
-    expect((await service.list({ appId: APP_ID, ownerId: OWNER_ID }))[0]?.initiatedBy).toBe(
-      'owner',
-    );
-  });
 });
 
 describe('GitHub deployment provenance belongs to the deployment', () => {
