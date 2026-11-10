@@ -1,8 +1,6 @@
 import { parseArgs } from 'node:util';
 import type { Deployment } from '@repo/api-client/models';
-import { $ } from 'bun';
 import { aws } from '#shared/aws.ts';
-import { repoRoot } from '#shared/paths.ts';
 import { sendCommand, waitForInvocation } from '#shared/ssm.ts';
 
 type App = {
@@ -41,6 +39,7 @@ function remainingCommandTime(): number {
 const { values } = parseArgs({
   options: {
     app: { type: 'string' },
+    'owner-email': { type: 'string' },
     source: { type: 'string' },
     target: { type: 'string' },
     control: { type: 'string' },
@@ -56,6 +55,7 @@ function argument({ name, pattern }: { name: keyof typeof values; pattern: RegEx
 }
 
 const appId = argument({ name: 'app', pattern: /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/ });
+const ownerEmail = argument({ name: 'owner-email', pattern: /^[^@\s]+@[^@\s]+$/ });
 const instancePattern = /^i-[a-f0-9]{17}$/;
 const sourceInstance = argument({ name: 'source', pattern: instancePattern });
 const targetInstance = argument({ name: 'target', pattern: instancePattern });
@@ -66,8 +66,20 @@ if (new Set(instances).size !== instances.length) {
 }
 const transfer = `migrations/${appId}/${crypto.randomUUID()}.tar.gz`;
 
-async function remote({ instance, script }: { instance: string; script: string }): Promise<string> {
+function remote(input: { instance: string; script: string }): Promise<string> {
   remainingCommandTime();
+  return runRemoteCommand({ ...input, deadline: cutoverDeadline });
+}
+
+async function runRemoteCommand({
+  instance,
+  script,
+  deadline,
+}: {
+  instance: string;
+  script: string;
+  deadline: number;
+}): Promise<string> {
   const commandId = await sendCommand({
     instanceIds: [instance],
     script: `set -eu\numask 077\n${script}`,
@@ -78,7 +90,7 @@ async function remote({ instance, script }: { instance: string; script: string }
     commandId,
     instanceId: instance,
     pollIntervalMs: MIGRATION_POLL_MS,
-    timeoutMs: Math.max(1, Math.min(MIGRATION_COMMAND_TIMEOUT_MS, cutoverDeadline - Date.now())),
+    timeoutMs: Math.max(1, Math.min(MIGRATION_COMMAND_TIMEOUT_MS, deadline - Date.now())),
   });
   if (result?.Status !== 'Success') {
     await aws(['ssm', 'cancel-command', '--command-id', commandId, '--instance-ids', instance])
@@ -101,20 +113,54 @@ function literal(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
 }
 
+function sqlScript(statement: string): string {
+  return `docker exec -i postgres-db sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -qAt -v ON_ERROR_STOP=1' <<'MIGRATION_SQL'\n${statement}\nMIGRATION_SQL`;
+}
+
 function sql(statement: string): Promise<string> {
-  return remote({
+  return remote({ instance: controlInstance, script: sqlScript(statement) });
+}
+
+class SourceChangedBeforePause extends Error {
+  constructor() {
+    super('App ownership, state or source deployment changed before suspension');
+  }
+}
+
+async function suspendApp(app: App): Promise<void> {
+  const result = await sql(`BEGIN;
+SET LOCAL lock_timeout='1s';
+SET LOCAL statement_timeout='2s';
+DO $lock$ BEGIN
+  PERFORM 1 FROM nibrun.apps WHERE id=${literal(appId)} AND owner_id=${literal(app.owner)} FOR UPDATE;
+END $lock$;
+UPDATE nibrun.apps a SET state='suspended'
+WHERE a.id=${literal(appId)} AND a.owner_id=${literal(app.owner)} AND a.state=${literal(app.state)}
+  AND EXISTS (SELECT 1 FROM nibrun.latest_app_deployments latest
+    WHERE latest.app_id=a.id AND latest.deployment_id=${literal(app.deployment)} AND latest.host_id=${literal(app.host)})
+RETURNING a.id;
+COMMIT;`);
+  if (result !== appId) {
+    throw new SourceChangedBeforePause();
+  }
+}
+
+async function resumeApp(app: App): Promise<void> {
+  await runRemoteCommand({
     instance: controlInstance,
-    script: `docker exec -i postgres-db sh -c 'exec psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -X -qAt -v ON_ERROR_STOP=1' <<'MIGRATION_SQL'\n${statement}\nMIGRATION_SQL`,
+    deadline: Date.now() + MIGRATION_COMMAND_TIMEOUT_MS,
+    script: sqlScript(`BEGIN;
+SET LOCAL lock_timeout='1s';
+SET LOCAL statement_timeout='2s';
+UPDATE nibrun.apps SET state='active'
+WHERE id=${literal(appId)} AND owner_id=${literal(app.owner)} AND state='suspended';
+SELECT id FROM nibrun.apps WHERE id=${literal(appId)} AND owner_id=${literal(app.owner)} AND state='active';
+COMMIT;`),
+  }).then(function verify(result) {
+    if (result !== appId) {
+      throw new Error('App could not be resumed; ownership or lifecycle state changed');
+    }
   });
-}
-
-function cli(args: string[]): Promise<string> {
-  remainingCommandTime();
-  return runCli(args);
-}
-
-function runCli(args: string[]): Promise<string> {
-  return $`bun run --filter @repo/cli nib ${args} --json`.cwd(repoRoot).quiet().text();
 }
 
 async function readApp(): Promise<App> {
@@ -129,7 +175,9 @@ JOIN nibrun.latest_app_deployments latest ON latest.app_id=a.id
 JOIN nibrun.deployments d ON d.id=latest.deployment_id
 JOIN nibrun.app_configs c ON c.id=d.config_id
 JOIN nibrun.artifacts ar ON ar.id=d.artifact_id
-WHERE a.id=${literal(appId)} AND a.state IN ('active','suspended') AND a.data_initialized_at IS NOT NULL
+WHERE a.id=${literal(appId)}
+  AND a.owner_id=(SELECT id FROM auth."user" WHERE lower(email)=lower(${literal(ownerEmail)}))
+  AND a.state IN ('active','suspended') AND a.data_initialized_at IS NOT NULL
   AND a.volume_storage_migration_state IS DISTINCT FROM 'pending'
   AND NOT c.has_extra_public_port AND c.volume_storage_endpoint IS NULL
   AND d.state IN ('running','stopped');
@@ -138,7 +186,6 @@ COMMIT;`);
   if (app.id !== appId) {
     throw new Error('App identity mismatch');
   }
-  await cli(['apps', 'status', '--app', app.slug]);
   return app;
 }
 
@@ -428,7 +475,7 @@ const stoppedAt = Date.now();
 cutoverDeadline = stoppedAt + CUTOVER_BUDGET_MS;
 let watchdog: ReturnType<typeof setTimeout> | undefined;
 try {
-  await cli(['apps', 'suspend', '--app', app.slug]);
+  await suspendApp(app);
   const { promise: expired, reject: rejectExpired } = Promise.withResolvers<never>();
   watchdog = setTimeout(
     function expire() {
@@ -439,8 +486,8 @@ try {
   await Promise.race([copyAndPlace({ app, source, target, archiveUrl }), expired]);
 } catch (error) {
   cutoverDeadline = 0;
-  if (app.state === 'active') {
-    await runCli(['apps', 'resume', '--app', app.slug]);
+  if (app.state === 'active' && !(error instanceof SourceChangedBeforePause)) {
+    await resumeApp(app);
     console.log('App resumed after migration failure');
   }
   throw error;
@@ -448,7 +495,7 @@ try {
   clearTimeout(watchdog);
 }
 if (app.state === 'active') {
-  await runCli(['apps', 'resume', '--app', app.slug]);
+  await resumeApp(app);
 }
 console.log(
   `Volume handoff and activation completed in ${Date.now() - stoppedAt}ms; HTTP readiness and DNS cutover remain`,
