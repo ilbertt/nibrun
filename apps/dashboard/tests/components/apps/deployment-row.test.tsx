@@ -37,21 +37,18 @@ function deployment(initiatedBy: DeploymentSummary['initiatedBy']): DeploymentSu
   };
 }
 
-test.each([
-  { initiatedBy: 'system.host-migration' as const, label: 'System · Host migration' },
-  { initiatedBy: 'system.storage-migration' as const, label: 'System · Storage migration' },
-])(
-  'system deployment rows identify their initiator without an artifact response: $initiatedBy',
-  (input) => {
+test.each(['system.host-migration', 'system.storage-migration'] as const)(
+  'system deployment rows explain their origin without an artifact response: %s',
+  (initiatedBy) => {
     const markup = renderToStaticMarkup(
       <table>
         <tbody>
-          <DeploymentRow deployment={deployment(input.initiatedBy)} artifact={undefined} />
+          <DeploymentRow deployment={deployment(initiatedBy)} artifact={undefined} />
         </tbody>
       </table>,
     );
-    expect(markup).toContain(input.label);
-    expect(markup).toContain(`aria-label="${input.label}"`);
+    expect(markup).toContain('aria-label="Automatic maintenance deployment"');
+    expect(markup).not.toContain('System ·');
   },
 );
 
@@ -63,5 +60,5 @@ test('user deployments do not receive a system label', () => {
       </tbody>
     </table>,
   );
-  expect(markup).not.toContain('System');
+  expect(markup).not.toContain('Automatic maintenance deployment');
 });

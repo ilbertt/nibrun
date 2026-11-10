@@ -15,12 +15,20 @@ export function DeploymentRow({
   deployment: DeploymentSummary;
   artifact: ArtifactSummary | undefined;
 }) {
+  const isSystem = deployment.initiatedBy !== 'owner';
+
   return (
-    <TableRow>
+    <TableRow
+      className={
+        isSystem
+          ? 'bg-muted/40 text-muted-foreground opacity-60 grayscale hover:bg-muted/40'
+          : undefined
+      }
+    >
       <TableCell>
         <div className="flex items-center gap-2">
           <span className="font-mono">{deployment.id}</span>
-          <SystemDeploymentOrigin initiatedBy={deployment.initiatedBy} />
+          {isSystem && <SystemDeploymentOrigin />}
         </div>
       </TableCell>
       <TableCell>
@@ -30,7 +38,12 @@ export function DeploymentRow({
         {artifact === undefined ? (
           ABSENT
         ) : (
-          <BinaryLabel artifact={artifact} github={deployment.github} mcp={deployment.mcp} />
+          <BinaryLabel
+            artifact={artifact}
+            github={deployment.github}
+            mcp={deployment.mcp}
+            showProvenance={!isSystem}
+          />
         )}
       </TableCell>
       <TableCell className="text-muted-foreground tabular-nums">

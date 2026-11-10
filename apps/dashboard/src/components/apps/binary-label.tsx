@@ -14,10 +14,12 @@ export function BinaryLabel({
   artifact,
   github,
   mcp,
+  showProvenance,
 }: {
   artifact: ArtifactSummary;
   github: DeploymentSummary['github'];
   mcp: DeploymentSummary['mcp'];
+  showProvenance: boolean;
 }) {
   const { copied, copy } = useClipboardCopy({ value: artifact.digest, onCopied: undefined });
 
@@ -36,9 +38,13 @@ export function BinaryLabel({
         </Tooltip>
         )
       </span>
-      <BinaryOrigin originalFileUrl={artifact.originalFileUrl} />
-      {mcp !== undefined && <McpDeploymentOrigin mcp={mcp} />}
-      {github !== undefined && <GitHubDeploymentOrigin github={github} />}
+      {showProvenance && (
+        <>
+          <BinaryOrigin originalFileUrl={artifact.originalFileUrl} />
+          {mcp !== undefined && <McpDeploymentOrigin mcp={mcp} />}
+          {github !== undefined && <GitHubDeploymentOrigin github={github} />}
+        </>
+      )}
     </>
   );
 }
