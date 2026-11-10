@@ -195,7 +195,24 @@ async function restoreTarget({ target, copy }: { target: Destination; copy: Copy
 . /etc/nibrunner/host.env
 set +a
 python3 - <<'PY'
-import gzip,json,os,pathlib,subprocess,tempfile
+import gzip,hashlib,json,os,pathlib,stat,subprocess,tempfile
+from itertools import chain
+def manifest(root):
+ entries={}
+ for path in chain([root],root.rglob('*')):
+  info=path.lstat()
+  if stat.S_ISLNK(info.st_mode):
+   contents=('symlink',os.readlink(path))
+  elif stat.S_ISDIR(info.st_mode):
+   contents=('directory',None)
+  elif stat.S_ISREG(info.st_mode):
+   digest=hashlib.sha256()
+   with path.open('rb') as stream:
+    while chunk:=stream.read(1024*1024):digest.update(chunk)
+   contents=('file',digest.hexdigest())
+  else:raise RuntimeError('Unsupported filesystem entry')
+  entries[str(path.relative_to(root))]=(contents,stat.S_IMODE(info.st_mode),info.st_uid,info.st_gid,int(info.st_mtime))
+ return entries
 app=${JSON.stringify(appId)}
 root=pathlib.Path('/mnt/zerofs/.nbd')
 destination=root/app
@@ -232,10 +249,17 @@ with tempfile.TemporaryDirectory(prefix='nibrun-migration-',dir='/data') as dire
  data.parent.mkdir(parents=True)
  for p in [layout,layout/'upper',data.parent]:os.chmod(p,0o755)
  legacy.rename(data)
+ expected=manifest(data)
  native=root/(${JSON.stringify(`.migration-${appId}-`)}+${JSON.stringify(transfer.split('/').at(-1))})
  with native.open('xb') as image:image.truncate(${copy.bytes})
  subprocess.run(['mke2fs','-q','-F','-t','ext4','-L','nibrun-data','-E','nodiscard','-d',str(layout),str(native)],check=True)
  assert subprocess.run(['e2fsck','-fn',str(native)],capture_output=True).returncode==0, 'Destination filesystem is not clean'
+ verification=pathlib.Path(directory)/'verification'
+ verification.mkdir()
+ result=subprocess.run(['debugfs','-R','rdump /upper/app/data '+str(verification),str(native)],capture_output=True,text=True,check=True)
+ assert all(line.startswith('debugfs ') for line in result.stderr.splitlines()), 'Destination filesystem extraction failed'
+ assert manifest(verification/'data')==expected, 'Destination data differs from source'
+ print('File contents and metadata verified before placement')
  assert not destination.exists()
  os.link(native,destination)
  native.unlink()
