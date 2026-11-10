@@ -29,7 +29,12 @@ function artifact(originalFileUrl: ArtifactSummary['originalFileUrl']): Artifact
 
 test('downloaded binaries link to their original source beside the name and SHA', () => {
   const markup = renderToStaticMarkup(
-    <BinaryLabel artifact={artifact(SOURCE_URL)} github={undefined} mcp={undefined} />,
+    <BinaryLabel
+      showProvenance={true}
+      artifact={artifact(SOURCE_URL)}
+      github={undefined}
+      mcp={undefined}
+    />,
   );
 
   expect(markup).toContain('my-server');
@@ -44,7 +49,12 @@ test('downloaded binaries link to their original source beside the name and SHA'
 
 test('uploaded binaries show their origin without a download link', () => {
   const markup = renderToStaticMarkup(
-    <BinaryLabel artifact={artifact(undefined)} github={undefined} mcp={undefined} />,
+    <BinaryLabel
+      showProvenance={true}
+      artifact={artifact(undefined)}
+      github={undefined}
+      mcp={undefined}
+    />,
   );
 
   expect(markup).toContain('my-server');
@@ -54,14 +64,35 @@ test('uploaded binaries show their origin without a download link', () => {
 });
 
 test.each([undefined, SOURCE_URL])(
+  'system deployments retain the binary identity and hide all provenance: %s',
+  (originalFileUrl) => {
+    const markup = renderToStaticMarkup(
+      <BinaryLabel
+        artifact={artifact(originalFileUrl)}
+        github={GITHUB}
+        mcp={{ clientId: 'registered-client' }}
+        showProvenance={false}
+      />,
+    );
+    expect(markup).toContain('my-server');
+    expect(markup).toContain('sha256:d9403d88cdf0');
+    expect(markup).not.toContain('Uploaded binary');
+    expect(markup).not.toContain('Binary source:');
+    expect(markup).not.toContain('Deployed by GitHub Actions');
+    expect(markup).not.toContain('Deployed via MCP');
+    expect(markup).not.toContain('href=');
+  },
+);
+
+test.each([undefined, SOURCE_URL])(
   'GitHub deployments retain the binary source and link to the verified workflow run attempt',
   (originalFileUrl) => {
     const binary = artifact(originalFileUrl);
     const markup = renderToStaticMarkup(
-      <BinaryLabel artifact={binary} github={GITHUB} mcp={undefined} />,
+      <BinaryLabel showProvenance={true} artifact={binary} github={GITHUB} mcp={undefined} />,
     );
     const ownerDeployment = renderToStaticMarkup(
-      <BinaryLabel artifact={binary} github={undefined} mcp={undefined} />,
+      <BinaryLabel showProvenance={true} artifact={binary} github={undefined} mcp={undefined} />,
     );
 
     expect(markup).toContain('my-server');
@@ -88,13 +119,13 @@ test.each([undefined, SOURCE_URL])(
     const binary = artifact(originalFileUrl);
     const clientId = 'https://claude.ai/oauth/mcp-oauth-client-metadata';
     const markup = renderToStaticMarkup(
-      <BinaryLabel artifact={binary} github={undefined} mcp={{ clientId }} />,
+      <BinaryLabel showProvenance={true} artifact={binary} github={undefined} mcp={{ clientId }} />,
     );
     const manual = renderToStaticMarkup(
-      <BinaryLabel artifact={binary} github={undefined} mcp={undefined} />,
+      <BinaryLabel showProvenance={true} artifact={binary} github={undefined} mcp={undefined} />,
     );
     const github = renderToStaticMarkup(
-      <BinaryLabel artifact={binary} github={GITHUB} mcp={undefined} />,
+      <BinaryLabel showProvenance={true} artifact={binary} github={GITHUB} mcp={undefined} />,
     );
     expect(markup).toContain(`aria-label="Deployed via MCP: ${clientId}"`);
     expect(markup).toContain(
