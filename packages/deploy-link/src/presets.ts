@@ -309,7 +309,7 @@ export const DEPLOY_PRESETS = {
   'nibrun-vitals': {
     isRecommended: false,
     projectUrl: 'https://github.com/ilbertt/nibrun-vitals',
-    version: 'v2026.10.12-1',
+    version: 'v2026.11.9-1',
     markdownContent: nibrunVitalsPage,
     category: DeployCategory.Analytics,
     title: 'nibrun-vitals',
@@ -318,8 +318,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'nibrun-vitals',
       binary:
-        'https://github.com/ilbertt/nibrun-vitals/releases/download/v2026.10.12-1/vitals-linux-x64',
-      sha256: '592323009995e239da2cc4307cd6e40f6ddba5785ba83aa5c90c6a220d157348',
+        'https://github.com/ilbertt/nibrun-vitals/releases/download/v2026.11.9-1/vitals-linux-x64',
+      sha256: 'e4e16a77025b65134581b7da8bb60538acd7c08508db70b84acf3f75563866b9',
       port: 3000,
       minimal: true,
     },
