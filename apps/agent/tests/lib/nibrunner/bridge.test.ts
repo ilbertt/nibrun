@@ -208,14 +208,14 @@ function fixture(initialDesired: HostDesiredState) {
   });
 }
 
-test('the bridge registers, polls and forwards draining reports across a process restart', async () => {
+test('the bridge registers, polls and forwards ready reports across a process restart', async () => {
   await run(
     Effect.gen(function* () {
       const setup = yield* fixture(desiredState());
       const bridge = yield* setup.create.pipe(Effect.provide(artifactStore()));
       yield* bridge.pollOnce;
       yield* bridge.reportOnce;
-      expect(setup.reports[0]?.state).toBe('draining');
+      expect(setup.reports[0]?.state).toBe('ready');
       expect(setup.reports[0]?.hostId).toBe(HOST_ID);
       expect(setup.reports[0]).not.toHaveProperty('acceptedDigest');
       const restarted = yield* setup.create.pipe(Effect.provide(artifactStore()));
@@ -245,7 +245,7 @@ test('registration rechecks acknowledgement before the normal report interval', 
       native.acceptedDigest = acceptedDigest;
       yield* fs.writeFileString(setup.config.reportedStateFile, JSON.stringify(native));
       expect(yield* bridge.reportOnce).toEqual(POLL_SETTINGS_FIXTURE);
-      expect(setup.reports[1]?.state).toBe('draining');
+      expect(setup.reports[1]?.state).toBe('ready');
     }),
   );
 });

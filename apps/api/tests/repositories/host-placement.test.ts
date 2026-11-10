@@ -131,15 +131,32 @@ test('a ready host with a stale report cannot receive a new app', async () => {
   expect(await deploy(await newApp('reject-stale'))).toEqual({ outcome: 'no-host' });
 });
 
-test('a redeploy retains its current host even when only a different host is ready', async () => {
+test('new apps choose a ready host while another host drains', async () => {
+  const drainingHost = await availableHost();
+  const readyHost = await availableHost();
+  const agent = new AgentRepository({ sql: withTypes<Queries>(sql), secretsKey: TEST_SECRETS_KEY });
+  await agent.observeReport({ reported: report({ hostId: drainingHost, state: 'draining' }) });
+  const app = await newApp('ready-over-draining');
+  expect((await deploy(app)).outcome).toBe('created');
+  const [row] = await sql.unsafe('SELECT host_id FROM nibrun.deployments WHERE app_id = $1', [
+    app.appId,
+  ]);
+  expect(row.host_id).toBe(readyHost);
+});
+
+test('redeploys and rollbacks retain their draining host while a different host is ready', async () => {
   const hostId = await registerHost({ sql, originId: 'retained-host' });
   const app = await createDeployedApp({ sql, name: 'retained-placement', hostId });
-  await sql.unsafe('UPDATE nibrun.deployments SET host_id = $1 WHERE id = $2', [
-    hostId,
-    app.deploymentId,
-  ]);
+  const agent = new AgentRepository({ sql: withTypes<Queries>(sql), secretsKey: TEST_SECRETS_KEY });
+  await agent.observeReport({ reported: report({ hostId, state: 'draining' }) });
   await availableHost();
   expect((await deploy(app)).outcome).toBe('created');
+  const rollback = await repository().insertRollback({
+    appId: app.appId,
+    ownerId: app.ownerId,
+    rollbackOf: app.deploymentId,
+  });
+  expect(rollback).not.toBeNull();
   const rows = await sql.unsafe('SELECT host_id FROM nibrun.deployments WHERE app_id = $1', [
     app.appId,
   ]);
