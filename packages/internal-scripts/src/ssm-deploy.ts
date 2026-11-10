@@ -75,7 +75,12 @@ const commandId = await sendCommand({
 console.log(`SSM command: ${commandId}`);
 
 console.log('Waiting for the deploy command to finish (up to ~15m)...');
-const invocation = await waitForInvocation({ commandId, instanceId });
+const invocation = await waitForInvocation({
+  commandId,
+  instanceId,
+  pollIntervalMs: undefined,
+  timeoutMs: undefined,
+});
 
 const status = invocation?.Status ?? 'Unknown';
 console.log(`Status: ${status}`);
