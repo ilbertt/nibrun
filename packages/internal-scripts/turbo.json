@@ -4,6 +4,7 @@
     "test": {
       "inputs": [
         "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/infra/nibrunner-host/deploy/assert_empty_host.py",
         "$TURBO_ROOT$/infra/app-host/deploy/prune_agent_versions.sh",
         "$TURBO_ROOT$/infra/nibrunner-host/deploy/install_tunnel.sh",
         "$TURBO_ROOT$/infra/nibrunner-host/systemd/nibrun-nibrunner-tunnel.service"
