@@ -15,6 +15,7 @@ Moving an app creates a new deployment; its volume survives the execution it bel
 GitHub and MCP provenance still represent owner deployments. Bind initiators in repository
 queries through `DeploymentInitiator` rather than embedding SQL string literals.
 Keep it nullable during rollout and add `NOT NULL` in a separate follow-up migration.
+Public deployments expose `initiatedBy`, treating a null database value as `owner`.
 Keep host ownership on deployments rather than duplicating it on apps or placements.
 `nibrun.app_hosts` derives each app's current host from its latest deployment, including
 failed and stopped executions. Desired-state queries share one repeatable-read snapshot.
