@@ -10,6 +10,7 @@ import {
 } from '@repo/protocol';
 import { stringEnum } from '@repo/typebox-extensions';
 import { Type } from '@sinclair/typebox';
+import { DeploymentInitiatorSchema } from '#lib/api/deployment-initiator.ts';
 import { ArtifactIdSchema, OAuthClientIdSchema } from '#lib/api/identifiers.ts';
 
 // `stopped` is the one an owner puts a release into and takes it back out of: a suspended app's
@@ -52,6 +53,7 @@ export const DeploymentSchema = Type.Object({
   id: DeploymentIdSchema,
   appId: AppIdSchema,
   artifactId: ArtifactIdSchema,
+  initiatedBy: DeploymentInitiatorSchema,
   github: Type.Optional(GitHubDeploymentSchema),
   mcp: Type.Optional(McpDeploymentSchema),
   config: AppConfigSchema,

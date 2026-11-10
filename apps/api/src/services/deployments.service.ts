@@ -8,6 +8,7 @@ import type {
 } from '@repo/protocol';
 import { schema } from '#db/queries.gen.ts';
 import type { Deployment, DeploymentState } from '#lib/api/deployment.ts';
+import { DeploymentInitiator } from '#lib/api/deployment-initiator.ts';
 import type { ArtifactId, DeploymentGrantId, ImportId } from '#lib/api/identifiers.ts';
 import { type PublicAppConfig, toAppConfig } from '#lib/app-config.ts';
 import { DeploymentLifecycle } from '#lib/deployments/lifecycle.ts';
@@ -328,6 +329,7 @@ function toPublicDeployment(row: DeploymentRow): PublicDeployment {
     id: row.id,
     appId: row.app_id,
     artifactId: row.artifact_id,
+    initiatedBy: row.initiated_by ?? DeploymentInitiator.Owner,
     config: toAppConfig(row),
     state: row.state,
     createdAt: toTimestamp(row.created_at),

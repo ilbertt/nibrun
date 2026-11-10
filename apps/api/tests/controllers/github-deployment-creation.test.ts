@@ -37,6 +37,7 @@ test('a verified app grant can deploy a binary through the existing service', as
     id: 'deployment-1',
     appId: GRANT_APP_ID,
     artifactId: 'artifact-1',
+    initiatedBy: 'owner',
     config: DEFAULT_CONFIG,
     state: 'pending',
     createdAt: new Date().toISOString(),
@@ -87,12 +88,14 @@ test('a grant for another app cannot create a deployment', async () => {
   expect(create).not.toHaveBeenCalled();
 });
 
-test('clients cannot supply GitHub provenance or choose a deployment grant', async () => {
+test('clients cannot supply deployment provenance or choose a deployment grant', async () => {
   spyOn(grants, 'authenticate').mockResolvedValue(githubDeploymentGrant());
   const create = spyOn(deployments, 'createWithDeploymentGrant');
   for (const claims of [
     { deploymentGrantId: 'forged-grant' },
     { github: { repository: 'forged/repository' } },
+    { initiatedBy: 'system.host-migration' },
+    { initiated_by: 'system.storage-migration' },
   ]) {
     const response = await sendJson({
       method: 'POST',
