@@ -52,15 +52,19 @@ test('moving or clearing an assigned host requires a new deployment', async () =
   ]);
 });
 
-test('deployment initiators default to the owner and remain nullable during rollout', async () => {
+test('deployment initiators default to the owner and reject null', async () => {
   const app = await createDeployedApp({ sql, name: 'default-initiator', hostId: HOST_ID });
   const repository = new DeploymentsRepository(withTypes<Queries>(sql));
   const owned = { appId: app.appId, ownerId: app.ownerId, deploymentId: app.deploymentId };
   expect((await repository.findById(owned))?.initiated_by).toBe(DeploymentInitiator.Owner);
-  await sql.unsafe('UPDATE nibrun.deployments SET initiated_by = NULL WHERE id = $1', [
-    app.deploymentId,
-  ]);
-  expect((await repository.findById(owned))?.initiated_by).toBeNull();
+  await expect(
+    (async function clearInitiator() {
+      await sql.unsafe('UPDATE nibrun.deployments SET initiated_by = NULL WHERE id = $1', [
+        app.deploymentId,
+      ]);
+    })(),
+  ).rejects.toMatchObject({ errno: NOT_NULL_VIOLATION });
+  expect((await repository.findById(owned))?.initiated_by).toBe(DeploymentInitiator.Owner);
   expect(
     await refusedBy(async function assignUnknownInitiator() {
       await sql.unsafe("UPDATE nibrun.deployments SET initiated_by = 'unknown' WHERE id = $1", [

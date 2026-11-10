@@ -782,7 +782,7 @@ export interface ISelectDeploymentsByAppResult {
     activated_at: IDeploymentsColumns["activated_at"];
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
-    /** The owner or platform operation that initiated this deployment. Nullable during rollout; a later migration will require it. */
+    /** The owner or platform operation that initiated this deployment. */
     initiated_by: IDeploymentsColumns["initiated_by"];
     /** OAuth client that initiated this deployment; CIMD clients need not have a local registration row. */
     mcp_client_id: IDeploymentsColumns["mcp_client_id"];
@@ -832,7 +832,7 @@ export interface ISelectDeploymentByIdResult {
     activated_at: IDeploymentsColumns["activated_at"];
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
-    /** The owner or platform operation that initiated this deployment. Nullable during rollout; a later migration will require it. */
+    /** The owner or platform operation that initiated this deployment. */
     initiated_by: IDeploymentsColumns["initiated_by"];
     /** OAuth client that initiated this deployment; CIMD clients need not have a local registration row. */
     mcp_client_id: IDeploymentsColumns["mcp_client_id"];
@@ -905,7 +905,7 @@ export interface ISelectInsertedDeploymentResult {
     activated_at: IDeploymentsColumns["activated_at"];
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
-    /** The owner or platform operation that initiated this deployment. Nullable during rollout; a later migration will require it. */
+    /** The owner or platform operation that initiated this deployment. */
     initiated_by: IDeploymentsColumns["initiated_by"];
     /** OAuth client that initiated this deployment; CIMD clients need not have a local registration row. */
     mcp_client_id: IDeploymentsColumns["mcp_client_id"];
@@ -1751,8 +1751,8 @@ export interface IDeploymentsColumns {
     mcp_chat_id: string | null;
     /** The immutable execution host assigned when this deployment is created. */
     host_id: import("@repo/protocol").HostId;
-    /** The owner or platform operation that initiated this deployment. Nullable during rollout; a later migration will require it. */
-    initiated_by: import("#lib/api/deployment-initiator.ts").DeploymentInitiator | null;
+    /** The owner or platform operation that initiated this deployment. */
+    initiated_by: import("#lib/api/deployment-initiator.ts").DeploymentInitiator;
 }
 
 /** Schema of `deployments`. */

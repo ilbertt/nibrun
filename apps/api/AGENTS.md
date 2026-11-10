@@ -11,11 +11,10 @@ It references `hosts.id`, a UUIDv7 assigned before the agent receives a session.
 `hosts.origin_id` uniquely retains the agent's persisted registration identity. Every session
 request must carry it. Legacy agents may present a saved canonical id; both resolve to the same host.
 Moving an app creates a new deployment; its volume survives the execution it belonged to.
-`deployments.initiated_by` defaults to `owner`; platform operations use `system.*` initiators.
+`deployments.initiated_by` is required and defaults to `owner`; platform operations use `system.*` initiators.
 GitHub and MCP provenance still represent owner deployments. Bind initiators in repository
 queries through `DeploymentInitiator` rather than embedding SQL string literals.
-Keep it nullable during rollout and add `NOT NULL` in a separate follow-up migration.
-Public deployments expose `initiatedBy`, treating a null database value as `owner`.
+Public deployments expose `initiatedBy`.
 Keep host ownership on deployments rather than duplicating it on apps or placements.
 `nibrun.app_hosts` derives each app's current host from its latest deployment, including
 failed and stopped executions. Desired-state queries share one repeatable-read snapshot.
