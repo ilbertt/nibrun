@@ -386,7 +386,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     return this.sql.SelectDeploymentsByApp`
       /* @notNull environment_names */
       SELECT d.id, d.app_id, d.artifact_id, d.state, d.instance_state, d.activated_at,
-             d.rollback_of_deployment_id, d.mcp_client_id, d.mcp_chat_id, d.created_at, d.message,
+             d.rollback_of_deployment_id, d.initiated_by, d.mcp_client_id, d.mcp_chat_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
              d.public_ipv4, d.extra_public_port,
              g.github_repository, g.github_workflow_ref, g.github_ref,
@@ -414,7 +414,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     const [row] = await this.sql.SelectDeploymentById`
       /* @notNull environment_names */
       SELECT d.id, d.app_id, d.artifact_id, d.state, d.instance_state, d.activated_at,
-             d.rollback_of_deployment_id, d.mcp_client_id, d.mcp_chat_id, d.created_at, d.message,
+             d.rollback_of_deployment_id, d.initiated_by, d.mcp_client_id, d.mcp_chat_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
              d.public_ipv4, d.extra_public_port,
              g.github_repository, g.github_workflow_ref, g.github_ref,
@@ -541,7 +541,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     const [row] = await tx.SelectInsertedDeployment`
       /* @notNull environment_names */
       SELECT d.id, d.app_id, d.artifact_id, d.state, d.instance_state, d.activated_at,
-             d.rollback_of_deployment_id, d.mcp_client_id, d.mcp_chat_id, d.created_at, d.message,
+             d.rollback_of_deployment_id, d.initiated_by, d.mcp_client_id, d.mcp_chat_id, d.created_at, d.message,
              d.started_at, d.last_healthy_at, d.restart_count,
              d.public_ipv4, d.extra_public_port,
              g.github_repository, g.github_workflow_ref, g.github_ref,

@@ -782,6 +782,8 @@ export interface ISelectDeploymentsByAppResult {
     activated_at: IDeploymentsColumns["activated_at"];
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
+    /** The owner or platform operation that initiated this deployment. Nullable during rollout; a later migration will require it. */
+    initiated_by: IDeploymentsColumns["initiated_by"];
     /** OAuth client that initiated this deployment; CIMD clients need not have a local registration row. */
     mcp_client_id: IDeploymentsColumns["mcp_client_id"];
     mcp_chat_id: IDeploymentsColumns["mcp_chat_id"];
@@ -830,6 +832,8 @@ export interface ISelectDeploymentByIdResult {
     activated_at: IDeploymentsColumns["activated_at"];
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
+    /** The owner or platform operation that initiated this deployment. Nullable during rollout; a later migration will require it. */
+    initiated_by: IDeploymentsColumns["initiated_by"];
     /** OAuth client that initiated this deployment; CIMD clients need not have a local registration row. */
     mcp_client_id: IDeploymentsColumns["mcp_client_id"];
     mcp_chat_id: IDeploymentsColumns["mcp_chat_id"];
@@ -901,6 +905,8 @@ export interface ISelectInsertedDeploymentResult {
     activated_at: IDeploymentsColumns["activated_at"];
     /** The deployment this one replays, when it was made to go back to one. */
     rollback_of_deployment_id: IDeploymentsColumns["rollback_of_deployment_id"];
+    /** The owner or platform operation that initiated this deployment. Nullable during rollout; a later migration will require it. */
+    initiated_by: IDeploymentsColumns["initiated_by"];
     /** OAuth client that initiated this deployment; CIMD clients need not have a local registration row. */
     mcp_client_id: IDeploymentsColumns["mcp_client_id"];
     mcp_chat_id: IDeploymentsColumns["mcp_chat_id"];
@@ -1745,6 +1751,8 @@ export interface IDeploymentsColumns {
     mcp_chat_id: string | null;
     /** The immutable execution host assigned when this deployment is created. */
     host_id: import("@repo/protocol").HostId;
+    /** The owner or platform operation that initiated this deployment. Nullable during rollout; a later migration will require it. */
+    initiated_by: import("#lib/api/deployment-initiator.ts").DeploymentInitiator | null;
 }
 
 /** Schema of `deployments`. */
@@ -2520,7 +2528,8 @@ export const schema = {
             github_deployment_grant_id: { _columnName: "github_deployment_grant_id", _foreignKeys: { deployments_github_deployment_grant_id_fkey: { _constraintName: "deployments_github_deployment_grant_id_fkey", _references: { _relationName: "github_deployment_grants", _columnName: "id" } } } },
             mcp_client_id: { _columnName: "mcp_client_id", _foreignKeys: {} },
             mcp_chat_id: { _columnName: "mcp_chat_id", _foreignKeys: {} },
-            host_id: { _columnName: "host_id", _foreignKeys: { deployments_host_id_fkey: { _constraintName: "deployments_host_id_fkey", _references: { _relationName: "hosts", _columnName: "id" } } } }
+            host_id: { _columnName: "host_id", _foreignKeys: { deployments_host_id_fkey: { _constraintName: "deployments_host_id_fkey", _references: { _relationName: "hosts", _columnName: "id" } } } },
+            initiated_by: { _columnName: "initiated_by", _foreignKeys: {} }
         },
         _indexes: {
             deployments_activated_artifact_idx: { _indexName: "deployments_activated_artifact_idx" },
@@ -2542,6 +2551,7 @@ export const schema = {
             deployments_github_deployment_grant_id_fkey: { _constraintName: "deployments_github_deployment_grant_id_fkey" },
             deployments_host_id_fkey: { _constraintName: "deployments_host_id_fkey" },
             deployments_initial_data_import_id_fkey: { _constraintName: "deployments_initial_data_import_id_fkey" },
+            deployments_initiated_by_check: { _constraintName: "deployments_initiated_by_check" },
             deployments_instance_state_check: { _constraintName: "deployments_instance_state_check" },
             deployments_mcp_chat_nonempty: { _constraintName: "deployments_mcp_chat_nonempty" },
             deployments_mcp_chat_requires_client: { _constraintName: "deployments_mcp_chat_requires_client" },

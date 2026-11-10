@@ -3,6 +3,7 @@ import { withTypes } from '@ilbertt/bun-sqlgen';
 import type { DeploymentId, HostId } from '@repo/protocol';
 import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
+import { DeploymentInitiator } from '#lib/api/deployment-initiator.ts';
 import {
   DeploymentsRepository,
   type ReportedDeployment,
@@ -49,6 +50,61 @@ test('moving or clearing an assigned host requires a new deployment', async () =
     HOST_ID,
     deploymentId,
   ]);
+});
+
+test('deployment initiators default to the owner and remain nullable during rollout', async () => {
+  const app = await createDeployedApp({ sql, name: 'default-initiator', hostId: HOST_ID });
+  const repository = new DeploymentsRepository(withTypes<Queries>(sql));
+  const owned = { appId: app.appId, ownerId: app.ownerId, deploymentId: app.deploymentId };
+  expect((await repository.findById(owned))?.initiated_by).toBe(DeploymentInitiator.Owner);
+  await sql.unsafe('UPDATE nibrun.deployments SET initiated_by = NULL WHERE id = $1', [
+    app.deploymentId,
+  ]);
+  expect((await repository.findById(owned))?.initiated_by).toBeNull();
+  expect(
+    await refusedBy(async function assignUnknownInitiator() {
+      await sql.unsafe("UPDATE nibrun.deployments SET initiated_by = 'unknown' WHERE id = $1", [
+        app.deploymentId,
+      ]);
+    }),
+  ).toBe('deployments_initiated_by_check');
+});
+
+test('a system host migration keeps its initiator while user redeploys and rollbacks use the owner', async () => {
+  const app = await createDeployedApp({ sql, name: 'system-host', hostId: HOST_ID });
+  const repository = new DeploymentsRepository(withTypes<Queries>(sql));
+  await sql.unsafe("UPDATE nibrun.deployments SET state = 'superseded' WHERE id = $1", [
+    app.deploymentId,
+  ]);
+  const [migrated] = await sql.unsafe(
+    `INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, host_id, initiated_by)
+     SELECT app_id, artifact_id, config_id, $1, $3
+     FROM nibrun.deployments WHERE id = $2 RETURNING id`,
+    [DESTINATION_HOST_ID, app.deploymentId, DeploymentInitiator.SystemHostMigration],
+  );
+  const owned = { appId: app.appId, ownerId: app.ownerId };
+  const migrationId = migrated.id as DeploymentId;
+  expect((await repository.findById({ ...owned, deploymentId: migrationId }))?.initiated_by).toBe(
+    DeploymentInitiator.SystemHostMigration,
+  );
+  expect((await repository.listByApp(owned))[0]?.initiated_by).toBe(
+    DeploymentInitiator.SystemHostMigration,
+  );
+  const redeployed = await repository.insert({
+    ...owned,
+    artifactId: app.artifactId,
+    initialDataFrom: null,
+    onlyOne: false,
+  });
+  expect(redeployed.outcome).toBe('created');
+  expect(redeployed.outcome === 'created' ? redeployed.row.initiated_by : undefined).toBe(
+    DeploymentInitiator.Owner,
+  );
+  const rollback = await repository.insertRollback({ ...owned, rollbackOf: migrationId });
+  expect(rollback?.initiated_by).toBe(DeploymentInitiator.Owner);
+  expect((await repository.findById({ ...owned, deploymentId: migrationId }))?.initiated_by).toBe(
+    DeploymentInitiator.SystemHostMigration,
+  );
 });
 
 test('an execution cannot be assigned to an unregistered host', async () => {
