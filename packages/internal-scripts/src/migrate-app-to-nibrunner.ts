@@ -1,4 +1,5 @@
 import { parseArgs } from 'node:util';
+import type { Deployment } from '@repo/api-client/models';
 import { $ } from 'bun';
 import { aws } from '#shared/aws.ts';
 import { repoRoot } from '#shared/paths.ts';
@@ -25,6 +26,7 @@ const MIGRATION_POLL_MS = 100;
 const MIGRATION_COMMAND_TIMEOUT_MS = 30_000;
 const CUTOVER_BUDGET_MS = 9_000;
 const HTTP_NOT_FOUND = 404;
+const HOST_MIGRATION_INITIATOR = 'system.host-migration' satisfies Deployment['initiatedBy'];
 let cutoverDeadline = Number.POSITIVE_INFINITY;
 
 function remainingCommandTime(): number {
@@ -357,8 +359,8 @@ BEGIN
   PERFORM 1 FROM nibrun.app_configs WHERE id=${literal(app.config)} AND id=(SELECT id FROM nibrun.app_configs WHERE app_id=${literal(appId)} ORDER BY id DESC LIMIT 1);
   IF NOT FOUND THEN RAISE EXCEPTION 'App configuration changed'; END IF;
   UPDATE nibrun.deployments SET state='superseded' WHERE id=${literal(app.deployment)};
-  INSERT INTO nibrun.deployments (app_id,artifact_id,config_id,host_id)
-  VALUES (${literal(appId)},${literal(app.artifact)},${literal(app.config)},${literal(target.host)});
+  INSERT INTO nibrun.deployments (app_id,artifact_id,config_id,host_id,initiated_by)
+  VALUES (${literal(appId)},${literal(app.artifact)},${literal(app.config)},${literal(target.host)},${literal(HOST_MIGRATION_INITIATOR)});
 END $migration$;
 SELECT json_build_object('deploymentId',deployment_id,'hostId',host_id) FROM nibrun.app_hosts WHERE app_id=${literal(appId)};
 COMMIT;`);

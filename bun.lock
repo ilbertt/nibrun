@@ -272,6 +272,7 @@
         "bcryptjs": "3.0.3",
       },
       "devDependencies": {
+        "@repo/api-client": "workspace:*",
         "@repo/typescript-config": "workspace:*",
         "git-cliff": "^2.14.2",
         "json-schema-to-typescript": "16.0.0",
