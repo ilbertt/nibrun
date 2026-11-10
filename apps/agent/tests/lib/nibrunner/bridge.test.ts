@@ -228,6 +228,28 @@ test('the bridge registers, polls and forwards draining reports across a process
   );
 });
 
+test('registration rechecks acknowledgement before the normal report interval', async () => {
+  await run(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const setup = yield* fixture(desiredState());
+      const native: NibrunnerReport = JSON.parse(
+        yield* fs.readFileString(setup.config.reportedStateFile),
+      );
+      const acceptedDigest = native.acceptedDigest;
+      native.acceptedDigest = null;
+      yield* fs.writeFileString(setup.config.reportedStateFile, JSON.stringify(native));
+      const bridge = yield* setup.create.pipe(Effect.provide(artifactStore()));
+      expect((yield* bridge.reportOnce).reportIntervalMs).toBe(POLL_SETTINGS_FIXTURE.minIntervalMs);
+      expect(setup.reports[0]?.state).toBe('registering');
+      native.acceptedDigest = acceptedDigest;
+      yield* fs.writeFileString(setup.config.reportedStateFile, JSON.stringify(native));
+      expect(yield* bridge.reportOnce).toEqual(POLL_SETTINGS_FIXTURE);
+      expect(setup.reports[1]?.state).toBe('draining');
+    }),
+  );
+});
+
 test('export publication cannot block reports or expose an intermediate native archive', async () => {
   await run(
     Effect.gen(function* () {
