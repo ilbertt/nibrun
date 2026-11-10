@@ -41,12 +41,7 @@ export async function runCommand({
   }
   const commandId = await sendCommand({ instanceIds: [instanceId], script, comment });
   console.log(`[${instanceId}] SSM command: ${commandId}`);
-  const invocation = await waitForInvocation({
-    commandId,
-    instanceId,
-    pollIntervalMs: undefined,
-    timeoutMs: undefined,
-  });
+  const invocation = await waitForInvocation({ commandId, instanceId });
   console.log(invocation?.StandardOutputContent ?? 'No command output');
   if (invocation?.Status !== 'Success') {
     console.error(invocation?.StandardErrorContent ?? 'No command error output');
@@ -157,18 +152,12 @@ async function readInvocation({
 export async function waitForInvocation({
   commandId,
   instanceId,
-  pollIntervalMs,
-  timeoutMs,
 }: {
   commandId: string;
   instanceId: string;
-  pollIntervalMs: number | undefined;
-  timeoutMs: number | undefined;
 }) {
-  const startedAt = Date.now();
-  const deadline = startedAt + (timeoutMs ?? DEPLOY_ATTEMPTS * POLL_MS);
   let invocation = await readInvocation({ commandId, instanceId });
-  while (Date.now() < deadline) {
+  for (let attempt = 0; attempt < DEPLOY_ATTEMPTS; attempt++) {
     if (invocation && TERMINAL_STATUSES.has(invocation.Status)) {
       break;
     }
@@ -176,9 +165,9 @@ export async function waitForInvocation({
     // this the log is blank for as long as the deploy runs and a wedged host is
     // indistinguishable from a busy one.
     console.log(
-      `  [${instanceId}] ${invocation?.Status ?? 'Pending'} after ${Math.floor((Date.now() - startedAt) / MS_PER_SECOND)}s`,
+      `  [${instanceId}] ${invocation?.Status ?? 'Pending'} after ${(attempt * POLL_MS) / MS_PER_SECOND}s`,
     );
-    await Bun.sleep(pollIntervalMs ?? POLL_MS);
+    await Bun.sleep(POLL_MS);
     invocation = await readInvocation({ commandId, instanceId });
   }
   return invocation;

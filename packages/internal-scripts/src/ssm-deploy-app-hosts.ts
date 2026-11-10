@@ -99,12 +99,7 @@ async function deployTo({ instanceId }: { instanceId: string }) {
   });
   console.log(`[${instanceId}] SSM command: ${commandId}`);
 
-  const invocation = await waitForInvocation({
-    commandId,
-    instanceId,
-    pollIntervalMs: undefined,
-    timeoutMs: undefined,
-  });
+  const invocation = await waitForInvocation({ commandId, instanceId });
   return {
     instanceId,
     status: invocation?.Status ?? 'Unknown',
