@@ -68,16 +68,17 @@ https://{$APP_HOST_DOMAIN}, https://fallback.{$APP_HOST_DOMAIN} {
 	redir https://{$WWW_HOSTNAME} permanent
 }
 
-# Everything else under the app domain: a hostname no app on this host answers
-# for. Caddy orders site blocks most-specific first, so the rendered ones above
-# win and this is what is left. An app that lives here is never one of them —
-# its block is rendered whether or not its microVM is up, and while it is down
-# the agent answers the port with a 503 of its own.
-#
-# It exists so an unknown hostname is answered rather than handled by whatever
-# TLS policy Caddy falls back to — this way every connection the edge makes to
-# this host is one Authenticated Origin Pulls has already checked.
-https://*.{$APP_HOST_DOMAIN} {
+# Cached DNS may still reach this edge after an app moves. Local site blocks win;
+# every other hostname reaches its new owner, including brought domains.
+:443 {
 	import origin_tls
-	respond 404
+	header {
+		Cache-Control no-store
+		+Via "1.1 nibrun-legacy"
+		defer
+	}
+	reverse_proxy {{NIBRUNNER_HTTP_ORIGIN}} {
+		lb_try_duration 5s
+		stream_close_delay 5m
+	}
 }

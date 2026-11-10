@@ -20,6 +20,7 @@ log() { echo "=== [on_box_deploy $(date -u +%H:%M:%S)] $* ==="; }
   "${FIRECRACKER_DIRECTORY:?}" \
   "${CADDY_VERSION:?}" "${CADDY_URL:?}" "${CADDY_SHA256:?}" \
   "${FILESYSTEMS_BUCKET:?}" "${API_HOSTNAME:?}" "${APP_HOST_DOMAIN:?}" "${WWW_HOSTNAME:?}" \
+  "${NIBRUNNER_HTTP_ORIGIN:?}" \
   "${CONTROL_PLANE_INTERNAL_URL:?}" "${LOG_INGEST_URL:?}" "${PORT_RELAY_PUBLIC_IPV4:?}" \
   "${VPC_IPV4_CIDR_BLOCK:?}" "${VPC_IPV6_CIDR_BLOCK:?}" \
   "${GUEST_IMAGES_BUCKET:?}" "${ARTIFACTS_BUCKET:?}" "${IMPORTS_BUCKET:?}"
@@ -436,7 +437,8 @@ changed_file /etc/caddy/tls/origin.crt && NEEDS_RELOAD+=(caddy) || true
 changed_file /etc/caddy/tls/origin.key && NEEDS_RELOAD+=(caddy) || true
 chown caddy:caddy /etc/caddy/tls/origin.crt /etc/caddy/tls/origin.key
 
-cp caddy/Caddyfile /etc/caddy/Caddyfile.new
+curl --silent --show-error --max-time 5 --output /dev/null "$NIBRUNNER_HTTP_ORIGIN"
+sed "s|{{NIBRUNNER_HTTP_ORIGIN}}|$NIBRUNNER_HTTP_ORIGIN|g" caddy/Caddyfile > /etc/caddy/Caddyfile.new
 changed_file /etc/caddy/Caddyfile && NEEDS_RELOAD+=(caddy) || true
 
 cp caddy/cloudflare-origin-pull-ca.pem /etc/caddy/cloudflare-origin-pull-ca.pem.new

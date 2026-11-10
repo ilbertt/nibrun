@@ -188,7 +188,7 @@ jobs:
         run: bun run --filter @repo/internal-scripts publish-agent-binary
 
   deploy-app-hosts:
-    needs: [terraform, publish-agent]
+    needs: [terraform, publish-agent, deploy-nibrunner-host]
     runs-on: ubuntu-latest
     env:
       DEPLOY_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).deploy_bucket }}
@@ -202,6 +202,7 @@ jobs:
       API_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).api_hostname }}
       APP_HOST_DOMAIN: ${{ fromJSON(needs.terraform.outputs.values).app_host_domain }}
       WWW_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).www_hostname }}
+      NIBRUNNER_HTTP_ORIGIN: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_http_origin }}
       CONTROL_PLANE_INTERNAL_URL: ${{ fromJSON(needs.terraform.outputs.values).control_plane_internal_url }}
       LOG_INGEST_URL: ${{ fromJSON(needs.terraform.outputs.values).log_ingest_url }}
       PORT_RELAY_PUBLIC_IPV4: ${{ fromJSON(needs.terraform.outputs.values).port_relay_public_ipv4 }}
@@ -255,6 +256,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NIBRUNNER_HOST_INSTANCE_ID: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_host_instance_id }}
+      NIBRUNNER_HTTP_PROXY_PORT: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_http_proxy_port }}
       NIBRUNNER_ZEROFS_STORAGE_URL: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_zerofs_storage_url }}
       NIBRUNNER_ZEROFS_ENCRYPTION_PASSWORD_PARAMETER: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_zerofs_encryption_password_parameter }}
       NIBRUNNER_CLOUDFLARED_TOKEN_PARAMETER: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_cloudflared_token_parameter }}
