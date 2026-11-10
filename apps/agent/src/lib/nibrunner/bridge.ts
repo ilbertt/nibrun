@@ -120,7 +120,7 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
       desiredDigest: digest,
       nowMs: yield* Clock.currentTimeMillis,
       maxAgeMs: REPORT_MAX_AGE_MS,
-      admissionState: 'draining',
+      admissionState: 'ready',
     });
     return { session, report, desired, value };
   });

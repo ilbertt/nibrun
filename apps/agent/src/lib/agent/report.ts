@@ -66,7 +66,7 @@ const report = Effect.gen(function* () {
     report: buildReportedState({
       hostId: session.hostId,
       reportedAt: yield* nowTimestamp,
-      state: current.converged ? 'ready' : 'registering',
+      state: current.converged ? 'draining' : 'registering',
       capacity,
       allocatable: allocatableCapacity({
         capacity,
