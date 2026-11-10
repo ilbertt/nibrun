@@ -21,9 +21,9 @@ type App = {
 type Source = { host: string; bucket: string; bytes: number };
 type Destination = { host: string; bucket: string };
 type Copy = { digest: string; bytes: number; compressedBytes: number };
-const MIGRATION_POLL_MS = 250;
+const MIGRATION_POLL_MS = 100;
 const MIGRATION_COMMAND_TIMEOUT_MS = 30_000;
-const CUTOVER_BUDGET_MS = 12_000;
+const CUTOVER_BUDGET_MS = 9_000;
 const HTTP_NOT_FOUND = 404;
 let cutoverDeadline = Number.POSITIVE_INFINITY;
 
@@ -161,7 +161,7 @@ async function inspectSource(app: App): Promise<Source> {
       script: `python3 - <<'PY'
 import json,pathlib,shlex,shutil,subprocess
 app=${JSON.stringify(appId)}
-assert all(shutil.which(tool) for tool in ['dmsetup','losetup','e2image','e2fsck','tar'])
+assert all(shutil.which(tool) for tool in ['dmsetup','losetup','mount','umount','e2fsck','tar'])
 d=json.loads(pathlib.Path('/var/lib/nibrun/desired-state.json').read_text())
 i=next(i for i in d['instances'] if i['appId']==app)
 assert d['hostId']==${JSON.stringify(app.host)} and i['deploymentId']==${JSON.stringify(app.deployment)}
@@ -230,7 +230,6 @@ else:raise RuntimeError('Source VM did not stop')
 slot=json.loads(pathlib.Path('/var/lib/nibrun/slots.json').read_text())[app]
 assert isinstance(slot,int) and slot>=0
 subprocess.run(['blockdev','--flushbufs','/dev/nbd'+str(slot)],check=True)
-subprocess.run(['/opt/nibrun/bin/zerofs/zerofs','flush','-c','/etc/zerofs/config.toml'],check=True)
 image=pathlib.Path('/mnt/zerofs/.nbd')/app
 assert image.stat().st_size==${source.bytes}
 modified=image.stat().st_mtime_ns
@@ -256,14 +255,17 @@ with tempfile.TemporaryDirectory(prefix='migration-snapshot-',dir=directory) as 
   try:
    recovery=subprocess.run(['e2fsck','-p','-E','journal_only',mapper],capture_output=True,text=True)
    assert recovery.returncode in [0,1], 'Snapshot journal recovery failed'
-   snapshot=work/'volume.img'
-   subprocess.run(['e2image','-ra',mapper,str(snapshot)],check=True,timeout=10)
-   with snapshot.open('r+b') as output:output.truncate(${source.bytes})
-   with archive.open('xb') as output:
-    subprocess.run(['tar','--sparse','-czf','-','-C',str(work),'volume.img'],stdout=output,check=True,timeout=10)
-    output.flush()
-    os.fsync(output.fileno())
-  finally:subprocess.run(['dmsetup','remove',name],check=True)
+   mounted=work/'mounted'
+   mounted.mkdir()
+   subprocess.run(['mount','-t','ext4','-o','ro,noload',mapper,str(mounted)],check=True)
+   try:
+    assert not any((mounted/'lost+found').iterdir()), 'Source recovery directory is not empty'
+    with archive.open('xb') as output:
+     subprocess.run(['tar','--sparse','--acls','--xattrs','--numeric-owner','--exclude=./lost+found','-czf','-','-C',str(mounted),'.'],stdout=output,check=True,timeout=10)
+     output.flush()
+     os.fsync(output.fileno())
+   finally:subprocess.run(['umount',str(mounted)],check=True)
+  finally:subprocess.run(['dmsetup','remove','--deferred',name],check=True)
  finally:subprocess.run(['losetup','--detach',loop],check=True)
 with image.open('rb') as original:assert hashlib.sha256(original.read(2048)).hexdigest()==header, 'Source metadata changed'
 assert image.stat().st_mtime_ns==modified, 'Source volume changed during copy'
@@ -313,21 +315,11 @@ with tempfile.TemporaryDirectory(prefix='nibrun-migration-',dir='/data') as dire
  subprocess.run(['aws','s3','cp','--only-show-errors',${JSON.stringify(`s3://${target.bucket}/${transfer}`)},str(archive)],check=True)
  assert archive.stat().st_size==${copy.compressedBytes}
  assert subprocess.check_output(['sha256sum',str(archive)],text=True).split()[0]==${JSON.stringify(copy.digest)}
- subprocess.run(['bsdtar','-xpf',str(archive),'-C',str(directory),'volume.img'],check=True)
- staging=pathlib.Path(directory)/'volume.img'
- assert staging.is_file() and not staging.is_symlink() and staging.stat().st_size==${copy.bytes}
- result=subprocess.run(['e2fsck','-p',str(staging)])
- assert result.returncode in [0,1], 'Copied filesystem needs manual recovery'
- legacy=pathlib.Path(directory)/'legacy'
- legacy.mkdir()
- result=subprocess.run(['debugfs','-R','rdump / '+str(legacy),str(staging)],capture_output=True,text=True,check=True)
- assert all(line.startswith('debugfs ') for line in result.stderr.splitlines()), 'Legacy filesystem extraction failed'
- (legacy/'lost+found').rmdir()
  layout=pathlib.Path(directory)/'layout'
  data=layout/'upper'/'app'/'data'
- data.parent.mkdir(parents=True)
+ data.mkdir(parents=True)
  for p in [layout,layout/'upper',data.parent]:os.chmod(p,0o755)
- legacy.rename(data)
+ subprocess.run(['bsdtar','-xpf',str(archive),'-C',str(data)],check=True)
  expected=manifest(data)
  native=root/(${JSON.stringify(`.migration-${appId}-`)}+${JSON.stringify(transfer.split('/').at(-1))})
  with native.open('xb') as image:image.truncate(${copy.bytes})
@@ -383,7 +375,9 @@ async function copyAndPlace({
   target: Destination;
 }): Promise<void> {
   const copy = await copySource({ app, source });
-  console.log(`Copied ${copy.bytes} bytes; compressed SHA-256 ${copy.digest}`);
+  console.log(
+    `Copied app files from a ${copy.bytes}-byte volume; compressed SHA-256 ${copy.digest}`,
+  );
   remainingCommandTime();
   await aws([
     's3',
@@ -394,9 +388,6 @@ async function copyAndPlace({
   ]);
   await restoreTarget({ target, copy });
   await placeDeployment({ app, target });
-  if (app.state === 'active') {
-    await cli(['apps', 'resume', '--app', app.slug]);
-  }
 }
 
 const app = await readApp();
@@ -429,6 +420,9 @@ try {
   throw error;
 } finally {
   clearTimeout(watchdog);
+}
+if (app.state === 'active') {
+  await runCli(['apps', 'resume', '--app', app.slug]);
 }
 console.log(
   `Volume handoff and activation completed in ${Date.now() - stoppedAt}ms; HTTP readiness and DNS cutover remain`,
