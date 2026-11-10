@@ -8,7 +8,7 @@ time_zone = "UTC"
 [host_storage]
 device = "{{HOST_STORAGE_DEVICE}}"
 mount_point = "/data"
-filesystem = "xfs"
+filesystem = "ext4"
 
 [paths]
 state_dir = "/var/lib/nibrunner"

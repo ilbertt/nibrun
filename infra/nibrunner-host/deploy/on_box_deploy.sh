@@ -49,10 +49,44 @@ if ! cmp -s config.toml /etc/nibrunner/config.toml ||
     "https://github.com/ilbertt/nibrunner/releases/download/${NIBRUNNER_VERSION}/nibrunnerd-linux-x64" \
     -o "$work/nibrunnerd"
   printf '%s  %s\n' "$NIBRUNNER_BINARY_SHA256" "$work/nibrunnerd" | sha256sum --check
-  install -m 0755 "$work/nibrunnerd" /usr/local/bin/nibrunnerd
   aws --region "$AWS_REGION" s3 cp --no-progress "$NIBRUNNER_GUEST_IMAGE_URL" "$work/image.tar.gz"
   printf '%s  %s\n' "$NIBRUNNER_GUEST_IMAGE_SHA256" "$work/image.tar.gz" | sha256sum --check
   tar -xzf "$work/image.tar.gz" -C "$work" vmlinux rootfs.ext4 manifest.json checksums.txt
+  if [ "$(findmnt --noheadings --output FSTYPE --mountpoint /data || true)" = xfs ]; then
+    assert_empty_host() {
+      python3 - <<'EMPTY_HOST'
+import json
+from pathlib import Path
+
+for name in ('desired.json', 'reported.json'):
+    document = json.loads((Path('/var/lib/nibrunner') / name).read_bytes())
+    if any(document.get(resource) != [] for resource in ('instances', 'volumes', 'checkpoints', 'exports')):
+        raise SystemExit('Refusing to reinitialize storage while the host has resources.')
+EMPTY_HOST
+    }
+    assert_empty_host
+    test "$(readlink -f "$instance_store_device")" = "$(readlink -f "$(findmnt --noheadings --output SOURCE --mountpoint /data)")"
+    command -v pgrep >/dev/null
+    systemctl stop nibrun-nibrunner-tunnel.service nibrun-nibrunner-bridge.service nibrunnerd.service
+    assert_empty_host
+    if pgrep -x 'firecracker|jailer' >/dev/null; then
+      echo 'refusing to reinitialize storage while a VMM is running' >&2
+      exit 1
+    else
+      vmm_probe_status=$?
+      test "$vmm_probe_status" -eq 1
+    fi
+    systemctl stop data.mount
+    python3 - "$instance_store_device" <<'UNMOUNTED_DEVICE'
+import os
+import sys
+
+descriptor = os.open(sys.argv[1], os.O_RDWR | os.O_EXCL)
+os.close(descriptor)
+UNMOUNTED_DEVICE
+    wipefs --all "$instance_store_device"
+  fi
+  install -m 0755 "$work/nibrunnerd" /usr/local/bin/nibrunnerd
   install -d -m 0700 /etc/nibrunner
   install -m 0600 config.toml /etc/nibrunner/config.toml
   nibrunnerd install --from "$work"
