@@ -18,6 +18,7 @@ import {
 import { Value } from '@sinclair/typebox/value';
 import { schema } from '#db/queries.gen.ts';
 import type { DeploymentState } from '#lib/api/deployment.ts';
+import { DeploymentInitiator } from '#lib/api/deployment-initiator.ts';
 import { OAuthClientIdSchema } from '#lib/api/identifiers.ts';
 import type { PublicAppConfig } from '#lib/app-config.ts';
 import { DEFAULT_HEALTH_CHECK, DEFAULT_RESTART_POLICY } from '#lib/app-config-defaults.ts';
@@ -104,6 +105,7 @@ function deploymentRow(overrides: Partial<DeploymentRow> = {}): DeploymentRow {
     instance_state: null,
     activated_at: null,
     rollback_of_deployment_id: null,
+    initiated_by: DeploymentInitiator.Owner,
     created_at: CREATED_AT,
     message: null,
     started_at: null,

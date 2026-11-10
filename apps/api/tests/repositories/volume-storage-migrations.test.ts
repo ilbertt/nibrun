@@ -377,6 +377,7 @@ test('only the owning started attempt can switch storage and concurrent retries 
   expect(after.find((deployment) => deployment.id === first)).toMatchObject({
     artifact_id: before[0]!.artifact_id,
     state: 'pending',
+    initiated_by: 'system.storage-migration',
   });
   expect(after.find((deployment) => deployment.id === before[0]!.id)?.state).toBe('superseded');
   expect((await desiredVolumes()).find((volume) => volume.appId === appId)?.storage).toMatchObject({

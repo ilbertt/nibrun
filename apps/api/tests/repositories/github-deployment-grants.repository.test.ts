@@ -5,6 +5,7 @@ import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import { type Queries, schema } from '#db/queries.gen.ts';
 import { AppNameSchema } from '#lib/api/app.ts';
+import { DeploymentInitiator } from '#lib/api/deployment-initiator.ts';
 import { DnsLabelSchema } from '#lib/api/dns-label.ts';
 import { ArtifactIdSchema, OAuthClientIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { configWithDefaults } from '#lib/app-config.ts';
@@ -332,6 +333,7 @@ test('deployment provenance survives grant expiry and workflow revocation', asyn
   if (deployed.outcome !== 'created') {
     throw new Error('The GitHub deployment must be created.');
   }
+  expect(deployed.row.initiated_by).toBe(DeploymentInitiator.Owner);
   const authorized = await service().authenticate({ appId, ownerId: OWNER_ID, grantId: issued.id });
   await workflowsRepository().remove({
     appId,
@@ -463,6 +465,7 @@ test.each(['registered-client', 'https://claude.ai/oauth/mcp-oauth-client-metada
     if (deployed.outcome !== 'created') {
       throw new Error('The MCP deployment must be created.');
     }
+    expect(deployed.row.initiated_by).toBe(DeploymentInitiator.Owner);
     const owned = { appId, ownerId: OWNER_ID, deploymentId: deployed.row.id };
     expect(deployed.row.mcp_client_id).toBe(clientId);
     expect(deployed.row.mcp_chat_id).toBe('originating-chat');

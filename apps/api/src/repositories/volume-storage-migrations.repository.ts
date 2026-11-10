@@ -2,6 +2,7 @@ import type { TypedSQL } from '@ilbertt/bun-sqlgen';
 import { type AppId, type DeploymentId, type HostId, ObjectKeySchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import type { Queries } from '#db/queries.gen.ts';
+import { DeploymentInitiator } from '#lib/api/deployment-initiator.ts';
 import type { ArtifactId, OwnerId } from '#lib/api/identifiers.ts';
 import type { VolumeStorageMigrationState } from '#lib/api/volume-storage-migration.ts';
 import { ConflictError } from '#lib/errors.ts';
@@ -306,8 +307,8 @@ export class VolumeStorageMigrationsRepository
   }: TransactionInput & { configId: string; artifactId: ArtifactId }): Promise<DeploymentId> {
     await supersedeLiveDeployment({ tx, appId, ownerId });
     const [inserted] = await tx.InsertVolumeStorageMigrationDeployment`
-      INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, host_id)
-      SELECT a.id, ${artifactId}, ${configId}, previous.host_id
+      INSERT INTO nibrun.deployments (app_id, artifact_id, config_id, host_id, initiated_by)
+      SELECT a.id, ${artifactId}, ${configId}, previous.host_id, ${DeploymentInitiator.SystemStorageMigration}
       FROM nibrun.apps a
       LEFT JOIN LATERAL (
         SELECT d.host_id FROM nibrun.deployments d
