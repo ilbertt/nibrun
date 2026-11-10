@@ -14,6 +14,7 @@
     "build-nibrunner-guest-image": "bun run src/build-nibrunner-guest-image.ts",
     "cli-release-notes": "bun run src/cli-release-notes.ts",
     "generate-nibrunner-types": "bun run src/generate-nibrunner-types.ts",
+    "migrate-app-to-nibrunner": "bun run src/migrate-app-to-nibrunner.ts",
     "prepare-cli-release": "bun run src/prepare-cli-release.ts",
     "publish-agent-binary": "bun run src/publish-agent-binary.ts",
     "publish-app-host-bundle": "bun run src/publish-app-host-bundle.ts",
