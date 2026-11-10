@@ -23,7 +23,6 @@ if (!/^[a-zA-Z0-9][a-zA-Z0-9._-]{1,100}$/.test(guestVersion)) {
 }
 const guestDirectory = `/var/lib/nibrunner/guest-images/${guestVersion}`;
 const configuration = (await Bun.file(join(hostDirectory, 'config.toml.template')).text())
-  .replaceAll('{{NIBRUNNER_HTTP_PROXY_PORT}}', requiredEnv('NIBRUNNER_HTTP_PROXY_PORT'))
   .replaceAll('{{VPC_IPV4_CIDR_BLOCK}}', requiredEnv('VPC_IPV4_CIDR_BLOCK'))
   .replaceAll('{{VPC_IPV6_CIDR_BLOCK}}', requiredEnv('VPC_IPV6_CIDR_BLOCK'))
   .replaceAll('{{GUEST_IMAGE_DIRECTORY}}', JSON.stringify(guestDirectory))

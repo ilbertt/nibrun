@@ -49,8 +49,8 @@ denied_egress_addresses_v4 = ["{{VPC_IPV4_CIDR_BLOCK}}"]
 denied_egress_addresses_v6 = ["{{VPC_IPV6_CIDR_BLOCK}}"]
 
 [proxy.http]
-listen_address = "0.0.0.0"
-port = {{NIBRUNNER_HTTP_PROXY_PORT}}
+listen_address = "127.0.0.1"
+port = 8080
 
 [proxy.http.fallback]
 origin_host = {{FALLBACK_ORIGIN_HOST}}

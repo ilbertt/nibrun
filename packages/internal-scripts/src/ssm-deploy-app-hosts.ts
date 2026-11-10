@@ -25,7 +25,6 @@ const sharedEnv: Record<string, string> = {
   API_HOSTNAME: requiredEnv('API_HOSTNAME'),
   APP_HOST_DOMAIN: requiredEnv('APP_HOST_DOMAIN'),
   WWW_HOSTNAME: requiredEnv('WWW_HOSTNAME'),
-  NIBRUNNER_HTTP_ORIGIN: requiredEnv('NIBRUNNER_HTTP_ORIGIN'),
   CONTROL_PLANE_INTERNAL_URL: requiredEnv('CONTROL_PLANE_INTERNAL_URL'),
   LOG_INGEST_URL: requiredEnv('LOG_INGEST_URL'),
   PORT_RELAY_PUBLIC_IPV4: requiredEnv('PORT_RELAY_PUBLIC_IPV4'),
@@ -99,12 +98,7 @@ async function deployTo({ instanceId }: { instanceId: string }) {
   });
   console.log(`[${instanceId}] SSM command: ${commandId}`);
 
-  const invocation = await waitForInvocation({
-    commandId,
-    instanceId,
-    pollIntervalMs: undefined,
-    timeoutMs: undefined,
-  });
+  const invocation = await waitForInvocation({ commandId, instanceId });
   return {
     instanceId,
     status: invocation?.Status ?? 'Unknown',

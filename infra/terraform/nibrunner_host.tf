@@ -8,7 +8,6 @@ data "aws_ec2_instance_type" "nibrunner_host" {
 
 locals {
   nibrunner_filesystems_prefix = "nibrunner/primary"
-  nibrunner_http_proxy_port    = 8080
 }
 
 # Keep this engine separate: the legacy deploy starts the shared ZeroFS writer,
@@ -65,13 +64,7 @@ resource "aws_security_group" "nibrunner_host" {
   description = "nibrunner commissioning host; SSM access only"
   vpc_id      = aws_vpc.app.id
 
-  ingress {
-    description     = "Migrated app traffic from the legacy proxy"
-    from_port       = local.nibrunner_http_proxy_port
-    to_port         = local.nibrunner_http_proxy_port
-    protocol        = "tcp"
-    security_groups = [aws_security_group.app_host.id]
-  }
+  ingress = []
 
   egress {
     description      = "All outbound"
@@ -234,12 +227,4 @@ output "nibrunner_zerofs_encryption_password_parameter" {
 output "nibrunner_host_instance_id" {
   description = "SSM deployment target for the nibrunner engine and its control-plane bridge."
   value       = aws_instance.nibrunner_host.id
-}
-
-output "nibrunner_http_proxy_port" {
-  value = local.nibrunner_http_proxy_port
-}
-
-output "nibrunner_http_origin" {
-  value = "http://${aws_instance.nibrunner_host.private_ip}:${local.nibrunner_http_proxy_port}"
 }
