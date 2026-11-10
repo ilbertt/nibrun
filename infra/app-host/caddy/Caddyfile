@@ -53,7 +53,7 @@ import /etc/caddy/rendered/*.caddy
 
 # The two names here that serve nothing: the apex, and the fallback origin the
 # edge resolves a custom hostname to. Both send their visitor to the marketing
-# site rather than to the 404 below.
+# site rather than forwarding to nibrunner.
 #
 # Custom-domain traffic never lands here. It reaches this host naming the brought
 # domain in both the handshake and the request, so it matches a rendered site

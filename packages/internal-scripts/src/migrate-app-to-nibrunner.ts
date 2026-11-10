@@ -146,7 +146,10 @@ async function verifyLegacyForwarding(app: App): Promise<void> {
     signal: AbortSignal.timeout(MIGRATION_COMMAND_TIMEOUT_MS),
   });
   await response.arrayBuffer();
-  if (response.status !== HTTP_NOT_FOUND || response.headers.get('via') === null) {
+  if (
+    response.status !== HTTP_NOT_FOUND ||
+    response.headers.get('via')?.includes('1.1 nibrun-legacy') !== true
+  ) {
     throw new Error('Legacy ingress forwarding must be deployed before migrating apps');
   }
 }
