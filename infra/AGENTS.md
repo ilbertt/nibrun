@@ -89,7 +89,12 @@ Origin Pulls. The control plane publishes only its VPC control and log-ingest li
 Terraform protects the Dozzle and VictoriaLogs public hostnames with Cloudflare Access,
 allowing only members of `cloudflare_account_id` with 24-hour sessions. The account must
 already have a Zero Trust organization and the Cloudflare identity provider configured.
-`CLOUDFLARE_TERRAFORM_API_TOKEN` needs **Access: Apps and Policies Write** on that account.
+`CLOUDFLARE_TERRAFORM_API_TOKEN` needs **Access: Apps and Policies Write** and
+**Access: Organizations, Identity Providers, and Groups Read** on that account. Terraform
+derives the Tunnel's Access team name from the existing organization's auth domain and each
+protected route's accepted audience from its Access application. `cloudflared` rejects requests
+without a valid token before forwarding them to Caddy. Production publishes neither dashboard's
+host port; local development keeps the loopback bindings.
 Dozzle's own login and VictoriaLogs' Caddy basic auth remain behind Access. The API's private
 log queries and the fleet's VPC log-ingest listener do not pass through Access.
 
