@@ -96,9 +96,10 @@ protected route's accepted audience from its Access application. `cloudflared` r
 without a valid token before forwarding them to Caddy. Production publishes neither dashboard's
 host port; local development keeps the loopback bindings.
 Access is the only login for Dozzle and VictoriaLogs. Deployments no longer generate or read
-their former password credentials. Terraform's `removed` blocks retire those credentials
-without deleting existing SSM values, so older host releases can still be deployed during a
-rollback. The API's private log queries and the fleet's VPC log-ingest listener do not pass
+their former password credentials. Terraform's `removed` blocks delete the former SSM
+parameters and forget their generated passwords. The destruction guard permits only deletion
+of those two retired parameters; replacements and unrelated deletions still need an explicit
+allowlist. The API's private log queries and the fleet's VPC log-ingest listener do not pass
 through Access.
 
 Sign-in needs a GitHub OAuth App whose callback URL is

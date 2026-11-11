@@ -9,6 +9,43 @@ type ResourceChange = {
   change: { actions: string[] };
 };
 
+const RETIRED_DASHBOARD_CREDENTIALS = new Set([
+  'aws_ssm_parameter.dozzle_password',
+  'aws_ssm_parameter.victorialogs_password',
+]);
+
+function isRetiredDashboardCredentialDeletion(change: ResourceChange) {
+  return (
+    RETIRED_DASHBOARD_CREDENTIALS.has(change.address) &&
+    change.change.actions.length === 1 &&
+    change.change.actions[0] === 'delete'
+  );
+}
+
+function destroyedResourceAddresses(changes: ResourceChange[]) {
+  return [
+    ...new Set(
+      changes
+        .filter((change) => change.change.actions.includes('delete'))
+        .map((change) => change.address),
+    ),
+  ].sort();
+}
+
+export function unexpectedTerraformDestroys({
+  changes,
+  allowed,
+}: {
+  changes: ResourceChange[];
+  allowed: ReadonlySet<string>;
+}) {
+  return destroyedResourceAddresses(
+    changes.filter(
+      (change) => !allowed.has(change.address) && !isRetiredDashboardCredentialDeletion(change),
+    ),
+  );
+}
+
 export function terraform(args: string[]) {
   return $`terraform ${args}`.cwd(terraformDir);
 }
@@ -39,15 +76,9 @@ export async function failOnUnexpectedDestroys(planFile: string) {
       .filter(Boolean),
   );
 
-  const destroyed = [
-    ...new Set(
-      (plan.resource_changes ?? [])
-        .filter((change: ResourceChange) => change.change.actions.includes('delete'))
-        .map((change: ResourceChange) => change.address),
-    ),
-  ].sort() as string[];
-
-  const unexpected = destroyed.filter((address) => !allowed.has(address));
+  const changes: ResourceChange[] = plan.resource_changes ?? [];
+  const destroyed = destroyedResourceAddresses(changes);
+  const unexpected = unexpectedTerraformDestroys({ changes, allowed });
 
   if (unexpected.length > 0) {
     await writeSummary(
