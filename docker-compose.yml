@@ -224,9 +224,8 @@ services:
       - nibrun
 
   # Every container's logs, read off the Docker socket, in local and prod alike.
-  # Loopback-only and unauthenticated on purpose: reaching it on the box takes an
-  # SSM port-forward, which already costs AWS credentials. The change that gives
-  # it a public route is the change that has to give it DOZZLE_AUTH_PROVIDER.
+  # Authentication belongs to the production Tunnel. Local access stays
+  # loopback-only, and production removes the host port binding entirely.
   dozzle:
     image: amir20/dozzle:v11.4
     container_name: dozzle

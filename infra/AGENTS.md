@@ -95,8 +95,10 @@ derives the Tunnel's Access team name from the existing organization's auth doma
 protected route's accepted audience from its Access application. `cloudflared` rejects requests
 without a valid token before forwarding them to Caddy. Production publishes neither dashboard's
 host port; local development keeps the loopback bindings.
-Dozzle's own login and VictoriaLogs' Caddy basic auth remain behind Access. The API's private
-log queries and the fleet's VPC log-ingest listener do not pass through Access.
+Access is the only login for Dozzle and VictoriaLogs. Deployments no longer generate or read
+their former password credentials. Terraform deletes the former SSM parameters and password
+generators when they are removed from configuration. The API's private log queries and the
+fleet's VPC log-ingest listener do not pass through Access.
 
 Sign-in needs a GitHub OAuth App whose callback URL is
 `https://<api_hostname>/api/auth/callback/github`.
