@@ -77,8 +77,6 @@ http://{$API_HOSTNAME} {
 	}
 }
 
-# Dozzle keeps its own login behind Cloudflare Access so a missing Access rule
-# cannot expose container logs.
 http://{$DOZZLE_HOSTNAME} {
 	# Log streaming is a websocket; reverse_proxy upgrades it as-is, and the
 	# retries below sit before the upgrade, where a dial that never connected is
@@ -98,20 +96,7 @@ http://{$UMAMI_HOSTNAME} {
 	}
 }
 
-# The fleet's logs. Unlike Dozzle, VictoriaLogs has no login of its own and no
-# way to expose a subset of itself: one -httpAuth credential covers every
-# endpoint including /insert, and -select.disable is all-or-nothing. So both the
-# gate and the endpoint allowlist are here.
 http://{$VICTORIALOGS_HOSTNAME} {
-	# Rendered by on_box_deploy.sh from the SSM password, the way Dozzle's user
-	# list is; bcrypt is what basic_auth reads, and nothing on the box holds the
-	# password itself. A file under the mounted directory rather than an
-	# environment variable because bcrypt re-salts on every run: the same
-	# password hashes differently each deploy, which through the environment
-	# would change the edge's compose config and recreate it every time. Here the
-	# new hash arrives through the reload and the container is never touched.
-	import /etc/caddy/auth/victorialogs.caddy
-
 	# Nothing is served at the bare hostname — the allowlist below starts at
 	# /select — so this is what makes typing the hostname land on the dashboard
 	# rather than a 404. A redirect, not a proxy: it publishes no new path.

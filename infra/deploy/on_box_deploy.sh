@@ -159,34 +159,6 @@ prune_unused_images
 log "Pulling images"
 $compose pull
 
-# Dozzle reads a user list holding a bcrypt hash, never the password itself, so
-# something has to do the hashing. Doing it here rather than in Terraform keeps
-# the salt out of state and makes rotation a matter of changing the parameter:
-# the file is rebuilt from it on every deploy. `generate` writes the file to
-# stdout and compose's own chatter to stderr, so the redirect stays clean, and
-# running it through compose takes the image version from docker-compose.yml
-# rather than repeating it here.
-log "Writing the Dozzle user list"
-mkdir -p dozzle/data
-$compose run --rm --no-deps -T --entrypoint /dozzle dozzle generate \
-  --name Admin --email "admin@${API_HOSTNAME}" \
-  --password "$(secret dozzle_password)" admin > dozzle/data/users.yml.new
-mv dozzle/data/users.yml.new dozzle/data/users.yml
-
-# VictoriaLogs has no login, so Caddy holds the one for its dashboard. Rendered
-# into the directory Caddy mounts rather than passed to the container, because
-# bcrypt re-salts on every run: as part of the edge's environment a hash that
-# differs on every deploy is a changed compose config, and compose answers that
-# by recreating the container — dropping the whole origin, every time. Produced
-# after the .env above because it takes compose, and before `up` because the
-# Caddyfile imports it and a missing file is a parse error on a cold box. Over
-# stdin so the password is never in a container's argv.
-log "Rendering the log dashboard login"
-victorialogs_hash=$(printf '%s\n' "$(secret victorialogs_password)" |
-  $compose run --rm --no-deps -T --entrypoint caddy caddy hash-password)
-mkdir -p caddy/auth
-printf 'basic_auth {\n\tadmin %s\n}\n' "${victorialogs_hash}" > caddy/auth/victorialogs.caddy
-
 log "Starting Umami before exposing its public route"
 $compose up -d --wait --wait-timeout 180 umami
 log "Ensuring Umami administrator and websites exist"
