@@ -5,12 +5,14 @@ function deletion(address: string) {
   return { address, change: { actions: ['delete'] } };
 }
 
-test('retired dashboard parameters can be deleted without an override', () => {
+test('retired dashboard credentials can be deleted without an override', () => {
   expect(
     unexpectedTerraformDestroys({
       changes: [
         deletion('aws_ssm_parameter.dozzle_password'),
         deletion('aws_ssm_parameter.victorialogs_password'),
+        deletion('random_password.dozzle_password'),
+        deletion('random_password.victorialogs_password'),
       ],
       allowed: new Set(),
     }),

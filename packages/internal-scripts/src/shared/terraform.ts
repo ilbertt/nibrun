@@ -12,6 +12,8 @@ type ResourceChange = {
 const RETIRED_DASHBOARD_CREDENTIALS = new Set([
   'aws_ssm_parameter.dozzle_password',
   'aws_ssm_parameter.victorialogs_password',
+  'random_password.dozzle_password',
+  'random_password.victorialogs_password',
 ]);
 
 function isRetiredDashboardCredentialDeletion(change: ResourceChange) {
