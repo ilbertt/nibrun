@@ -1,6 +1,6 @@
-resource "cloudflare_zero_trust_access_policy" "log_viewers" {
+resource "cloudflare_zero_trust_access_policy" "control_plane" {
   account_id       = var.cloudflare_account_id
-  name             = "${local.resource_name_prefix}-log-viewers"
+  name             = "${local.resource_name_prefix}-control-plane"
   decision         = "allow"
   session_duration = "24h"
 
@@ -21,7 +21,7 @@ resource "cloudflare_zero_trust_access_application" "control_plane" {
   name                       = "${local.resource_name_prefix}-${each.key}"
   type                       = "self_hosted"
   domain                     = each.value
-  session_duration           = cloudflare_zero_trust_access_policy.log_viewers.session_duration
+  session_duration           = cloudflare_zero_trust_access_policy.control_plane.session_duration
   http_only_cookie_attribute = true
 
   destinations = [{
@@ -30,7 +30,7 @@ resource "cloudflare_zero_trust_access_application" "control_plane" {
   }]
 
   policies = [{
-    id         = cloudflare_zero_trust_access_policy.log_viewers.id
+    id         = cloudflare_zero_trust_access_policy.control_plane.id
     precedence = 1
   }]
 }
