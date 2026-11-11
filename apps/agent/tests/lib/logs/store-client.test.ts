@@ -17,10 +17,10 @@ test('an empty batch does not produce an upload', async () => {
   expect(await upload([])).toEqual([]);
 });
 
-test('empty tenant and cron messages retain their records', async () => {
+test('blank tenant and cron lines retain their terminators and records', async () => {
   const requests = await upload([
-    { ...tenantLogEvent(0), kind: 'data', stream: 'stdout', text: '' },
-    { ...cronOutput(1), kind: 'data', stream: 'stdout', text: '' },
+    { ...tenantLogEvent(0), kind: 'data', stream: 'stdout', text: '\n' },
+    { ...cronOutput(1), kind: 'data', stream: 'stdout', text: '\n' },
   ]);
   expect(requests).toHaveLength(1);
   const records = requests[0]!.body
@@ -33,7 +33,7 @@ test('empty tenant and cron messages retain their records', async () => {
     records.map(function message(record) {
       return record._msg;
     }),
-  ).toEqual(['', '']);
+  ).toEqual(['\n', '\n']);
   expect(
     records.map(function sequence(record) {
       return record.sequence;
@@ -42,11 +42,11 @@ test('empty tenant and cron messages retain their records', async () => {
   expect(records[1]?.cronJobId).toBe(CRON_JOB_ID);
 });
 
-test('mixed uploads preserve empty messages, formatting, identity and gaps', async () => {
+test('mixed uploads preserve blank lines, CRLF, formatting, identity and gaps', async () => {
   const requests = await upload([
-    { ...tenantLogEvent(0), kind: 'data', stream: 'stdout', text: '' },
+    { ...tenantLogEvent(0), kind: 'data', stream: 'stdout', text: '\n' },
     { ...cronOutput(1), kind: 'data', stream: 'stdout', text: '  indented\n' },
-    { ...tenantLogEvent(2), kind: 'data', stream: 'stdout', text: '\n' },
+    { ...tenantLogEvent(2), kind: 'data', stream: 'stdout', text: '\r\n' },
     { ...tenantLogEvent(GAP_SEQUENCE), kind: 'gap', droppedBytes: DROPPED_BYTES },
   ]);
   expect(requests).toHaveLength(1);
@@ -55,9 +55,9 @@ test('mixed uploads preserve empty messages, formatting, identity and gaps', asy
     .split('\n')
     .map((line) => Value.Parse(TenantLogRecordSchema, JSON.parse(line)));
   expect(records.map((record) => record.sequence)).toEqual([0, 1, 2, GAP_SEQUENCE]);
-  expect(records[0]?._msg).toBe('');
+  expect(records[0]?._msg).toBe('\n');
   expect(records[1]).toMatchObject({ _msg: '  indented\n', cronJobId: CRON_JOB_ID });
-  expect(records[2]?._msg).toBe('\n');
+  expect(records[2]?._msg).toBe('\r\n');
   expect(records[3]?.droppedBytes).toBe(DROPPED_BYTES);
 });
 

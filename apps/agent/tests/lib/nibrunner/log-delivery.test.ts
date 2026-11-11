@@ -94,19 +94,19 @@ test('a rejected upload leaves its position unchanged for retry', async () => {
   );
 });
 
-test('empty tenant and cron output is published once and advances the cursor', async () => {
+test('blank tenant and cron lines keep their terminators without being replayed', async () => {
   await run(
     Effect.gen(function* () {
       const { fs, file, delivery, cursors, requests } = yield* fixture;
       const records = [
-        { ...nibrunnerTenantLog(), sequence: 0, text: '' },
+        { ...nibrunnerTenantLog(), sequence: 0, text: '\n' },
         {
           ...nibrunnerTenantLog(),
           kind: 'cron-data',
           sequence: 1,
           jobId: 'job',
           runId: 'run',
-          text: '',
+          text: '\n',
         },
       ];
       const lines = records.map((record) => `${JSON.stringify(record)}\n`).join('');
@@ -119,7 +119,7 @@ test('empty tenant and cron output is published once and advances the cursor', a
         requests[0]?.map(function message(record) {
           return record._msg;
         }),
-      ).toEqual(['', '']);
+      ).toEqual(['\n', '\n']);
       expect(
         requests[0]?.map(function sequence(record) {
           return record.sequence;

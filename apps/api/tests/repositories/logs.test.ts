@@ -100,30 +100,6 @@ describe('a read takes one window of one deployment out of the store', () => {
     expect(records[0]?._msg).toBe('listening on 0.0.0.0:8090');
   });
 
-  test('an omitted empty message remains a blank line between adjacent records', async () => {
-    const { _msg: _message, ...emptyMessage } = storedRow({ sequence: '1' });
-    const { records } = await read([
-      storedRow({ sequence: '0', _msg: 'before' }),
-      emptyMessage,
-      storedRow({ sequence: '2', _msg: 'after' }),
-    ]);
-
-    expect(
-      records.map(function message(record) {
-        return record._msg;
-      }),
-    ).toEqual(['before', '', 'after']);
-    expect(
-      records.map(function sequence(record) {
-        return record.sequence;
-      }),
-    ).toEqual([0, 1, 2]);
-    expect(records[1]).toMatchObject({
-      sourceId: emptyMessage.sourceId,
-      _time: emptyMessage._time,
-    });
-  });
-
   test('a gap keeps the byte count it reports as a number', async () => {
     const { records } = await read([
       storedRow({ droppedBytes: String(DROPPED_BYTES), stream: 'stderr' }),

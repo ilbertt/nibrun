@@ -206,7 +206,6 @@ services:
     command:
       - -retentionPeriod=${VICTORIALOGS_RETENTION_PERIOD}
       - -storageDataPath=/victoria-logs-data
-      - -defaultMsgValue=
       # Overrides the journald default of `_HOSTNAME,_SYSTEMD_UNIT`, which would
       # be a stream per microVM on this fleet: `nibrun-vm@<instanceId>.service`
       # is one unit per instance, and instances are minted on every deploy. Host

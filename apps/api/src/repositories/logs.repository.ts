@@ -91,7 +91,6 @@ const quoted = (value: string) => JSON.stringify(value);
 /**
  * The store keeps every field as a string, so the two numbers a record carries are read back as
  * text and have to be numbers again before the record is the shape the protocol declares.
- * Empty-valued fields are omitted by the store, so a missing message represents a blank line.
  *
  * A record that then fails to validate is skipped rather than thrown: one malformed line must not
  * cost a reader the window it is in. `TenantLogRecordSchema` is what would catch a field renamed
@@ -100,7 +99,6 @@ const quoted = (value: string) => JSON.stringify(value);
 function toRecord(row: LogRow): TenantLogRecord | undefined {
   const value = {
     ...row,
-    _msg: row._msg ?? '',
     sequence: Number(row.sequence),
     ...(row.droppedBytes === undefined ? {} : { droppedBytes: Number(row.droppedBytes) }),
   };
