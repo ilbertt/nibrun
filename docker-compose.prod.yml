@@ -96,9 +96,8 @@ services:
     networks:
       - nibrun
 
-  # Local reaches Dozzle over loopback and needs no login; here it is behind a
-  # public hostname, so it grows one. Simple auth over forward-proxy because the
-  # Tunnel authenticates the connector, while Dozzle authenticates its visitors.
+  # Keep Dozzle's login behind Cloudflare Access so a missing Access rule cannot
+  # expose container logs. Local reaches Dozzle over loopback and needs no login.
   #
   # The user list is built into dozzle/data by on_box_deploy.sh, which hashes
   # the password it reads from SSM. Mounting the directory rather than the file
