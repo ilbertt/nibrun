@@ -94,6 +94,48 @@ test('a rejected upload leaves its position unchanged for retry', async () => {
   );
 });
 
+test('blank tenant and cron lines keep their terminators without being replayed', async () => {
+  await run(
+    Effect.gen(function* () {
+      const { fs, file, delivery, cursors, requests } = yield* fixture;
+      const records = [
+        { ...nibrunnerTenantLog(), sequence: 0, text: '\n' },
+        {
+          ...nibrunnerTenantLog(),
+          kind: 'cron-data',
+          sequence: 1,
+          jobId: 'job',
+          runId: 'run',
+          text: '\n',
+        },
+      ];
+      const lines = records.map((record) => `${JSON.stringify(record)}\n`).join('');
+      yield* fs.writeFileString(file, lines);
+      expect(yield* delivery.send(input)).toBe(true);
+      expect((yield* cursors.get(APP_ID))?.offset).toBe(Buffer.byteLength(lines));
+      expect(yield* delivery.send(input)).toBe(false);
+      expect(requests).toHaveLength(1);
+      expect(
+        requests[0]?.map(function message(record) {
+          return record._msg;
+        }),
+      ).toEqual(['\n', '\n']);
+      expect(
+        requests[0]?.map(function sequence(record) {
+          return record.sequence;
+        }),
+      ).toEqual([0, 1]);
+      yield* fs.writeFileString(
+        file,
+        `${lines}${JSON.stringify({ ...nibrunnerTenantLog(), sequence: 2 })}\n`,
+      );
+      yield* delivery.send(input);
+      expect(requests).toHaveLength(2);
+      expect(requests[1]?.map((record) => record.sequence)).toEqual([2]);
+    }),
+  );
+});
+
 test('a failed position commit replays acknowledged event identities safely', async () => {
   await run(
     Effect.gen(function* () {

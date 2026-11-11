@@ -11,6 +11,55 @@ import { recordingServer } from '#tests/support/server.ts';
 const CRON_JOB_ID = Value.Parse(CronJobIdSchema, 'cron-job-1');
 const CRON_RUN_ID = Value.Parse(CronRunIdSchema, 'cron-run-1');
 const DROPPED_BYTES = 1024;
+const GAP_SEQUENCE = 3;
+
+test('an empty batch does not produce an upload', async () => {
+  expect(await upload([])).toEqual([]);
+});
+
+test('blank tenant and cron lines retain their terminators and records', async () => {
+  const requests = await upload([
+    { ...tenantLogEvent(0), kind: 'data', stream: 'stdout', text: '\n' },
+    { ...cronOutput(1), kind: 'data', stream: 'stdout', text: '\n' },
+  ]);
+  expect(requests).toHaveLength(1);
+  const records = requests[0]!.body
+    .trimEnd()
+    .split('\n')
+    .map(function parse(line) {
+      return Value.Parse(TenantLogRecordSchema, JSON.parse(line));
+    });
+  expect(
+    records.map(function message(record) {
+      return record._msg;
+    }),
+  ).toEqual(['\n', '\n']);
+  expect(
+    records.map(function sequence(record) {
+      return record.sequence;
+    }),
+  ).toEqual([0, 1]);
+  expect(records[1]?.cronJobId).toBe(CRON_JOB_ID);
+});
+
+test('mixed uploads preserve blank lines, CRLF, formatting, identity and gaps', async () => {
+  const requests = await upload([
+    { ...tenantLogEvent(0), kind: 'data', stream: 'stdout', text: '\n' },
+    { ...cronOutput(1), kind: 'data', stream: 'stdout', text: '  indented\n' },
+    { ...tenantLogEvent(2), kind: 'data', stream: 'stdout', text: '\r\n' },
+    { ...tenantLogEvent(GAP_SEQUENCE), kind: 'gap', droppedBytes: DROPPED_BYTES },
+  ]);
+  expect(requests).toHaveLength(1);
+  const records = requests[0]!.body
+    .trimEnd()
+    .split('\n')
+    .map((line) => Value.Parse(TenantLogRecordSchema, JSON.parse(line)));
+  expect(records.map((record) => record.sequence)).toEqual([0, 1, 2, GAP_SEQUENCE]);
+  expect(records[0]?._msg).toBe('\n');
+  expect(records[1]).toMatchObject({ _msg: '  indented\n', cronJobId: CRON_JOB_ID });
+  expect(records[2]?._msg).toBe('\r\n');
+  expect(records[3]?.droppedBytes).toBe(DROPPED_BYTES);
+});
 
 function cronOutput(sequence: number): TenantLogEvent {
   return { ...tenantLogEvent(sequence), cronJobId: CRON_JOB_ID, cronRunId: CRON_RUN_ID };
