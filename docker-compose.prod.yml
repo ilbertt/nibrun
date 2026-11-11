@@ -96,6 +96,10 @@ services:
     networks:
       - nibrun
 
+  # Host port-forwards must not bypass the Tunnel's Access validation.
+  victorialogs:
+    ports: !reset []
+
   # Keep Dozzle's login behind Cloudflare Access so a missing Access rule cannot
   # expose container logs. Local reaches Dozzle over loopback and needs no login.
   #
@@ -104,6 +108,7 @@ services:
   # means the deploy can replace the file without the container holding the old
   # inode.
   dozzle:
+    ports: !reset []
     environment:
       - DOZZLE_AUTH_PROVIDER=simple
     volumes:

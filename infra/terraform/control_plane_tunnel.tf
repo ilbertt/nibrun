@@ -1,6 +1,13 @@
 locals {
-  control_plane_hostnames       = toset([var.api_hostname, var.dozzle_hostname, var.victorialogs_hostname, var.umami_hostname])
+  control_plane_hostnames       = toset(concat([var.api_hostname, var.umami_hostname], values(local.control_plane_access_hostnames)))
   control_plane_tunnel_hostname = "${cloudflare_zero_trust_tunnel_cloudflared.control_plane.id}.cfargotunnel.com"
+  control_plane_access = {
+    for application in cloudflare_zero_trust_access_application.control_plane : application.domain => {
+      required  = true
+      team_name = trimsuffix(data.cloudflare_zero_trust_organization.control_plane.auth_domain, ".cloudflareaccess.com")
+      aud_tag   = [application.aud]
+    }
+  }
 }
 
 resource "cloudflare_zero_trust_tunnel_cloudflared" "control_plane" {
@@ -19,6 +26,7 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "control_plane" {
         service  = "http://caddy:80"
         origin_request = {
           http_host_header = hostname
+          access           = lookup(local.control_plane_access, hostname, null)
         }
       }
     ], [{ service = "http_status:404" }])

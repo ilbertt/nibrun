@@ -1,3 +1,14 @@
+locals {
+  control_plane_access_hostnames = {
+    dozzle = var.dozzle_hostname
+    logs   = var.victorialogs_hostname
+  }
+}
+
+data "cloudflare_zero_trust_organization" "control_plane" {
+  account_id = var.cloudflare_account_id
+}
+
 resource "cloudflare_zero_trust_access_policy" "control_plane" {
   account_id       = var.cloudflare_account_id
   name             = "${local.resource_name_prefix}-control-plane"
@@ -12,10 +23,7 @@ resource "cloudflare_zero_trust_access_policy" "control_plane" {
 }
 
 resource "cloudflare_zero_trust_access_application" "control_plane" {
-  for_each = {
-    dozzle = var.dozzle_hostname
-    logs   = var.victorialogs_hostname
-  }
+  for_each = local.control_plane_access_hostnames
 
   account_id                 = var.cloudflare_account_id
   name                       = "${local.resource_name_prefix}-${each.key}"
