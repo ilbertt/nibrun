@@ -97,10 +97,8 @@ without a valid token before forwarding them to Caddy. Production publishes neit
 host port; local development keeps the loopback bindings.
 Access is the only login for Dozzle and VictoriaLogs. Deployments no longer generate or read
 their former password credentials. Terraform deletes the former SSM parameters and password
-generators when they are removed from configuration. The destruction guard permits only deletion
-of those four retired resources; replacements and unrelated deletions still need an explicit
-allowlist. The API's private log queries and the fleet's VPC log-ingest listener do not pass
-through Access.
+generators when they are removed from configuration. The API's private log queries and the
+fleet's VPC log-ingest listener do not pass through Access.
 
 Sign-in needs a GitHub OAuth App whose callback URL is
 `https://<api_hostname>/api/auth/callback/github`.
