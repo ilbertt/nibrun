@@ -210,15 +210,15 @@ export const DEPLOY_PRESETS = {
   'drizzle-gateway': {
     isRecommended: false,
     projectUrl: 'https://gateway.drizzle.team',
-    version: 'v1.6.0',
+    version: 'v1.8.0',
     markdownContent: drizzleGatewayPage,
     category: DeployCategory.DeveloperTools,
     title: 'Drizzle Gateway',
     subtitle: 'A self-hosted Drizzle Studio for browsing and managing your SQL databases.',
     deployLink: {
       name: 'drizzle-gateway',
-      binary: 'https://pub-e240a4fd7085425baf4a7951e7611520.r2.dev/drizzle-gateway-1.6.0-linux-x64',
-      sha256: '793aaf0acb8db9d90b83cc9db78df82009051862acb995419b39d9497ddb51a5',
+      binary: 'https://pub-e240a4fd7085425baf4a7951e7611520.r2.dev/drizzle-gateway-1.8.0-linux-x64',
+      sha256: 'd3e1892a87c5fe7f8ca11d6dd15c20ed73547217ec531c980402290e8e46cc18',
       port: 4983,
       env: [`STORE_PATH=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`],
       minimal: true,
@@ -227,7 +227,7 @@ export const DEPLOY_PRESETS = {
   'libredb-studio': {
     isRecommended: false,
     projectUrl: 'https://github.com/libredb/libredb-studio',
-    version: '1.2.0',
+    version: '1.3.0',
     markdownContent: libredbStudioPage,
     category: DeployCategory.DeveloperTools,
     title: 'LibreDB Studio',
@@ -238,7 +238,7 @@ export const DEPLOY_PRESETS = {
         'https://github.com/oven-sh/bun/releases/download/bun-v1.4.4/bun-linux-x64-baseline.zip',
       sha256: 'e0446eb55995772eb9894bebae9a6be368d985a8b9271ee124486f9946eedd76',
       'initial-data':
-        'https://github.com/libredb/libredb-studio/releases/download/1.2.0/libredb-studio-standalone-1.2.0-linux-x64.tar.gz',
+        'https://github.com/libredb/libredb-studio/releases/download/1.3.0/libredb-studio-standalone-1.3.0-linux-x64.tar.gz',
       port: 3000,
       arg: ['--smol', '/app/data/server.js'],
       env: [
