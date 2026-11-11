@@ -11,7 +11,7 @@ resource "cloudflare_zero_trust_access_policy" "log_viewers" {
   }]
 }
 
-resource "cloudflare_zero_trust_access_application" "logs" {
+resource "cloudflare_zero_trust_access_application" "control_plane" {
   for_each = {
     dozzle = var.dozzle_hostname
     logs   = var.victorialogs_hostname
