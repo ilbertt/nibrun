@@ -94,6 +94,38 @@ test('a rejected upload leaves its position unchanged for retry', async () => {
   );
 });
 
+test('empty tenant and cron output advances the cursor without publishing or replaying', async () => {
+  await run(
+    Effect.gen(function* () {
+      const { fs, file, delivery, cursors, requests } = yield* fixture;
+      const records = [
+        { ...nibrunnerTenantLog(), sequence: 0, text: '' },
+        {
+          ...nibrunnerTenantLog(),
+          kind: 'cron-data',
+          sequence: 1,
+          jobId: 'job',
+          runId: 'run',
+          text: '',
+        },
+      ];
+      const lines = records.map((record) => `${JSON.stringify(record)}\n`).join('');
+      yield* fs.writeFileString(file, lines);
+      expect(yield* delivery.send(input)).toBe(true);
+      expect((yield* cursors.get(APP_ID))?.offset).toBe(Buffer.byteLength(lines));
+      expect(yield* delivery.send(input)).toBe(false);
+      expect(requests).toEqual([]);
+      yield* fs.writeFileString(
+        file,
+        `${lines}${JSON.stringify({ ...nibrunnerTenantLog(), sequence: 2 })}\n`,
+      );
+      yield* delivery.send(input);
+      expect(requests).toHaveLength(1);
+      expect(requests[0]?.map((record) => record.sequence)).toEqual([2]);
+    }),
+  );
+});
+
 test('a failed position commit replays acknowledged event identities safely', async () => {
   await run(
     Effect.gen(function* () {

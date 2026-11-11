@@ -11,6 +11,35 @@ import { recordingServer } from '#tests/support/server.ts';
 const CRON_JOB_ID = Value.Parse(CronJobIdSchema, 'cron-job-1');
 const CRON_RUN_ID = Value.Parse(CronRunIdSchema, 'cron-run-1');
 const DROPPED_BYTES = 1024;
+const GAP_SEQUENCE = 3;
+
+test('empty messages do not produce an upload, including cron output', async () => {
+  expect(await upload([])).toEqual([]);
+  expect(
+    await upload([
+      { ...tenantLogEvent(0), kind: 'data', stream: 'stdout', text: '' },
+      { ...cronOutput(1), kind: 'data', stream: 'stdout', text: '' },
+    ]),
+  ).toEqual([]);
+});
+
+test('mixed uploads skip empty messages and preserve formatting, identity and gaps', async () => {
+  const requests = await upload([
+    { ...tenantLogEvent(0), kind: 'data', stream: 'stdout', text: '' },
+    { ...cronOutput(1), kind: 'data', stream: 'stdout', text: '  indented\n' },
+    { ...tenantLogEvent(2), kind: 'data', stream: 'stdout', text: '\n' },
+    { ...tenantLogEvent(GAP_SEQUENCE), kind: 'gap', droppedBytes: DROPPED_BYTES },
+  ]);
+  expect(requests).toHaveLength(1);
+  const records = requests[0]!.body
+    .trimEnd()
+    .split('\n')
+    .map((line) => Value.Parse(TenantLogRecordSchema, JSON.parse(line)));
+  expect(records.map((record) => record.sequence)).toEqual([1, 2, GAP_SEQUENCE]);
+  expect(records[0]).toMatchObject({ _msg: '  indented\n', cronJobId: CRON_JOB_ID });
+  expect(records[1]?._msg).toBe('\n');
+  expect(records[2]?.droppedBytes).toBe(DROPPED_BYTES);
+});
 
 function cronOutput(sequence: number): TenantLogEvent {
   return { ...tenantLogEvent(sequence), cronJobId: CRON_JOB_ID, cronRunId: CRON_RUN_ID };
