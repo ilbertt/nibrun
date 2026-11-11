@@ -77,9 +77,8 @@ http://{$API_HOSTNAME} {
 	}
 }
 
-# Container logs. Dozzle authenticates its own visitors (simple auth, prod only)
-# — the edge only gets them here, and deliberately does not add a second gate in
-# front of the login page.
+# Dozzle keeps its own login behind Cloudflare Access so a missing Access rule
+# cannot expose container logs.
 http://{$DOZZLE_HOSTNAME} {
 	# Log streaming is a websocket; reverse_proxy upgrades it as-is, and the
 	# retries below sit before the upgrade, where a dial that never connected is

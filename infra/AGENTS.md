@@ -86,6 +86,13 @@ revoking the first; `prevent_destroy` blocks revocation during an ordinary apply
 The control plane and nibrunner use Tunnels and need no origin certificates or Authenticated
 Origin Pulls. The control plane publishes only its VPC control and log-ingest listeners.
 
+Terraform protects the Dozzle and VictoriaLogs public hostnames with Cloudflare Access,
+allowing only members of `cloudflare_account_id` with 24-hour sessions. The account must
+already have a Zero Trust organization and the Cloudflare identity provider configured.
+`CLOUDFLARE_TERRAFORM_API_TOKEN` needs **Access: Apps and Policies Write** on that account.
+Dozzle's own login and VictoriaLogs' Caddy basic auth remain behind Access. The API's private
+log queries and the fleet's VPC log-ingest listener do not pass through Access.
+
 Sign-in needs a GitHub OAuth App whose callback URL is
 `https://<api_hostname>/api/auth/callback/github`.
 
