@@ -13,17 +13,36 @@ const CRON_RUN_ID = Value.Parse(CronRunIdSchema, 'cron-run-1');
 const DROPPED_BYTES = 1024;
 const GAP_SEQUENCE = 3;
 
-test('empty messages do not produce an upload, including cron output', async () => {
+test('an empty batch does not produce an upload', async () => {
   expect(await upload([])).toEqual([]);
-  expect(
-    await upload([
-      { ...tenantLogEvent(0), kind: 'data', stream: 'stdout', text: '' },
-      { ...cronOutput(1), kind: 'data', stream: 'stdout', text: '' },
-    ]),
-  ).toEqual([]);
 });
 
-test('mixed uploads skip empty messages and preserve formatting, identity and gaps', async () => {
+test('empty tenant and cron messages retain their records', async () => {
+  const requests = await upload([
+    { ...tenantLogEvent(0), kind: 'data', stream: 'stdout', text: '' },
+    { ...cronOutput(1), kind: 'data', stream: 'stdout', text: '' },
+  ]);
+  expect(requests).toHaveLength(1);
+  const records = requests[0]!.body
+    .trimEnd()
+    .split('\n')
+    .map(function parse(line) {
+      return Value.Parse(TenantLogRecordSchema, JSON.parse(line));
+    });
+  expect(
+    records.map(function message(record) {
+      return record._msg;
+    }),
+  ).toEqual(['', '']);
+  expect(
+    records.map(function sequence(record) {
+      return record.sequence;
+    }),
+  ).toEqual([0, 1]);
+  expect(records[1]?.cronJobId).toBe(CRON_JOB_ID);
+});
+
+test('mixed uploads preserve empty messages, formatting, identity and gaps', async () => {
   const requests = await upload([
     { ...tenantLogEvent(0), kind: 'data', stream: 'stdout', text: '' },
     { ...cronOutput(1), kind: 'data', stream: 'stdout', text: '  indented\n' },
@@ -35,10 +54,11 @@ test('mixed uploads skip empty messages and preserve formatting, identity and ga
     .trimEnd()
     .split('\n')
     .map((line) => Value.Parse(TenantLogRecordSchema, JSON.parse(line)));
-  expect(records.map((record) => record.sequence)).toEqual([1, 2, GAP_SEQUENCE]);
-  expect(records[0]).toMatchObject({ _msg: '  indented\n', cronJobId: CRON_JOB_ID });
-  expect(records[1]?._msg).toBe('\n');
-  expect(records[2]?.droppedBytes).toBe(DROPPED_BYTES);
+  expect(records.map((record) => record.sequence)).toEqual([0, 1, 2, GAP_SEQUENCE]);
+  expect(records[0]?._msg).toBe('');
+  expect(records[1]).toMatchObject({ _msg: '  indented\n', cronJobId: CRON_JOB_ID });
+  expect(records[2]?._msg).toBe('\n');
+  expect(records[3]?.droppedBytes).toBe(DROPPED_BYTES);
 });
 
 function cronOutput(sequence: number): TenantLogEvent {

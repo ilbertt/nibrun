@@ -94,7 +94,7 @@ test('a rejected upload leaves its position unchanged for retry', async () => {
   );
 });
 
-test('empty tenant and cron output advances the cursor without publishing or replaying', async () => {
+test('empty tenant and cron output is published once and advances the cursor', async () => {
   await run(
     Effect.gen(function* () {
       const { fs, file, delivery, cursors, requests } = yield* fixture;
@@ -114,14 +114,24 @@ test('empty tenant and cron output advances the cursor without publishing or rep
       expect(yield* delivery.send(input)).toBe(true);
       expect((yield* cursors.get(APP_ID))?.offset).toBe(Buffer.byteLength(lines));
       expect(yield* delivery.send(input)).toBe(false);
-      expect(requests).toEqual([]);
+      expect(requests).toHaveLength(1);
+      expect(
+        requests[0]?.map(function message(record) {
+          return record._msg;
+        }),
+      ).toEqual(['', '']);
+      expect(
+        requests[0]?.map(function sequence(record) {
+          return record.sequence;
+        }),
+      ).toEqual([0, 1]);
       yield* fs.writeFileString(
         file,
         `${lines}${JSON.stringify({ ...nibrunnerTenantLog(), sequence: 2 })}\n`,
       );
       yield* delivery.send(input);
-      expect(requests).toHaveLength(1);
-      expect(requests[0]?.map((record) => record.sequence)).toEqual([2]);
+      expect(requests).toHaveLength(2);
+      expect(requests[1]?.map((record) => record.sequence)).toEqual([2]);
     }),
   );
 });

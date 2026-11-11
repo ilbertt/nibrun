@@ -57,13 +57,12 @@ export function makeLogStoreClient({ baseUrl }: { baseUrl: string }): LogStoreCl
   return {
     publish: ({ events, hostId }) =>
       Effect.gen(function* () {
-        const records = events
-          .map((event) => tenantLogRecord({ event, hostId }))
-          .filter((record) => record._msg.length > 0);
-        if (records.length === 0) {
+        if (events.length === 0) {
           return;
         }
-        const body = records.map((record) => `${JSON.stringify(record)}\n`).join('');
+        const body = events
+          .map((event) => `${JSON.stringify(tenantLogRecord({ event, hostId }))}\n`)
+          .join('');
 
         const response = yield* Effect.tryPromise({
           try: (signal) =>
