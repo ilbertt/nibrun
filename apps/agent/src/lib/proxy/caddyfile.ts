@@ -17,18 +17,20 @@ export function renderAppSites(routes: readonly RouteTarget[]): string {
 }
 
 function siteBlock(route: RouteTarget): string | undefined {
-  const addresses = route.hostnames
+  const hostnames = route.hostnames
     .map((entry) => entry.hostname)
     // One unusable hostname would stop the whole file loading and take every app with it.
     .filter((hostname) => isValidMessage({ schema: HostnameSchema, value: hostname }))
-    .sort()
-    .map((hostname) => `https://${hostname}`);
-  if (addresses.length === 0) {
+    .map((hostname) => hostname.toLowerCase())
+    .sort();
+  if (hostnames.length === 0) {
     return undefined;
   }
+  const addresses = hostnames.map((hostname) => `https://${hostname}`);
+  const allowedSni = `{http.request.tls.server_name}.lowerAscii() in ${JSON.stringify(hostnames)}`;
   return [
     `${addresses.join(', ')} {`,
-    '\timport origin_tls',
+    `\timport origin_alias_tls \`${allowedSni}\``,
     `\treverse_proxy ${LOOPBACK}:${route.hostPort} {`,
     '\t\tlb_try_duration 5s',
     // Give unrelated streams a grace period while bounding retention of old proxy configs.
