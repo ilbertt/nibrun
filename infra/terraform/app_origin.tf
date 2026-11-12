@@ -1,5 +1,5 @@
 locals {
-  app_origin_hostnames = toset([var.app_host_domain, "*.${var.app_host_domain}"])
+  app_origin_hostnames = toset([var.app_host_domain, "*.${var.app_host_domain}", "fallback.${var.app_host_domain}"])
 }
 
 data "cloudflare_dns_records" "app_origin" {
