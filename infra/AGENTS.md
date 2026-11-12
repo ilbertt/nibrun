@@ -69,10 +69,9 @@ a rebuilt account to names its predecessor still holds for ~90 days.
 DNS, every record **proxied** (orange cloud):
 
 - Terraform manages the four control-plane hostnames as CNAMEs to the control-plane Tunnel.
-- Terraform manages `<app_domain>` and `*.<app_domain>` as CNAMEs to the nibrunner Tunnel and
-  retains `fallback.<app_domain>` as an A record pointing to the first app host. A fresh setup
-  creates these records; existing deployments keep their Terraform state so the same resources
-  remain managed after the migration imports are removed.
+- Terraform manages `<app_domain>` and `*.<app_domain>` as CNAMEs to the nibrunner Tunnel.
+  A fresh setup creates these records; existing deployments keep their Terraform state so the
+  same resources remain managed after the migration imports are removed.
 
 App-host origins use A records only. Cloudflare serves visitors over IPv6 from its own edge;
 the Tunnel needs no public origin address. App-host addresses outlive a replacement.
