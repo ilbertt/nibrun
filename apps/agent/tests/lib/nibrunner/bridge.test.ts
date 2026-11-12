@@ -24,6 +24,7 @@ import {
 import { Value } from '@sinclair/typebox/value';
 import { Deferred, Effect, Fiber, Layer, Schedule } from 'effect';
 import { makeControlPlaneClient } from '#lib/control/client.ts';
+import { writeTextFile } from '#lib/json-store.ts';
 import { makeNibrunnerBridge } from '#lib/nibrunner/bridge.ts';
 import { nibrunnerExportReports } from '#lib/nibrunner/exports.ts';
 import { makeNibrunnerFilesystem } from '#lib/nibrunner/filesystem.ts';
@@ -35,6 +36,7 @@ import { NibrunnerExports } from '#services/nibrunner-exports.service.ts';
 import { NibrunnerFilesystem } from '#services/nibrunner-filesystem.service.ts';
 import { NibrunnerGuestConnections } from '#services/nibrunner-guest-connections.service.ts';
 import { NibrunnerLogs } from '#services/nibrunner-logs.service.ts';
+import { ReportSignal } from '#services/report-signal.service.ts';
 import { artifactStore } from '#tests/support/artifacts.ts';
 import {
   APP_ID,
@@ -110,6 +112,9 @@ function fixture(initialDesired: HostDesiredState) {
           sqliteResults.push(Value.Parse(SqliteQueryResultSchema, await request.json()));
           return Response.json({});
         }
+        case 'cron-query': {
+          return Response.json({ result: 'none' });
+        }
         default:
           reports.push(Value.Parse(HostReportedStateSchema, await request.json()));
           return Response.json({});
@@ -168,6 +173,7 @@ function fixture(initialDesired: HostDesiredState) {
         config,
         control: makeControlPlaneClient({ baseUrl }),
       }).pipe(
+        Effect.provide(ReportSignal.Default),
         Effect.provideService(
           NibrunnerExports,
           NibrunnerExports.make({
@@ -246,6 +252,43 @@ test('registration rechecks acknowledgement before the normal report interval', 
       yield* fs.writeFileString(setup.config.reportedStateFile, JSON.stringify(native));
       expect(yield* bridge.reportOnce).toEqual(POLL_SETTINGS_FIXTURE);
       expect(setup.reports[1]?.state).toBe('ready');
+    }),
+  );
+});
+
+test('the running bridge forwards readiness changes across consecutive atomic report replacements', async () => {
+  await run(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const setup = yield* fixture(desiredState({ instances: [desiredInstance()] }));
+      const native: NibrunnerReport = JSON.parse(
+        yield* fs.readFileString(setup.config.reportedStateFile),
+      );
+      native.instances = [
+        {
+          appId: APP_ID,
+          deploymentId: DEPLOYMENT_ID,
+          state: 'starting',
+          compute: null,
+          restartCount: 0,
+        },
+      ];
+      yield* writeTextFile({ path: setup.config.reportedStateFile, value: JSON.stringify(native) });
+      const bridge = yield* setup.create.pipe(Effect.provide(artifactStore()));
+      const fiber = yield* Effect.forkScoped(bridge.run);
+      for (const state of ['starting', 'running', 'idle'] as const) {
+        native.instances = native.instances.map((instance) => ({ ...instance, state }));
+        yield* writeTextFile({
+          path: setup.config.reportedStateFile,
+          value: JSON.stringify(native),
+        });
+        yield* Effect.sync(() => setup.reports.at(-1)?.instances[0]?.state).pipe(
+          Effect.repeat({ schedule: Schedule.spaced('5 millis'), until: (sent) => sent === state }),
+          Effect.timeout('2 seconds'),
+        );
+        expect(setup.reports.at(-1)?.instances[0]?.state).toBe(state);
+      }
+      yield* Fiber.interrupt(fiber);
     }),
   );
 });

@@ -9,6 +9,7 @@ import { NibrunnerExports } from '#services/nibrunner-exports.service.ts';
 import { NibrunnerFilesystem } from '#services/nibrunner-filesystem.service.ts';
 import { NibrunnerGuestConnections } from '#services/nibrunner-guest-connections.service.ts';
 import { NibrunnerLogs } from '#services/nibrunner-logs.service.ts';
+import { ReportSignal } from '#services/report-signal.service.ts';
 
 export class NibrunnerBridge extends Effect.Service<NibrunnerBridge>()('NibrunnerBridge', {
   scoped: Effect.gen(function* () {
@@ -36,5 +37,6 @@ export class NibrunnerBridge extends Effect.Service<NibrunnerBridge>()('Nibrunne
     NibrunnerFilesystem.Default,
     NibrunnerGuestConnections.Default,
     NibrunnerLogs.Default,
+    ReportSignal.Default,
   ],
 }) {}
