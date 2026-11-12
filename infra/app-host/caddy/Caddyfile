@@ -90,7 +90,7 @@ https://{$APP_HOST_DOMAIN}, https://fallback.{$APP_HOST_DOMAIN} {
 		+Via "1.1 nibrun-legacy"
 		defer
 	}
-	reverse_proxy {NIBRUNNER_HTTP_ORIGIN}} {
+	reverse_proxy {{NIBRUNNER_HTTP_ORIGIN}} {
 		lb_try_duration 5s
 		stream_close_delay 5m
 	}
