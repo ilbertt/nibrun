@@ -1078,8 +1078,10 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(tool.inputSchema.properties.name).toEqual(
       JSON.parse(JSON.stringify(CreateAppRequestSchema.properties.name)),
     );
-    expect(tool.inputSchema.properties.config).toEqual(
-      JSON.parse(JSON.stringify(CreateAppRequestSchema.properties.config)),
+    expect(tool.inputSchema.properties.config.additionalProperties).toBe(false);
+    expect(tool.inputSchema.properties.config.properties).not.toHaveProperty('environment');
+    expect(tool.inputSchema.properties.config.properties.httpPort).toEqual(
+      JSON.parse(JSON.stringify(CreateAppRequestSchema.properties.config.properties.httpPort)),
     );
     const fetched = CreateArtifactBodySchema.anyOf
       .map((schema) => schema.properties)
@@ -1143,11 +1145,55 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(tool.outputSchema.properties.upload.required).toEqual(['artifactId', 'url']);
   });
 
+  test.each([
+    { name: MCP_TOOL_NAMES.deployApp, source: { url: BINARY_URL } },
+    {
+      name: MCP_TOOL_NAMES.prepareDeploy,
+      source: { filename: ARTIFACT.originalFileName, sizeBytes: ARTIFACT.sizeBytes },
+    },
+  ])(
+    'rejects environment values at the MCP boundary: $name',
+    async function rejectEnvironment({ name, source }) {
+      const token = await accessToken();
+      const listingResponse = await rpc({ method: 'tools/list', token, protocolVersion });
+      const listed = await rpcBody(listingResponse);
+      const tool = listed.result.tools.find((entry: { name: string }) => entry.name === name);
+      expect(tool.inputSchema.properties.config.additionalProperties).toBe(false);
+      expect(tool.inputSchema.properties.config.properties).not.toHaveProperty('environment');
+      expect(JSON.stringify(tool.inputSchema)).not.toContain('x-nibrun-secret');
+
+      const createApp = spyOn(appsService, 'create');
+      const createUpload = spyOn(artifactsService, 'create');
+      const fetchBinary = spyOn(artifactsService, 'createFromUrl');
+      const deploy = spyOn(deploymentsService, 'createWithMcpClient');
+      const response = await rpc({
+        method: 'tools/call',
+        params: {
+          name,
+          arguments: {
+            name: 'Needs configuration',
+            config: { httpPort: 8080, environment: { API_KEY: 'blocked-environment-value' } },
+            ...source,
+          },
+        },
+        token,
+        protocolVersion,
+      });
+      const body = await rpcBody(response);
+      expect(body.error ?? body.result?.isError).toBeTruthy();
+      expect(createApp).not.toHaveBeenCalled();
+      expect(createUpload).not.toHaveBeenCalled();
+      expect(fetchBinary).not.toHaveBeenCalled();
+      expect(deploy).not.toHaveBeenCalled();
+      expect(JSON.stringify(body)).not.toContain('blocked-environment-value');
+    },
+  );
+
   test.each([true, false])(
     'prepares an upload and deploys into the same app: new=%s',
     async (isNew) => {
       const app = ownedApp();
-      const config = { httpPort: 8080, environment: { API_KEY: 'initial-secret' } };
+      const config = { httpPort: 8080, args: ['serve'] };
       const target = isNew ? { name: app.name, config } : { appId: app.id };
       const createApp = spyOn(appsService, 'create').mockResolvedValue(app);
       const getApp = spyOn(appsService, 'get').mockResolvedValue(app);
@@ -1201,7 +1247,6 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       expect(complete).not.toHaveBeenCalled();
       expect(fetch).not.toHaveBeenCalled();
       expect(deploy).not.toHaveBeenCalled();
-      expect(JSON.stringify(result)).not.toContain('initial-secret');
       expect(JSON.stringify(result)).not.toContain(token);
       const deployedResponse = await rpc({
         method: 'tools/call',
@@ -1337,7 +1382,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     { source: { url: BINARY_URL }, config: undefined },
     {
       source: { binary: NATIVE_BINARY },
-      config: { httpPort: 8080, environment: { API_KEY: 'initial-secret' } },
+      config: { httpPort: 8080, args: ['serve'] },
     },
   ])('creates an app and redeploys it using the returned ID: %j', async ({ source, config }) => {
     const app = ownedApp();
@@ -1376,7 +1421,6 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     });
     expect(create.mock.invocationCallOrder[0]).toBeLessThan(fetch.mock.invocationCallOrder[0]!);
     expect(fetch.mock.invocationCallOrder[0]).toBeLessThan(deploy.mock.invocationCallOrder[0]!);
-    expect(JSON.stringify(result)).not.toContain('initial-secret');
     const redeployResponse = await rpc({
       method: 'tools/call',
       params: {

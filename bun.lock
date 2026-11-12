@@ -208,7 +208,7 @@
     },
     "packages/chatgpt-plugin": {
       "name": "@repo/chatgpt-plugin",
-      "version": "0.1.4",
+      "version": "0.1.6",
       "dependencies": {
         "@repo/api-constants": "workspace:*",
         "@repo/global-constants": "workspace:*",

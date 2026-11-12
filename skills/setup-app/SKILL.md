@@ -22,4 +22,6 @@ before choosing a different starting point.
 Verify with build checks and HTTP/API requests. Use a browser for testing only when the user
 asks for browser or visual testing.
 
-Then read [deploy-to-nibrun](../deploy-to-nibrun/SKILL.md) to compile and deploy it.
+Do not ask for passwords, API keys or tokens in chat, or embed them in source, binaries or archives.
+Then read [deploy-to-nibrun](../deploy-to-nibrun/SKILL.md) to compile and deploy the app, with
+required credentials configured by the user directly in the dashboard.
