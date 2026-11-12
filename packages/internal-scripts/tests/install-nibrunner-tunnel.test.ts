@@ -39,6 +39,11 @@ case "$(basename "$0")" in
     ;;
   systemctl)
     printf '%s\\n' "$*" >> "$TEST_SYSTEMCTL_LOG"
+    case "$1" in
+      show) printf '%s\\n' "$TEST_INVOCATION_ID" ;;
+      is-active) test -f "$TEST_ACTIVE_MARKER" ;;
+      restart) touch "$TEST_ACTIVE_MARKER" ;;
+    esac
     ;;
   cloudflared)
     exit "$TEST_READY_EXIT_CODE"
@@ -76,6 +81,8 @@ function runInstall(overrides: Record<string, string>) {
       TEST_SSM_EXIT_CODE: '0',
       TEST_READY_EXIT_CODE: '0',
       TEST_SYSTEMCTL_LOG: join(fixtureRoot, 'systemctl.log'),
+      TEST_ACTIVE_MARKER: join(fixtureRoot, 'service-active'),
+      TEST_INVOCATION_ID: 'active-tunnel-generation',
       ...overrides,
     },
   });
@@ -127,4 +134,50 @@ test('fails deployment when the connector cannot reach Cloudflare', function rej
   const result = runInstall({ TEST_READY_EXIT_CODE: '1' });
   expect(result.exitCode).not.toBe(0);
   expect(result.stderr.toString()).toContain('the Cloudflare Tunnel did not become ready');
+});
+
+function restartCount() {
+  return readFileSync(join(fixtureRoot, 'systemctl.log'), 'utf8')
+    .split('\n')
+    .filter(function restarted(line) {
+      return line === 'restart nibrun-nibrunner-tunnel.service';
+    }).length;
+}
+
+test('keeps a verified unchanged connector running during repeated deployments', function preservesConnections() {
+  expect(runInstall({}).exitCode).toBe(0);
+  expect(restartCount()).toBe(1);
+  expect(runInstall({}).exitCode).toBe(0);
+  expect(restartCount()).toBe(1);
+});
+
+function expectRestart(overrides: Record<string, string>) {
+  const before = restartCount();
+  expect(runInstall(overrides).exitCode).toBe(0);
+  expect(restartCount()).toBe(before + 1);
+}
+
+test('restarts when the token, unit, or connector binary changes', function appliesChangedInputs() {
+  expect(runInstall({}).exitCode).toBe(0);
+  const rotated = { TEST_TUNNEL_TOKEN: 'rotated-token' };
+  expectRestart(rotated);
+
+  const unit = join(fixtureRoot, 'nibrun-nibrunner-tunnel.service');
+  writeFileSync(unit, readFileSync(unit, 'utf8').replace('RestartSec=5', 'RestartSec=6'));
+  expectRestart(rotated);
+
+  const executable = join(fixtureRoot, 'bin/host-command');
+  writeFileSync(executable, `${readFileSync(executable, 'utf8')}\n:\n`);
+  expectRestart(rotated);
+});
+
+test('retries an activation that failed readiness and recovers an inactive connector', function retriesActivation() {
+  expect(runInstall({ TEST_READY_EXIT_CODE: '1' }).exitCode).not.toBe(0);
+  expect(runInstall({}).exitCode).toBe(0);
+  expect(restartCount()).toBe(2);
+
+  rmSync(join(fixtureRoot, 'service-active'));
+  expectRestart({});
+
+  expectRestart({ TEST_INVOCATION_ID: 'unverified-generation' });
 });
