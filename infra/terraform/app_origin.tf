@@ -1,6 +1,5 @@
 locals {
-  legacy_fallback_hostname = "fallback.${var.app_host_domain}"
-  app_origin_hostnames     = toset([var.app_host_domain, "*.${var.app_host_domain}", local.legacy_fallback_hostname])
+  app_origin_hostnames = toset([var.app_host_domain, "*.${var.app_host_domain}"])
 }
 
 data "cloudflare_dns_records" "app_origin" {
@@ -22,8 +21,8 @@ resource "cloudflare_dns_record" "app_origin" {
 
   zone_id = data.cloudflare_zone.app_host.id
   name    = each.value
-  type    = each.value == local.legacy_fallback_hostname ? "A" : "CNAME"
-  content = each.value == local.legacy_fallback_hostname ? aws_eip.app_host[0].public_ip : local.nibrunner_tunnel_hostname
+  type    = "CNAME"
+  content = local.nibrunner_tunnel_hostname
   proxied = true
   ttl     = 1
 
