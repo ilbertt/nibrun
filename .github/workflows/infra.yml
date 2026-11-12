@@ -81,8 +81,6 @@ jobs:
           TF_VAR_nibrunner_domain: ${{ vars.NIBRUNNER_ORIGIN_DOMAIN }}
           TF_VAR_cloudflare_account_id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           TF_VAR_cloudflare_terraform_api_token: ${{ secrets.CLOUDFLARE_TERRAFORM_API_TOKEN }}
-          # Cloudflare replaces the wildcard when its type changes from A to CNAME.
-          ALLOWED_TERRAFORM_DESTROY_ADDRESSES: 'cloudflare_dns_record.app_origin["*.${{ vars.APP_DOMAIN }}"]'
         run: bun run --filter @repo/internal-scripts terraform-plan
 
   terraform-fork-guard:
