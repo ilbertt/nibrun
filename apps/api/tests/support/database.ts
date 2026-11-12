@@ -37,8 +37,11 @@ export async function startTestDatabase(): Promise<SQL> {
 }
 
 export async function stopTestDatabase(sql: SQL | undefined): Promise<void> {
-  await sql?.end();
-  await compose(['down']);
+  try {
+    await sql?.end();
+  } finally {
+    await compose(['down', '--volumes']);
+  }
 }
 
 async function compose(args: string[]): Promise<void> {

@@ -8,7 +8,11 @@
       "outputs": ["dist/**", "public/**"]
     },
     "test": {
-      "inputs": ["$TURBO_DEFAULT$", "$TURBO_ROOT$/skills/**"]
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/skills/**",
+        "$TURBO_ROOT$/docker-compose.test.yml"
+      ]
     }
   }
 }
