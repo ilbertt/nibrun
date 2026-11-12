@@ -1,5 +1,4 @@
-import type { AppId } from '@repo/protocol';
-import { Duration, Effect, Option } from 'effect';
+import { Duration, Effect } from 'effect';
 import { CONTROL_PLANE_BACKOFF } from '#lib/agent/backoff.ts';
 import { supervised } from '#lib/agent/loop.ts';
 import { nowTimestamp } from '#lib/clock.ts';
@@ -10,36 +9,11 @@ import {
   readAvailableCacheBytes,
   readHostCapacity,
 } from '#lib/report/capacity.ts';
-import type { InstanceRecord } from '#lib/report/instance-record.ts';
-import type { PublicAddress } from '#lib/vm/instance-env.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
 import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
 import { AgentState } from '#services/agent-state.service.ts';
 import { ControlPlane } from '#services/control-plane.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
-import { SlotAllocator } from '#services/slot-allocator.service.ts';
-
-/**
- * Resolved here rather than kept on the record: the port belongs to the slot the app holds and
- * the address to the relay this host was configured with, so reading both at report time is what
- * makes giving a port up show up in the next report rather than at the next boot.
- */
-const publicAddresses = (records: readonly InstanceRecord[]) =>
-  Effect.gen(function* () {
-    const config = yield* AgentConfig;
-    const allocator = yield* SlotAllocator;
-    const reached = new Map<AppId, PublicAddress>();
-    for (const record of records.filter((one) => one.hasExtraPublicPort)) {
-      const slot = yield* allocator.lookup(record.appId);
-      if (Option.isSome(slot)) {
-        reached.set(record.appId, {
-          ipv4: config.portRelayPublicIpv4,
-          port: slot.value.extraPublicPort,
-        });
-      }
-    }
-    return reached;
-  });
 
 /**
  * The floor a raise cannot get under. Without it an instance flapping between two states would
@@ -59,7 +33,6 @@ const report = Effect.gen(function* () {
     stateDir: config.stateDir,
     zerofsConfigFile: config.zerofsConfigFile,
   });
-  const reachedAt = yield* publicAddresses(records);
 
   yield* control.sendReportedState({
     sessionToken: session.sessionToken,
@@ -75,7 +48,7 @@ const report = Effect.gen(function* () {
       }),
       versions: sessions.versions,
       records,
-      reachedAt,
+      reachedAt: new Map(),
       volumes: current.volumeReports,
       volumeUsage: current.volumeUsage,
       computeUsage: current.computeUsage,

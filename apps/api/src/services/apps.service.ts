@@ -194,8 +194,8 @@ export class AppsService extends Service {
     name: AppName;
     config?: NewAppConfig;
   }): Promise<PublicApp> {
-    const asked = { ...configWithDefaults(config), environment: config?.environment ?? {} };
-    const { environment, ...withDefaults } = isAnonymous ? withoutExtraPort(asked) : asked;
+    const withDefaults = configWithDefaults(config);
+    const environment = config?.environment ?? {};
     refuseRedactedValues(environment);
     refuseValuesNeedingAPort({
       environment,
@@ -728,25 +728,6 @@ function refuseValuesNeedingAPort({
       `${EXTRA_PUBLIC_PORT_VALUES.map((value) => interpolableRuntimeValue(value.name)).join(' and ')} are only set for an app with a public port besides HTTP, which this one has not asked for: ${naming.join(', ')}.`,
     );
   }
-}
-
-type AskedAppConfig = Omit<PublicAppConfig, 'environment'> & { environment: TenantEnvironment };
-
-/**
- * A port besides HTTP is a raw listener on the public internet, and a person with no identity is
- * handed nothing that reaches past the HTTPS the platform terminates for them. Taken away rather
- * than refused, so a link written for the port — sharkord's — still deploys; and the values naming
- * it go with it, because the guest fails a boot over a reference it was not given. Only creation
- * asks: changing an app is not a stranger's to do at all.
- */
-function withoutExtraPort(config: AskedAppConfig): AskedAppConfig {
-  return {
-    ...config,
-    hasExtraPublicPort: false,
-    environment: Object.fromEntries(
-      Object.entries(config.environment).filter(([, value]) => !namesExtraPublicPortValues(value)),
-    ),
-  };
 }
 
 // An app the caller does not own is indistinguishable from one that does not exist; a 403 would

@@ -20,7 +20,7 @@ const SERVICE_UNAVAILABLE_STATUS = 503;
 const FORBIDDEN_STATUS = 403;
 const APPS_ALLOWED = 3;
 const ASKED_TOTAL = 10;
-const APP_REQUEST_TYPES = ['custom-bucket', 'always-on'] as const;
+const APP_REQUEST_TYPES = ['custom-bucket', 'always-on', 'extra-public-port'] as const;
 const NO_RESOURCE_OPTIONS = {
   'requested-vcpu-count': undefined,
   'requested-memory-mib': undefined,

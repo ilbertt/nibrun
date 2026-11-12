@@ -71,7 +71,8 @@ the layout under `src/commands/` is the command tree.
   point to this command.
 - `nib paid-request --type always-on --app <name-or-slug>` and `--type custom-bucket`
   record interest for the selected app without enabling the feature or charging.
-  Both use the shared app selector: a terminal can choose an app, while scripts and
+  `--type extra-public-port` records the same app-scoped interest for an extra TCP/UDP port.
+  These use the shared app selector: a terminal can choose an app, while scripts and
   `--json` require `--app`. Their JSON results include the request type and app ID.
 - `nib paid-request --type resources --app <name-or-slug>` uses the same app-scoped
   flow with `--requested-vcpu-count`, `--requested-memory-mib`, and

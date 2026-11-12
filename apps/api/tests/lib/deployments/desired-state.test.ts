@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol/runtime-values';
 import type { Queries } from '#db/queries.gen.ts';
 import type { AppActivation, AppState } from '#lib/api/app.ts';
 import type { DeploymentState } from '#lib/api/deployment.ts';
@@ -72,6 +73,29 @@ describe('what a host is told to run with', () => {
     });
 
     expect(instance.config.environment).toEqual({ OPENCLAW_STATE_DIR: SECRET } as never);
+  });
+
+  test('extra port settings stay stored without activating a port or forwarding unresolved references', () => {
+    const row = { ...deploymentRow(), has_extra_public_port: true };
+    const sealed = sealEnvironment({
+      key: TEST_SECRETS_KEY,
+      environment: {
+        ANNOUNCED_IP: interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name),
+        WEBRTC_PORT: interpolableRuntimeValue(RUNTIME_VALUES.EXTRA_PUBLIC_PORT.name),
+        OPENCLAW_STATE_DIR: SECRET,
+      } as never,
+    });
+    const instance = toDesiredInstance({
+      row,
+      hostnames: new Map(),
+      environments: new Map([[DEPLOYMENT, sealed]]),
+      secretsKey: TEST_SECRETS_KEY,
+    });
+
+    expect(instance.config.hasExtraPublicPort).toBe(false);
+    expect(instance.config.environment).toEqual({ OPENCLAW_STATE_DIR: SECRET } as never);
+    expect(row.has_extra_public_port).toBe(true);
+    expect(sealed).toHaveProperty('ANNOUNCED_IP');
   });
 
   test('an instance nothing was stored for runs with none', () => {

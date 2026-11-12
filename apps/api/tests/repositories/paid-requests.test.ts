@@ -88,6 +88,9 @@ test('the upgrade preserves valid requests and requires app IDs for app features
       [OWNER_ID],
     );
     await transaction.unsafe(await migrations.get('0076_resources_paid_requests.sql')!.text());
+    await transaction.unsafe(
+      await migrations.get('0085_extra_public_port_paid_requests.sql')!.text(),
+    );
     const after = await transaction.unsafe(
       'SELECT id, request_type, requested_apps_amount, app_id FROM nibrun.paid_requests WHERE owner_id = $1 ORDER BY request_type',
       [OWNER_ID],

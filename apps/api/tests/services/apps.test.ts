@@ -18,6 +18,7 @@ import {
   TimestampSchema,
   VolumeIdSchema,
 } from '@repo/protocol';
+import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol/runtime-values';
 import { Value } from '@sinclair/typebox/value';
 import { SQL } from 'bun';
 import { schema } from '#db/queries.gen.ts';
@@ -37,7 +38,7 @@ import {
   TooManyRequestsError,
 } from '#lib/errors.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
-import { openSecret, sealedFromStore } from '#lib/tenant-secrets.ts';
+import { openEnvironment, openSecret, sealedFromStore } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import type {
   AppHostnameRow,
@@ -1664,58 +1665,32 @@ describe("what a stranger held becomes the person's who they signed in as", () =
   });
 });
 
-/**
- * A raw listener on the public internet is not handed to a person with no identity. The ask is
- * dropped rather than refused, and the values that would name the port go with it: a link written
- * for one still deploys, and the guest is never asked to expand a reference it was not given.
- */
-describe('a stranger is not given a public port besides HTTP', () => {
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being dropped, not an interpolation
-  const ANNOUNCED_IP = '${NIBRUN_PUBLIC_IPV4}';
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being dropped, not an interpolation
-  const WEBRTC_PORT = '${NIBRUN_EXTRA_PUBLIC_PORT}';
-
-  test('an app created asking for one is made without it', async () => {
+describe('anonymous deployments retain extra port settings for a later paid request', () => {
+  test('a recipe keeps the port setting and its environment references', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
-
+    const environment = asEnvironment({
+      ANNOUNCED_IP: interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name),
+      WEBRTC_PORT: interpolableRuntimeValue(RUNTIME_VALUES.EXTRA_PUBLIC_PORT.name),
+      TOKEN: SECRET,
+    });
     const app = await serviceWith({ appsRepo }).create({
       ownerId: OWNER_ID,
       isAnonymous: true,
       name: APP_NAME,
-      config: { hasExtraPublicPort: true },
+      config: { hasExtraPublicPort: true, environment },
     });
 
-    expect(app.config.hasExtraPublicPort).toBe(false);
-    expect(appsRepo.offeredConfigs).toEqual([DEFAULT_STORED_CONFIG]);
-  });
-
-  test('the values that would name the port go with it, and the rest stay', async () => {
-    const appsRepo = new StubAppsRepository({ failures: 0 });
-
-    const app = await serviceWith({ appsRepo }).create({
-      ownerId: OWNER_ID,
-      isAnonymous: true,
-      name: APP_NAME,
-      config: {
-        hasExtraPublicPort: true,
-        environment: asEnvironment({ ANNOUNCED_IP, WEBRTC_PORT, TOKEN: SECRET }),
-      },
+    expect(app.config.hasExtraPublicPort).toBe(true);
+    expect(app.config.environment).toEqual({
+      ANNOUNCED_IP: REDACTED,
+      WEBRTC_PORT: REDACTED,
+      TOKEN: REDACTED,
     });
-
-    expect(app.config.environment).toEqual({ TOKEN: REDACTED });
-    expect(Object.keys(appsRepo.offeredConfigs[0]?.environment ?? {})).toEqual(['TOKEN']);
-  });
-
-  test('an app created without asking is theirs', async () => {
-    const appsRepo = new StubAppsRepository({ failures: 0 });
-
-    const app = await serviceWith({ appsRepo }).create({
-      ownerId: OWNER_ID,
-      isAnonymous: true,
-      name: APP_NAME,
-    });
-
-    expect(app.config.hasExtraPublicPort).toBe(false);
+    const stored = appsRepo.offeredConfigs[0];
+    expect(stored?.hasExtraPublicPort).toBe(true);
+    expect(openEnvironment({ key: TEST_SECRETS_KEY, sealed: stored?.environment ?? {} })).toEqual(
+      environment,
+    );
   });
 });
 

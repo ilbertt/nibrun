@@ -23,6 +23,7 @@ const REQUEST_TYPES = [
   'custom-bucket',
   'always-on',
   'resources',
+  'extra-public-port',
 ] as const satisfies readonly PaidRequestType[];
 type CliPaidRequestType = (typeof REQUEST_TYPES)[number];
 
@@ -91,6 +92,7 @@ export const PAID_REQUEST_OUTPUT = defineOutput({
     const requestedFeatures = {
       'always-on': `keep app ${value.appId} always on`,
       'custom-bucket': `use your own S3-compatible bucket for app ${value.appId}`,
+      'extra-public-port': `use an extra public TCP/UDP port for app ${value.appId}`,
     } satisfies Record<z.infer<typeof AppFeatureRequestTypeSchema>, string>;
     out.success(
       `Thanks! We recorded your request to ${requestedFeatures[value.requestType]}. This does not enable the feature or charge you.`,

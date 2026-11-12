@@ -94,14 +94,12 @@ describe('the forward is what decides whether a port reaches the guest', () => {
     ));
 });
 
-describe('an app is forwarded the port it asked for and no other', () => {
-  test('one that asked takes the port its slot names', () =>
+describe('extra public ports stay inactive', () => {
+  test('a persisted request cannot open an extra public port', () =>
     run(
       Effect.gen(function* () {
         const [forwarded] = yield* forwardsFor([instanceRecord({ hasExtraPublicPort: true })]);
-        const slot = Option.getOrThrow(yield* (yield* SlotAllocator).lookup(APP_ID));
-
-        expect(forwarded?.extraPublicPort).toBe(slot.extraPublicPort);
+        expect(forwarded && 'extraPublicPort' in forwarded).toBe(false);
       }),
     ));
 

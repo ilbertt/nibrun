@@ -9,6 +9,7 @@ import {
   type VolumeId,
   VolumeIdSchema,
 } from '@repo/protocol';
+import { namesExtraPublicPortValues } from '@repo/protocol/runtime-values';
 import { Value } from '@sinclair/typebox/value';
 import type { Queries } from '#db/queries.gen.ts';
 import { toRunConfig } from '#lib/app-config.ts';
@@ -178,6 +179,12 @@ function toDesiredConfig({
 }): AppConfig {
   return {
     ...toRunConfig(row),
-    environment: openEnvironment({ key: secretsKey, sealed }),
+    hasExtraPublicPort: false,
+    // Recipes retain these references in storage, but the guest cannot resolve them until a port is active.
+    environment: Object.fromEntries(
+      Object.entries(openEnvironment({ key: secretsKey, sealed })).filter(
+        ([, value]) => !namesExtraPublicPortValues(value),
+      ),
+    ),
   };
 }

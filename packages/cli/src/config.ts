@@ -57,7 +57,7 @@ export const SHARED_OPTIONS = {
     name: EXTRA_PUBLIC_PORT_FLAG,
     option: {
       schema: z.boolean().optional(),
-      description: `Give the app a public TCP and UDP port of its own, for a protocol HTTPS cannot carry. The number is assigned rather than chosen, and the guest is told which address and port it was given. Pass --${EXTRA_PUBLIC_PORT_FLAG}=false to give it up.`,
+      description: `Save that the app needs an extra public TCP/UDP port. This upcoming paid feature stays inactive. Request it in the dashboard or with paid-request --type extra-public-port. Pass --${EXTRA_PUBLIC_PORT_FLAG}=false to clear the setting.`,
     },
   },
   unset: {

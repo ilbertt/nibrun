@@ -50,7 +50,6 @@ export const forwardedInstances = Effect.gen(function* () {
         appId: record.appId,
         hostPort: slot.value.hostPort,
         httpPort: record.httpPort,
-        ...(record.hasExtraPublicPort && { extraPublicPort: slot.value.extraPublicPort }),
         hostIpv4: slot.value.hostIpv4,
         guestIpv4: slot.value.guestIpv4,
       });

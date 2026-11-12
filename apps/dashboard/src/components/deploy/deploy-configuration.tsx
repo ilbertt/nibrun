@@ -1,10 +1,5 @@
 import type { DeploySuggestion } from '@repo/deploy-link';
 import {
-  EXTRA_PUBLIC_PORT_VALUES,
-  interpolableRuntimeValue,
-  RUNTIME_VALUES,
-} from '@repo/protocol/runtime-values';
-import {
   Accordion,
   AccordionContent,
   AccordionItem,
@@ -47,8 +42,7 @@ export function DeployConfiguration({
   form: DeployFormState;
   suggested: DeploySuggestion | undefined;
 }) {
-  const { api, locked, replacing, defaultPort, defaultExtraPublicPort, defaultArgs, portOffered } =
-    form;
+  const { api, locked, replacing, defaultPort, defaultExtraPublicPort, defaultArgs } = form;
 
   return (
     <>
@@ -93,13 +87,12 @@ export function DeployConfiguration({
                     id="deploy-extra-public-port"
                     checked={field.state.value ?? defaultExtraPublicPort}
                     onCheckedChange={(checked) => field.handleChange(checked)}
-                    disabled={!portOffered}
                   />
                   <FieldContent>
                     <FieldLabel htmlFor="deploy-extra-public-port">
-                      Give this app a public port besides HTTPS
+                      This app needs a public port besides HTTPS
                     </FieldLabel>
-                    {portOffered ? <ExtraPublicPortExplained /> : <ExtraPublicPortAfterSigningIn />}
+                    <ExtraPublicPortExplained />
                   </FieldContent>
                 </Field>
               )}
@@ -257,43 +250,14 @@ function ExtraPublicPortExplained() {
   return (
     <>
       <FieldDescription>
-        One port, TCP and UDP, for a protocol HTTPS cannot carry — WebRTC media, a game server,
-        anything that has to be reached directly.
+        One additional TCP/UDP port for protocols HTTPS cannot carry. This is an upcoming paid
+        feature and will not be activated by deploying.
       </FieldDescription>
       <FieldDescription>
-        You do not pick the number. nibrun assigns it and sets these for the app:
-      </FieldDescription>
-      <ul className="list-disc space-y-1 pt-2 pb-3 pl-4 text-muted-foreground text-sm">
-        {EXTRA_PUBLIC_PORT_VALUES.map(({ name, description }) => (
-          <li key={name}>
-            <code className="font-mono">{name}</code> — {description}
-          </li>
-        ))}
-      </ul>
-      <FieldDescription>
-        Your own variables may name them — set{' '}
-        <code className="font-mono">
-          ANNOUNCED_IP={interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name)}
-        </code>{' '}
-        and the app reads it under the name it already expects.
-      </FieldDescription>
-      <FieldDescription>
-        Free for now, and likely to become part of a paid plan later.
+        We’ll save this setting. After deploying, use Request extra port in the app’s configuration
+        to let us know you’re interested.
       </FieldDescription>
     </>
-  );
-}
-
-/**
- * Greyed rather than gone, as every other thing a stranger is not offered: the box says what
- * signing in gets, and that a link asking for the port is answered without one until then.
- */
-function ExtraPublicPortAfterSigningIn() {
-  return (
-    <FieldDescription>
-      Sign in to open one. An app made without an account is deployed without it, whatever the link
-      asked for.
-    </FieldDescription>
   );
 }
 
