@@ -9,9 +9,15 @@ nibrun takes one compiled binary and gives it a microVM of its own, a persistent
 an HTTPS URL. No Dockerfile, no YAML, no cluster.
 
 Build for Linux x86_64, deploy through nibrun's MCP server or CLI, then ask the URL for something.
+
 What that path does not need is below it: [copying an app](#copying-an-app), [the guest contract](#the-guest-contract),
 [naming a runtime value](#naming-a-runtime-value), [a second public port](#a-second-public-port),
 [cron jobs](#cron-jobs), and [what nibrun does not do](#tradeoffs).
+
+Never ask users to paste credentials into chat or pass them through MCP, command arguments,
+source files, compiled binaries or archives. Users enter credentials directly in the nibrun
+dashboard or the destination app's setup page. Reuse configured credentials without reading or
+returning their values.
 
 For CI deployments, start at [GitHub Actions](#github-actions).
 
@@ -85,9 +91,16 @@ is what keeps an address across that.
 ### With MCP
 
 Choose the app: supply a `name` and optional initial `config` to create one, or an `appId` to
-redeploy an existing app. Initial configuration includes the environment, arguments and HTTP port
-needed on first boot. Existing apps reuse their saved configuration. Reuse the returned `app.id`
-as `appId` for subsequent deployments; a name creates a new app.
+redeploy an existing app. Initial configuration includes the arguments and HTTP port needed on
+first boot. Environment values are not accepted through MCP; existing apps reuse their saved
+configuration. Reuse the returned `app.id` as `appId` for subsequent deployments; a name creates
+a new app.
+
+If the app needs environment variables before its first boot, call `prepare_deploy` to create it
+without deploying. Give the user its dashboard link, `https://app.nibrun.com/apps/<appId>`,
+where they enter the values directly under **Environment variables**. Wait for their confirmation,
+then deploy using that `appId`. Native file binding can still be used for the binary; direct
+uploads use the prepared artifact as described below.
 
 Include `chatId` in `deploy_app` when your current chat ID is available; omit it rather than
 guessing. Without it, nibrun records the client's `_meta["openai/session"]` when available.
@@ -164,7 +177,8 @@ the app supports and what can run on the local machine:
 2. If supported, seed a dedicated data folder using the app's documented initialization command,
    or run the local build bound to `127.0.0.1`, complete admin setup, and stop it cleanly.
 3. Deploy the seeded folder with `--data-folder`, using the Linux x86_64 binary. Supply any
-   encryption keys or other environment values the saved data needs on this first deploy.
+   required environment values through the dashboard before the first deploy, without sharing
+   credentials in chat.
 4. Check the public app requires the configured login and no longer offers an initial admin claim.
 
 ```sh
@@ -192,10 +206,10 @@ For a local binary, the CLI skips uploading when that app already has an artifac
 bytes and filename. It still creates a new deployment with the configuration you supplied.
 
 Environment variables are an **edit**, not a replacement — anything a deploy does not name is left
-alone, so secrets are set once:
+alone. For non-sensitive configuration:
 
 ```sh
-nib run ./my-server --app my-app --env STRIPE_SECRET_KEY=sk_live_...
+nib run ./my-server --app my-app --env LOG_LEVEL=info
 ```
 
 Arguments for the binary go inside the quotes, not after them:
