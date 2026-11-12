@@ -17,7 +17,11 @@
     },
     "test": {
       "dependsOn": [],
-      "env": ["RUNTIME_TEST_PLATFORM"]
+      "env": [
+        "RUNTIME_TEST_PLATFORM",
+        "NIBRUN_TEST_ISOLATION",
+        "NIBRUN_TEST_NETWORK_PROBES"
+      ]
     }
   }
 }

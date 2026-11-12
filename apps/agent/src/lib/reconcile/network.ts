@@ -59,11 +59,6 @@ export const forwardedInstances = Effect.gen(function* () {
   return forwarded;
 });
 
-/**
- * A failed apply leaves whatever was already in the kernel, because `nft -f` replaces the table
- * in one transaction. Tearing down running tenants over a transient failure would be the bigger
- * outage — refusing to add new ones is the part that has to hold.
- */
 export const applyNetworkStrict = Effect.gen(function* () {
   const config = yield* AgentConfig;
   const firewall = yield* HostFirewall;

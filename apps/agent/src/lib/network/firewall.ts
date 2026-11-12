@@ -192,7 +192,7 @@ function forwardChainV4({ controlPlaneCidrsV4 }: FirewallState): string[] {
     header: 'forward {',
     rules: [
       'type filter hook forward priority filter; policy accept;',
-      'ct state established,related accept',
+      'ct direction reply ct state established,related accept',
       `iifname ${TAP_MATCH} ip daddr ${INSTANCE_METADATA_ADDRESS_V4} ${DENY} comment "instance metadata endpoint"`,
       `iifname ${TAP_MATCH} oifname ${TAP_MATCH} ${DENY} comment "guest to guest"`,
       `iifname ${TAP_MATCH} ip daddr ${GUEST_NETWORK_CIDR} ${DENY} comment "guest to guest"`,
@@ -210,7 +210,7 @@ function inputChainV4(): string[] {
     header: 'input {',
     rules: [
       'type filter hook input priority filter; policy accept;',
-      `iifname ${TAP_MATCH} ct state established,related accept`,
+      `iifname ${TAP_MATCH} ct direction reply ct state established,related accept`,
       `iifname ${TAP_MATCH} ${DENY} comment "guest to host"`,
     ],
   });
@@ -222,7 +222,7 @@ function forwardChainV6({ controlPlaneCidrsV6 }: FirewallState): string[] {
     header: 'forward {',
     rules: [
       'type filter hook forward priority filter; policy accept;',
-      'ct state established,related accept',
+      'ct direction reply ct state established,related accept',
       `iifname ${TAP_MATCH} ip6 daddr ${INSTANCE_METADATA_ADDRESS_V6} ${DENY} comment "instance metadata endpoint"`,
       `iifname ${TAP_MATCH} oifname ${TAP_MATCH} ${DENY} comment "guest to guest"`,
       ...controlPlaneCidrsV6.map(
@@ -238,7 +238,7 @@ function inputChainV6(): string[] {
     header: 'input {',
     rules: [
       'type filter hook input priority filter; policy accept;',
-      `iifname ${TAP_MATCH} ct state established,related accept`,
+      `iifname ${TAP_MATCH} ct direction reply ct state established,related accept`,
       `iifname ${TAP_MATCH} ${DENY} comment "guest to host"`,
     ],
   });
