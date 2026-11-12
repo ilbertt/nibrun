@@ -94,6 +94,22 @@ test('a standby host receives no apps, volumes or exports', async () => {
   });
 });
 
+test('health reports leave the serialized desired state unchanged', async function stableDesiredState() {
+  const hostId = await registerHost({ sql, originId: 'stable-order-host' });
+  const apps = [];
+  for (const name of ['ordering-first', 'ordering-second', 'ordering-third']) {
+    apps.push(await createHostedApp({ name, hostId }));
+  }
+  const agent = repository();
+  const before = JSON.stringify(await agent.desiredState({ hostId }));
+  for (const app of apps) {
+    await sql.unsafe('UPDATE nibrun.deployments SET last_healthy_at = now() WHERE id = $1', [
+      app.deploymentId,
+    ]);
+    expect(JSON.stringify(await agent.desiredState({ hostId }))).toBe(before);
+  }
+});
+
 test('current execution lookup is scoped to the app owner', async () => {
   const hosts = new DeploymentHostsRepository(withTypes<Queries>(sql));
   expect(await hosts.currentForApp({ appId: source.appId, ownerId: source.ownerId })).toEqual({

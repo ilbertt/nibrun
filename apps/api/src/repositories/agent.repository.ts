@@ -151,6 +151,7 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
                  activation, idle_timeout_ms, deployment_state
           FROM nibrun.desired_deployments
           WHERE id IN (SELECT deployment_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
+          ORDER BY app_id, id
         `,
         sql.SelectDesiredVolumes`
           SELECT v.app_id, v.state,
@@ -172,14 +173,17 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
             LIMIT 1
           ) s ON true
           WHERE v.app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
+          ORDER BY v.app_id
         `,
         sql.SelectDesiredHostnames`
           SELECT app_id, hostname, kind FROM nibrun.desired_hostnames
           WHERE app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
+          ORDER BY app_id, hostname
         `,
         sql.SelectDesiredEnvironment`
           SELECT deployment_id, name, value FROM nibrun.desired_environment
           WHERE deployment_id IN (SELECT deployment_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
+          ORDER BY deployment_id, name
         `,
         sql.SelectDesiredExports`
           /* @notNull artifact_object_key */
@@ -189,6 +193,7 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
                  digest, size_bytes, artifact_object_key, original_file_name, config_id
           FROM nibrun.desired_exports
           WHERE app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
+          ORDER BY id
         `,
         sql.SelectDesiredExportEnvironment`
           SELECT export_id, name, value FROM nibrun.desired_export_environment
@@ -197,6 +202,7 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
             JOIN nibrun.app_hosts h ON h.app_id = e.app_id
             WHERE h.host_id = ${hostId}
           )
+          ORDER BY export_id, name
         `,
       ]);
 
