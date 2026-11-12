@@ -26,6 +26,7 @@ export type DisposableAppHostnameRow = Queries['SelectDisposableAppHostnames'];
 type OwnedApp = { appId: AppId; ownerId: OwnerId };
 
 export const CUSTOM_KIND: AppHostnameKind = 'custom';
+const PLATFORM_KIND: AppHostnameKind = 'platform';
 
 /**
  * The names an app answers on.
@@ -261,8 +262,10 @@ export class AppHostnamesRepository extends Repository implements AppHostnamesRe
     limit: number;
   }): Promise<PendingHostnameRow[]> {
     return this.sql.SelectPendingCustomHostnames`
-      SELECT h.id, h.hostname, h.cloudflare_id, h.created_at
+      SELECT h.id, h.hostname, h.cloudflare_id, h.created_at, p.hostname AS origin_server
       FROM nibrun.app_hostnames h
+      JOIN nibrun.live_apps a ON a.id = h.app_id
+      JOIN nibrun.app_hostnames p ON p.app_id = a.id AND p.kind = ${PLATFORM_KIND}
       WHERE h.state = 'pending' AND h.kind = ${CUSTOM_KIND}
       ORDER BY h.id <= ${after}::uuid, h.id
       LIMIT ${limit}

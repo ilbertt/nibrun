@@ -12,6 +12,7 @@ import type {
   AppHostnamesRepositoryContract,
   CustomHostnameClaim,
   CustomHostnameRow,
+  PendingHostnameRow,
 } from '#repositories/app-hostnames.repository.ts';
 import {
   type CustomHostnamesRepositoryContract,
@@ -25,16 +26,12 @@ const APP_HOST_DOMAIN = 'apps.example.com';
 const APP_ID = Value.Parse(AppIdSchema, 'app-1');
 const OWNER_ID = Value.Parse(OwnerIdSchema, 'owner-1');
 const BROUGHT = Value.Parse(HostnameSchema, 'app.example.dev');
+const PLATFORM_ORIGIN = Value.Parse(HostnameSchema, 'app-1.apps.example.com');
 const CLOUDFLARE_ID = 'ch-1';
 const DCV_TARGET = 'delegation.example.com';
 const PENDING_TTL_DAYS = 7;
 
-type PendingRow = {
-  id: string;
-  hostname: Hostname;
-  cloudflare_id: string | null;
-  created_at: Date;
-};
+type PendingRow = PendingHostnameRow;
 
 function hostnameRow(overrides: Partial<AppHostnameRow> = {}): AppHostnameRow {
   return {
@@ -58,6 +55,7 @@ class StubHostnamesRepository implements AppHostnamesRepositoryContract {
   readonly reports: EdgeReport[] = [];
   readonly polledAfter: Array<string | null> = [];
   pending: PendingRow[] = [];
+  platform: Hostname | null = PLATFORM_ORIGIN;
   removed: string | null = CLOUDFLARE_ID;
   // What the claim comes to, as the statement would answer it; null is an app not the caller's.
   claim: CustomHostnameClaim | null = { outcome: 'created', row: customHostnameRow() };
@@ -103,9 +101,13 @@ class StubHostnamesRepository implements AppHostnamesRepositoryContract {
   listDisposable = notAsked;
   removeDisposable = notAsked;
 
-  // Reads an app makes of its own hostnames; nothing here asks for them.
   listByOwner = notAsked;
-  listByApp = notAsked;
+
+  listByApp(): Promise<AppHostnameRow[]> {
+    return Promise.resolve(
+      this.platform === null ? [] : [hostnameRow({ hostname: this.platform, kind: 'platform' })],
+    );
+  }
 }
 
 function notAsked(): never {
@@ -115,6 +117,7 @@ function notAsked(): never {
 class StubEdge implements CustomHostnamesRepositoryContract {
   readonly trace: string[] = [];
   readonly methods: DcvMethod[] = [];
+  readonly origins: Hostname[] = [];
   available = true;
   state_: AppHostnameState = 'pending';
   errors: string[] = [];
@@ -122,7 +125,11 @@ class StubEdge implements CustomHostnamesRepositoryContract {
   removeFailure: unknown;
   revalidateFailure: unknown;
 
-  add({ method }: { method: DcvMethod }): Promise<EdgeHostname> {
+  add({
+    method,
+    originServer,
+  }: Parameters<CustomHostnamesRepositoryContract['add']>[0]): Promise<EdgeHostname> {
+    this.origins.push(originServer);
     this.trace.push('add');
     this.methods.push(method);
     if (this.addFailure) {
@@ -255,6 +262,28 @@ describe('the row is written before the edge is told', () => {
   });
 });
 
+describe('a custom domain follows its app origin', () => {
+  test('registration uses the platform hostname issued to the owned app', async () => {
+    const { service, appsRepo, customHostnamesRepo } = build();
+    const legacyOrigin = Value.Parse(HostnameSchema, 'legacy-app.apps.example.com');
+    appsRepo.platform = legacyOrigin;
+
+    await service.add(owned());
+
+    expect(customHostnamesRepo.origins).toEqual([legacyOrigin]);
+  });
+
+  test('an app without an owned platform hostname writes no claim and calls no edge', async () => {
+    const { service, appsRepo, customHostnamesRepo } = build();
+    appsRepo.platform = null;
+
+    await expect(service.add(owned())).rejects.toBeInstanceOf(NotFoundError);
+
+    expect(appsRepo.trace).toEqual([]);
+    expect(customHostnamesRepo.trace).toEqual([]);
+  });
+});
+
 describe('removing a domain lets the row go whatever the edge says', () => {
   test("a hostname this app never had is not somebody else's to remove", async () => {
     const { service, appsRepo } = build();
@@ -345,6 +374,7 @@ describe('a waiting hostname is settled by the clock a host report lends', () =>
     return {
       id: 'row-1',
       hostname: BROUGHT,
+      origin_server: PLATFORM_ORIGIN,
       cloudflare_id: CLOUDFLARE_ID,
       created_at: new Date(Date.now() - days * MS_PER_DAY),
     };
@@ -428,6 +458,7 @@ describe('a waiting hostname is settled by the clock a host report lends', () =>
     return {
       id: 'row-1',
       hostname: BROUGHT,
+      origin_server: PLATFORM_ORIGIN,
       cloudflare_id: null,
       created_at: new Date(Date.now() - ms),
     };
@@ -446,6 +477,7 @@ describe('a waiting hostname is settled by the clock a host report lends', () =>
       await service.reconcile();
 
       expect(customHostnamesRepo.trace).toEqual(['add', 'state']);
+      expect(customHostnamesRepo.origins).toEqual([PLATFORM_ORIGIN]);
       expect(appsRepo.trace).toContain('attach');
       expect(appsRepo.states).toEqual(['active']);
     },
@@ -488,7 +520,13 @@ describe('a deployment without an edge says so rather than half-working', () => 
   test('and the pass that settles them does nothing at all', async () => {
     const { service, appsRepo } = build({ withEdge: false });
     appsRepo.pending = [
-      { id: 'row-1', hostname: BROUGHT, cloudflare_id: CLOUDFLARE_ID, created_at: new Date() },
+      {
+        id: 'row-1',
+        hostname: BROUGHT,
+        origin_server: PLATFORM_ORIGIN,
+        cloudflare_id: CLOUDFLARE_ID,
+        created_at: new Date(),
+      },
     ];
 
     await service.reconcile();

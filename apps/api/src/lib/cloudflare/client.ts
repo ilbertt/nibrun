@@ -78,14 +78,16 @@ export class CloudflareClient {
   createCustomHostname({
     hostname,
     method,
+    originServer,
   }: {
     hostname: string;
     method: DcvMethod;
+    originServer: string;
   }): Promise<CustomHostname> {
     return this.#request<CustomHostname>({
       method: 'POST',
       path: 'custom_hostnames',
-      body: { hostname, ssl: sslConfig(method) },
+      body: { hostname, ssl: sslConfig(method), custom_origin_server: originServer },
     });
   }
 

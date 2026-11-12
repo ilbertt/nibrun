@@ -202,6 +202,7 @@ export interface ISelectPendingCustomHostnamesResult {
     cloudflare_id: IAppHostnamesColumns["cloudflare_id"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
+    origin_server: IAppHostnamesColumns["hostname"];
 }
 
 /** Result of query `SelectDisposableAppHostnames`. */

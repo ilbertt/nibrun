@@ -102,9 +102,9 @@ describe('a deployment with no Cloudflare account says so where the edge would b
   test('and every call that needs the edge refuses', async () => {
     const hostname = 'app.example.dev' as Parameters<typeof unconfigured.add>[0]['hostname'];
 
-    await expect(unconfigured.add({ hostname, method: 'txt' })).rejects.toBeInstanceOf(
-      CustomHostnamesUnavailableError,
-    );
+    await expect(
+      unconfigured.add({ hostname, method: 'txt', originServer: hostname }),
+    ).rejects.toBeInstanceOf(CustomHostnamesUnavailableError);
     await expect(unconfigured.dcvTarget({ hostname })).rejects.toBeInstanceOf(
       CustomHostnamesUnavailableError,
     );

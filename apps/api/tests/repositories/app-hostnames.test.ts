@@ -239,6 +239,11 @@ async function seedApp(sql: SQL): Promise<void> {
     OWNER_ID,
     APP_SLUG,
   ]);
+  await sql.unsafe(
+    `INSERT INTO nibrun.app_hostnames (app_id, hostname, kind, state)
+     SELECT id, $1, 'platform', 'active' FROM nibrun.apps WHERE slug = $2`,
+    [`${APP_SLUG}.apps.example.com`, APP_SLUG],
+  );
 }
 
 async function seedStranger(sql: SQL): Promise<AppId> {

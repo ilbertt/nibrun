@@ -13,6 +13,7 @@ import { BadGatewayError, BadRequestError, ConflictError, NotFoundError } from '
 import type {
   AppHostnamesRepositoryContract,
   CustomHostnameRow,
+  PendingHostnameRow,
 } from '#repositories/app-hostnames.repository.ts';
 import type { CustomHostnamesRepositoryContract } from '#repositories/custom-hostnames.repository.ts';
 import { Service } from '#services/service.ts';
@@ -113,6 +114,13 @@ export class HostnamesService extends Service {
       );
     }
 
+    const originServer = (await this.hostnamesRepo.listByApp({ appId, ownerId })).find(
+      (entry) => entry.kind === 'platform',
+    )?.hostname;
+    if (!originServer) {
+      throw new NotFoundError('App not found.');
+    }
+
     const claim = await this.hostnamesRepo.addCustom({ appId, ownerId, hostname });
     if (!claim) {
       throw new NotFoundError('App not found.');
@@ -124,7 +132,7 @@ export class HostnamesService extends Service {
       return { hostname: await this.reassert({ appId, hostname, row: claim.row }), created: false };
     }
 
-    const { cloudflareId, state, dcvTarget } = await this.register(hostname);
+    const { cloudflareId, state, dcvTarget } = await this.register({ hostname, originServer });
     const attached = await this.hostnamesRepo.attachCustom({
       hostname,
       cloudflareId,
@@ -194,11 +202,19 @@ export class HostnamesService extends Service {
    * The delegation target is only read for a hostname proved that way: an apex is proved over
    * HTTP, and a target handed to its owner would be a record to place that nothing ever reads.
    */
-  private async register(
-    hostname: Hostname,
-  ): Promise<{ cloudflareId: string; state: AppHostnameState; dcvTarget: string | null }> {
+  private async register({
+    hostname,
+    originServer,
+  }: {
+    hostname: Hostname;
+    originServer: Hostname;
+  }): Promise<{ cloudflareId: string; state: AppHostnameState; dcvTarget: string | null }> {
     const method = dcvMethodFor(hostname);
-    const { cloudflareId, state } = await this.customHostnamesRepo.add({ hostname, method });
+    const { cloudflareId, state } = await this.customHostnamesRepo.add({
+      hostname,
+      method,
+      originServer,
+    });
     const dcvTarget =
       method === 'txt' ? await this.customHostnamesRepo.dcvTarget({ hostname }) : null;
     return { cloudflareId, state, dcvTarget };
@@ -248,11 +264,7 @@ export class HostnamesService extends Service {
     }
   }
 
-  private async advance(row: {
-    hostname: Hostname;
-    cloudflare_id: string | null;
-    created_at: Date;
-  }): Promise<void> {
+  private async advance(row: PendingHostnameRow): Promise<void> {
     const age = Date.now() - row.created_at.getTime();
     if (age > PENDING_TTL_MS) {
       await this.expire(row);
@@ -287,8 +299,11 @@ export class HostnamesService extends Service {
     }
   }
 
-  private async attachAtEdge(row: { hostname: Hostname }): Promise<string> {
-    const { cloudflareId, dcvTarget } = await this.register(row.hostname);
+  private async attachAtEdge(row: PendingHostnameRow): Promise<string> {
+    const { cloudflareId, dcvTarget } = await this.register({
+      hostname: row.hostname,
+      originServer: row.origin_server,
+    });
     await this.hostnamesRepo.attachCustom({ hostname: row.hostname, cloudflareId, dcvTarget });
 
     this.logger.info('custom hostname reached the edge on a later pass', {

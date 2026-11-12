@@ -8,6 +8,7 @@ import {
 const ZONE_ID = 'zone-1';
 const API_TOKEN = 'token-1';
 const HOSTNAME = 'app.example.dev';
+const ORIGIN_SERVER = 'app-1.apps.example.com';
 const HTTP_OK = 200;
 const HTTP_BAD_GATEWAY = 502;
 const HTTP_NOT_FOUND = 404;
@@ -67,7 +68,11 @@ describe('a call to the edge carries this zone and this token', () => {
   test('the hostname is created under the configured zone', async () => {
     const { calls } = answering([ok({ id: 'ch-1' })]);
 
-    await client().createCustomHostname({ hostname: HOSTNAME, method: 'txt' });
+    await client().createCustomHostname({
+      hostname: HOSTNAME,
+      method: 'txt',
+      originServer: ORIGIN_SERVER,
+    });
 
     expect(calls[0]?.url).toBe(
       `https://api.cloudflare.com/client/v4/zones/${ZONE_ID}/custom_hostnames`,
@@ -80,11 +85,20 @@ describe('a call to the edge carries this zone and this token', () => {
   test('and asks for the validation it was told to, as the edge spells it', async () => {
     const { calls } = answering([ok({ id: 'ch-1' }), ok({ id: 'ch-2' })]);
 
-    await client().createCustomHostname({ hostname: HOSTNAME, method: 'txt' });
-    await client().createCustomHostname({ hostname: HOSTNAME, method: 'http' });
+    await client().createCustomHostname({
+      hostname: HOSTNAME,
+      method: 'txt',
+      originServer: ORIGIN_SERVER,
+    });
+    await client().createCustomHostname({
+      hostname: HOSTNAME,
+      method: 'http',
+      originServer: ORIGIN_SERVER,
+    });
 
     expect(await calls[0]?.json()).toMatchObject({
       hostname: HOSTNAME,
+      custom_origin_server: ORIGIN_SERVER,
       ssl: { method: 'txt', type: 'dv' },
     });
     expect(await calls[1]?.json()).toMatchObject({ ssl: { method: 'http', type: 'dv' } });
@@ -96,7 +110,11 @@ describe('a refusal is an error however the edge phrases it', () => {
     answering([{ status: 403, body: { success: false, result: null, errors: [] } }]);
 
     await expect(
-      client().createCustomHostname({ hostname: HOSTNAME, method: 'txt' }),
+      client().createCustomHostname({
+        hostname: HOSTNAME,
+        method: 'txt',
+        originServer: ORIGIN_SERVER,
+      }),
     ).rejects.toBeInstanceOf(CloudflareError);
   });
 
@@ -110,7 +128,11 @@ describe('a refusal is an error however the edge phrases it', () => {
     ]);
 
     await expect(
-      client().createCustomHostname({ hostname: HOSTNAME, method: 'txt' }),
+      client().createCustomHostname({
+        hostname: HOSTNAME,
+        method: 'txt',
+        originServer: ORIGIN_SERVER,
+      }),
     ).rejects.toThrow(/already exists/);
   });
 
@@ -120,7 +142,11 @@ describe('a refusal is an error however the edge phrases it', () => {
     answering([{ status: HTTP_BAD_GATEWAY, body: undefined }]);
 
     await expect(
-      client().createCustomHostname({ hostname: HOSTNAME, method: 'txt' }),
+      client().createCustomHostname({
+        hostname: HOSTNAME,
+        method: 'txt',
+        originServer: ORIGIN_SERVER,
+      }),
     ).rejects.toBeInstanceOf(CloudflareError);
   });
 });

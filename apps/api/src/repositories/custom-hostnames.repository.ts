@@ -59,7 +59,11 @@ export class CustomHostnamesUnavailableError extends Error {
 export abstract class CustomHostnamesRepositoryContract {
   /** Whether this deployment can register a hostname at the edge at all. */
   abstract readonly available: boolean;
-  abstract add(input: { hostname: Hostname; method: DcvMethod }): Promise<EdgeHostname>;
+  abstract add(input: {
+    hostname: Hostname;
+    method: DcvMethod;
+    originServer: Hostname;
+  }): Promise<EdgeHostname>;
   abstract dcvTarget(input: { hostname: Hostname }): Promise<string>;
   abstract report(input: { cloudflareId: string }): Promise<EdgeReport>;
   abstract revalidate(input: { cloudflareId: string; method: DcvMethod }): Promise<void>;
@@ -91,11 +95,13 @@ export class CustomHostnamesRepository implements CustomHostnamesRepositoryContr
   async add({
     hostname,
     method,
+    originServer,
   }: {
     hostname: Hostname;
     method: DcvMethod;
+    originServer: Hostname;
   }): Promise<EdgeHostname> {
-    const created = await this.reachable().createCustomHostname({ hostname, method });
+    const created = await this.reachable().createCustomHostname({ hostname, method, originServer });
     return { cloudflareId: created.id, state: toState(created) };
   }
 
