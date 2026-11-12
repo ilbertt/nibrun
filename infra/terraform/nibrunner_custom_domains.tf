@@ -1,6 +1,10 @@
+locals {
+  nibrunner_fallback_hostname = "fallback.${var.nibrunner_domain}"
+}
+
 resource "cloudflare_dns_record" "nibrunner_fallback" {
   zone_id = data.cloudflare_zone.nibrunner.id
-  name    = "fallback.${var.nibrunner_domain}"
+  name    = local.nibrunner_fallback_hostname
   type    = "CNAME"
   content = local.nibrunner_tunnel_hostname
   proxied = true
