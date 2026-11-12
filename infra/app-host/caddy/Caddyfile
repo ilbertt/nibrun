@@ -65,33 +65,12 @@
 # app on it — or one whose agent has not converged yet — still starts.
 import /etc/caddy/rendered/*.caddy
 
-# The two names here that serve nothing: the apex, and the fallback origin the
-# edge resolves a custom hostname to. Both send their visitor to the marketing
-# site rather than forwarding to nibrunner.
-#
-# Custom-domain traffic keeps the brought Host header, so it matches a rendered
-# site rather than the address Cloudflare resolved for its origin.
-#
-# The apex needs two things elsewhere before it reaches this block at all: a
-# record of its own, and an origin certificate naming <app_domain> beside the
-# wildcard — the edge validates the name it asked for, and *.<app_domain> does
-# not cover the bare one.
 https://{$APP_HOST_DOMAIN}, https://fallback.{$APP_HOST_DOMAIN} {
 	import origin_tls
 	redir https://{$WWW_HOSTNAME} permanent
 }
 
-# Cached DNS may still reach this edge after an app moves. Local site blocks win;
-# every other hostname reaches its new owner, including brought domains.
 :443 {
 	import origin_tls
-	header {
-		Cache-Control no-store
-		+Via "1.1 nibrun-legacy"
-		defer
-	}
-	reverse_proxy {{NIBRUNNER_HTTP_ORIGIN}} {
-		lb_try_duration 5s
-		stream_close_delay 5m
-	}
+	respond 404
 }
