@@ -7,6 +7,7 @@ import { makeSessionHolder } from '#lib/control/session.ts';
 import { nibrunnerCronListings, pollNibrunnerCron } from '#lib/nibrunner/cron-query.ts';
 import { pollNibrunnerFilesystem } from '#lib/nibrunner/filesystem-query.ts';
 import { nibrunnerQueryDeployments } from '#lib/nibrunner/query-deployments.ts';
+import { makeNibrunnerReportLoop } from '#lib/nibrunner/report-loop.ts';
 import { nibrunnerReportedState } from '#lib/nibrunner/reported-state.ts';
 import { makeNibrunnerSqliteGuest } from '#lib/nibrunner/sqlite-guest.ts';
 import { stageNibrunnerArtifacts } from '#lib/nibrunner/stage-artifacts.ts';
@@ -244,6 +245,11 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
     });
   }).pipe(Effect.tapErrorTag('ControlPlaneError', sessions.onExpired));
 
+  const reportLoop = yield* makeNibrunnerReportLoop({
+    reportedStateFile: config.reportedStateFile,
+    reportOnce,
+  });
+
   return {
     pollOnce,
     reportOnce,
@@ -261,13 +267,7 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
           onFailure: (cause) => Effect.logWarning('nibrunner desired poll failed', cause),
           schedule: CONTROL_PLANE_BACKOFF,
         }),
-        supervised({
-          once: reportOnce.pipe(
-            Effect.flatMap((poll) => Effect.sleep(`${poll.reportIntervalMs} millis`)),
-          ),
-          onFailure: (cause) => Effect.logWarning('nibrunner report failed', cause),
-          schedule: CONTROL_PLANE_BACKOFF,
-        }),
+        reportLoop,
         supervised({
           once: filesystemOnce,
           onFailure: () => Effect.logWarning('nibrunner filesystem query failed'),
