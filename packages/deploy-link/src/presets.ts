@@ -105,7 +105,7 @@ export const DEPLOY_PRESETS = {
   opencloud: {
     isRecommended: false,
     projectUrl: 'https://github.com/opencloud-eu/opencloud',
-    version: 'v9.0.0',
+    version: 'v9.1.0',
     markdownContent: opencloudPage,
     category: DeployCategory.FilesAndSharing,
     title: 'OpenCloud',
@@ -113,8 +113,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'opencloud',
       binary:
-        'https://github.com/opencloud-eu/opencloud/releases/download/v9.0.0/opencloud-9.0.0-linux-amd64',
-      sha256: '2944b956461107cf8d73424c3602d83ac157988e28dc6ce95370c45633de45c4',
+        'https://github.com/opencloud-eu/opencloud/releases/download/v9.1.0/opencloud-9.1.0-linux-amd64',
+      sha256: '183d95c3a77ccb520dabaa106e08d1037afcaa8af6403c22eb6ac9a565de777e',
       port: 9200,
       arg: ['server'],
       env: [
@@ -262,7 +262,7 @@ export const DEPLOY_PRESETS = {
   'open-connector': {
     isRecommended: false,
     projectUrl: 'https://github.com/oomol-lab/open-connector',
-    version: 'v1.9.9',
+    version: 'v1.10.0',
     markdownContent: openConnectorPage,
     category: DeployCategory.DeveloperTools,
     title: 'OpenConnector',
@@ -270,8 +270,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'open-connector',
       binary:
-        'https://github.com/oomol-lab/open-connector/releases/download/v1.9.9/open-connector-linux-x64',
-      sha256: '44ceb28072b8fa550e75d63c1f27bfa046bf4d289d6e34d60130c85ce3cb4886',
+        'https://github.com/oomol-lab/open-connector/releases/download/v1.10.0/open-connector-linux-x64',
+      sha256: '0d04af111cf75573be1b421c1ced953f5dd8d9a9a8c17ce05b5d50e21f492bb4',
       port: 3000,
       env: [
         'HOST=0.0.0.0',
