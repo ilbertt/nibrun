@@ -163,7 +163,7 @@ variable "victorialogs_hostname" {
 # with the dashboard.
 variable "app_host_domain" {
   type        = string
-  description = "Registrable domain user apps are served under, as <slug>.<app_host_domain>. Point a wildcard A record at an app host."
+  description = "Registrable domain user apps are served under, as <slug>.<app_host_domain>. Its wildcard routes to the nibrunner Tunnel."
 
   validation {
     condition     = trimspace(var.app_host_domain) != ""

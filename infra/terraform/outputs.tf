@@ -112,7 +112,7 @@ output "app_host_deploy_group" {
 }
 
 output "app_host_public_ips" {
-  description = "A record targets for the app domain's wildcard."
+  description = "A record targets for legacy app-host routes."
   value       = aws_eip.app_host[*].public_ip
 }
 
