@@ -86,15 +86,15 @@ revoking the first; `prevent_destroy` blocks revocation during an ordinary apply
 The control plane and nibrunner use Tunnels and need no origin certificates or Authenticated
 Origin Pulls. The control plane publishes only its VPC control and log-ingest listeners.
 
-Terraform protects the Dozzle and VictoriaLogs public hostnames with Cloudflare Access,
+Terraform protects the Dozzle, VictoriaLogs and Umami public hostnames with Cloudflare Access,
 allowing only members of `cloudflare_account_id` with 24-hour sessions. The account must
 already have a Zero Trust organization and the Cloudflare identity provider configured.
 `CLOUDFLARE_TERRAFORM_API_TOKEN` needs **Access: Apps and Policies Write** and
 **Access: Organizations, Identity Providers, and Groups Read** on that account. Terraform
 derives the Tunnel's Access team name from the existing organization's auth domain and each
 protected route's accepted audience from its Access application. `cloudflared` rejects requests
-without a valid token before forwarding them to Caddy. Production publishes neither dashboard's
-host port; local development keeps the loopback bindings.
+without a valid token before forwarding them to Caddy. Production publishes no host ports for
+these dashboards; local development keeps the loopback bindings.
 Access is the only login for Dozzle and VictoriaLogs. Deployments no longer generate or read
 their former password credentials. Terraform deletes the former SSM parameters and password
 generators when they are removed from configuration. The API's private log queries and the
@@ -104,7 +104,13 @@ Sign-in needs a GitHub OAuth App whose callback URL is
 `https://<api_hostname>/api/auth/callback/github`.
 
 Umami uses the `UMAMI_HOSTNAME` repository variable (`umami.nibrun.com` for this deployment).
-Its admin credentials are seeded before the public proxy starts.
+Its admin credentials are seeded before the public proxy starts. Umami keeps its own login
+behind Access; it does not authenticate Cloudflare identities. Only `/script.js` and `/api/send`
+bypass Access so anonymous visitors can load the tracker and submit analytics. The Tunnel
+matches these exact paths before its hostname-wide token validation rule, with path normalization
+enabled. All other paths, including `/mcp` and the read API, require Access authentication.
+Machine clients need an Access service-auth policy and token in addition to their Umami API key;
+the account-member policy does not grant service tokens access.
 
 For Umami's region and city data, enable **Rules → Settings → Managed Transforms → Add visitor
 location headers** in the control-plane zone. Caddy forwards Cloudflare's headers to Umami, which

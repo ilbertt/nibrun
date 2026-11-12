@@ -11,6 +11,7 @@
 
 services:
   umami:
+    ports: !reset []
     environment:
       - CLIENT_IP_HEADER=CF-Connecting-IP
 
@@ -76,7 +77,14 @@ services:
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    command: ["tunnel", "--metrics", "127.0.0.1:2000", "run"]
+    command:
+      [
+        "tunnel",
+        "--metrics",
+        "127.0.0.1:2000",
+        "--disable-path-normalization=false",
+        "run",
+      ]
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARED_TOKEN:?}
     healthcheck:

@@ -1,5 +1,5 @@
 locals {
-  control_plane_hostnames       = toset(concat([var.api_hostname, var.umami_hostname], values(local.control_plane_access_hostnames)))
+  control_plane_hostnames       = toset(concat([var.api_hostname], values(local.control_plane_access_hostnames)))
   control_plane_tunnel_hostname = "${cloudflare_zero_trust_tunnel_cloudflared.control_plane.id}.cfargotunnel.com"
   control_plane_access = {
     for application in cloudflare_zero_trust_access_application.control_plane : application.domain => {
@@ -21,6 +21,15 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "control_plane" {
   tunnel_id  = cloudflare_zero_trust_tunnel_cloudflared.control_plane.id
   config = {
     ingress = concat([
+      for path in values(local.umami_public_paths) : {
+        hostname = var.umami_hostname
+        path     = "^${replace(path, ".", "\\.")}$"
+        service  = "http://caddy:80"
+        origin_request = {
+          http_host_header = var.umami_hostname
+        }
+      }
+      ], [
       for hostname in local.control_plane_hostnames : {
         hostname = hostname
         service  = "http://caddy:80"
