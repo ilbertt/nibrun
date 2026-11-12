@@ -1,5 +1,5 @@
 const HTTP_PORT = 18080;
-const READY_ATTEMPTS = 50;
+const READY_ATTEMPTS = 10;
 const RETRY_MS = 20;
 export const GUEST_NAMESPACE = 'isolation-guest';
 const UPSTREAM_NAMESPACE = 'isolation-upstream';
@@ -81,9 +81,9 @@ export function reaches({ namespace, address }: { namespace: string; address: st
   );
 }
 
-async function waitForServer(namespace: string) {
+async function waitForServer({ namespace, address }: { namespace: string; address: string }) {
   for (let attempt = 0; attempt < READY_ATTEMPTS; attempt++) {
-    if (reaches({ namespace, address: '::1' })) {
+    if (reaches({ namespace, address })) {
       return;
     }
     await Bun.sleep(RETRY_MS);
@@ -91,11 +91,52 @@ async function waitForServer(namespace: string) {
   throw new Error('The isolation fixture listener did not start.');
 }
 
+const UDP_PORT = 18081;
+const UDP_SOURCE_PORT = 40000;
+const UDP_SERVER = `import socket, sys
+server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+server.bind(("0.0.0.0", int(sys.argv[1])))
+while True:
+    data, peer = server.recvfrom(1024)
+    server.sendto(data, peer)
+`;
+const UDP_CLIENT = `import socket, sys
+client = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+client.settimeout(1)
+client.bind(("10.201.0.2", int(sys.argv[1])))
+client.sendto(b"isolation", ("10.43.0.134", int(sys.argv[2])))
+assert client.recvfrom(1024)[0] == b"isolation"
+`;
+
+export function privateUdpConnection() {
+  return (
+    Bun.spawnSync([
+      'ip',
+      'netns',
+      'exec',
+      GUEST_NAMESPACE,
+      'python3',
+      '-c',
+      UDP_CLIENT,
+      String(UDP_SOURCE_PORT),
+      String(UDP_PORT),
+    ]).exitCode === 0
+  );
+}
+
+async function waitForUdpServer() {
+  for (let attempt = 0; attempt < READY_ATTEMPTS; attempt++) {
+    if (privateUdpConnection()) {
+      return;
+    }
+    await Bun.sleep(RETRY_MS);
+  }
+  throw new Error('The UDP isolation fixture did not start.');
+}
+
 export function createIsolationNetwork() {
   const servers: ReturnType<typeof Bun.spawn>[] = [];
-  let hostServer: ReturnType<typeof Bun.serve> | undefined;
   async function close() {
-    hostServer?.stop(true);
     for (const server of servers) {
       server.kill();
     }
@@ -108,7 +149,13 @@ export function createIsolationNetwork() {
     }
   }
   async function start() {
-    networkCommand(['sysctl', '-w', 'net.ipv4.ip_forward=1', 'net.ipv6.conf.all.forwarding=1']);
+    networkCommand([
+      'sysctl',
+      '-w',
+      'net.ipv4.ip_forward=1',
+      'net.ipv6.conf.all.forwarding=1',
+      'net.ipv6.conf.default.forwarding=1',
+    ]);
     link({
       namespace: GUEST_NAMESPACE,
       host: 'nbr9001',
@@ -133,11 +180,13 @@ export function createIsolationNetwork() {
       ipv6: '2001:db8:2::1/64',
       peer6: '2001:db8:2::2/64',
     });
-    hostServer = Bun.serve({
-      hostname: '10.201.0.1',
-      port: HTTP_PORT,
-      fetch: () => new Response('fixture'),
-    });
+    servers.push(
+      Bun.spawn(['python3', '-m', 'http.server', String(HTTP_PORT), '--bind', '10.201.0.1'], {
+        stdout: 'ignore',
+        stderr: 'ignore',
+      }),
+    );
+    await waitForServer({ namespace: GUEST_NAMESPACE, address: '10.201.0.1' });
     for (const address of ['169.254.169.254', '10.43.0.134']) {
       networkCommand([
         'ip',
@@ -166,6 +215,13 @@ export function createIsolationNetwork() {
       ]);
       networkCommand(['ip', '-6', 'route', 'add', `${address}/128`, 'via', '2001:db8:2::2']);
     }
+    servers.push(
+      Bun.spawn(
+        ['ip', 'netns', 'exec', UPSTREAM_NAMESPACE, 'python3', '-c', UDP_SERVER, String(UDP_PORT)],
+        { stdout: 'ignore', stderr: 'ignore' },
+      ),
+    );
+    await waitForUdpServer();
     for (const namespace of [UPSTREAM_NAMESPACE, NEIGHBOR_NAMESPACE]) {
       servers.push(
         Bun.spawn(
@@ -184,8 +240,9 @@ export function createIsolationNetwork() {
           { stdout: 'ignore', stderr: 'ignore' },
         ),
       );
-      await waitForServer(namespace);
+      await waitForServer({ namespace, address: '::1' });
     }
+    await waitForServer({ namespace: GUEST_NAMESPACE, address: '2001:db8:2::2' });
   }
   return { start, close };
 }

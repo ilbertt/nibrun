@@ -8,6 +8,7 @@ import {
   createIsolationNetwork,
   GUEST_NAMESPACE,
   networkCommand,
+  privateUdpConnection,
   reaches,
 } from '#tests/support/isolation-network.ts';
 import { platform, provided } from '#tests/support/run.ts';
@@ -18,15 +19,10 @@ const STATE: FirewallState = {
   controlPlaneCidrsV4: ['10.43.0.0/16'],
   controlPlaneCidrsV6: ['2600:1f18:abcd::/56'],
 };
-const PUBLIC = ['203.0.113.2', '2001:db8:2::2'];
-const INTERNAL = [
-  '10.201.0.1',
-  '169.254.169.254',
-  '10.43.0.134',
-  '10.201.0.6',
-  'fd00:ec2::254',
-  '2600:1f18:abcd::2',
-];
+const PUBLIC_IPV4 = '203.0.113.2';
+const PUBLIC = [PUBLIC_IPV4, '2001:db8:2::2'];
+const INTERNAL_IPV4 = ['10.201.0.1', '169.254.169.254', '10.43.0.134', '10.201.0.6'];
+const INTERNAL = [...INTERNAL_IPV4, 'fd00:ec2::254', '2600:1f18:abcd::2'];
 const run = provided(CommandRunner.Default.pipe(Layer.provideMerge(platform)));
 
 function reachable(address: string) {
@@ -39,8 +35,9 @@ test.skipIf(process.env.NIBRUN_TEST_NETWORK_PROBES !== '1')(
     const network = createIsolationNetwork();
     try {
       await network.start();
+      expect(privateUdpConnection()).toBe(true);
       for (const address of [...PUBLIC, ...INTERNAL]) {
-        expect(reachable(address)).toBe(true);
+        expect({ address, reachable: reachable(address) }).toEqual({ address, reachable: true });
       }
       await run(
         Effect.gen(function* () {
@@ -59,26 +56,39 @@ test.skipIf(process.env.NIBRUN_TEST_NETWORK_PROBES !== '1')(
             const firewall = yield* HostFirewall;
             const apply = firewall.apply(Effect.succeed(STATE));
             yield* apply;
+            expect(privateUdpConnection()).toBe(false);
             for (const address of PUBLIC) {
-              expect(reachable(address)).toBe(true);
+              expect({ address, reachable: reachable(address) }).toEqual({
+                address,
+                reachable: true,
+              });
             }
             for (const address of INTERNAL) {
-              expect(reachable(address)).toBe(false);
+              expect({ address, reachable: reachable(address) }).toEqual({
+                address,
+                reachable: false,
+              });
             }
             networkCommand(['nft', 'flush', 'chain', 'ip', 'nibrun', 'forward']);
             expect(reachable('10.43.0.134')).toBe(true);
             refuseWrites = true;
             expect((yield* Effect.either(apply))._tag).toBe('Left');
             for (const address of [...PUBLIC, ...INTERNAL]) {
-              expect(reachable(address)).toBe(false);
+              expect({ address, reachable: reachable(address) }).toEqual({
+                address,
+                reachable: false,
+              });
             }
             refuseWrites = false;
             yield* apply;
-            for (const address of PUBLIC) {
-              expect(reachable(address)).toBe(true);
-            }
-            for (const address of INTERNAL) {
-              expect(reachable(address)).toBe(false);
+            // Guests are configured with IPv4; the fixture's synthetic IPv6 routes are lost
+            // when its veth loses carrier, independently of the firewall's recovery.
+            expect(reachable(PUBLIC_IPV4)).toBe(true);
+            for (const address of INTERNAL_IPV4) {
+              expect({ address, reachable: reachable(address) }).toEqual({
+                address,
+                reachable: false,
+              });
             }
           }).pipe(Effect.provide(HostFirewall.Default.pipe(Layer.provideMerge(runner))));
         }),
