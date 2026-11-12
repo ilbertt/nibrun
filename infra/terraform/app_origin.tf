@@ -28,3 +28,14 @@ resource "cloudflare_dns_record" "app_origin" {
 
   depends_on = [cloudflare_zero_trust_tunnel_cloudflared_config.nibrunner]
 }
+
+resource "cloudflare_dns_record" "nibrunner_custom_origin" {
+  zone_id = data.cloudflare_zone.app_host.id
+  name    = "nibrunner-origin.${var.app_host_domain}"
+  type    = "CNAME"
+  content = local.nibrunner_tunnel_hostname
+  proxied = true
+  ttl     = 1
+
+  depends_on = [cloudflare_zero_trust_tunnel_cloudflared_config.nibrunner]
+}
