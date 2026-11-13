@@ -23,10 +23,10 @@ export function PaidExtraPortRequestDialog({ trigger }: { trigger: ReactElement 
       <DialogTrigger render={trigger} />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Need an extra public port?</DialogTitle>
+          <DialogTitle>Need extra public ports?</DialogTitle>
           <DialogDescription>
-            Expose one additional TCP/UDP port for protocols HTTPS cannot carry. This is an upcoming
-            paid feature. Send a request to let us know you’re interested.
+            Request extra TCP/UDP ports for protocols HTTPS cannot carry. This is an upcoming paid
+            feature. Send a request to let us know you’re interested.
           </DialogDescription>
         </DialogHeader>
         <DialogBody className="flex flex-col gap-4">

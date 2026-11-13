@@ -386,7 +386,7 @@ Extra public ports are a paid feature. Request one from **Request extra port** i
 configuration, or with the CLI:
 
 ```sh
-nib paid-request --type extra-public-port --app my-app
+nib paid-request --type extra-public-port --app my-app --requested-ports-amount 1
 ```
 
 A request records interest; it does not enable the port or charge the owner. Deployment presets,

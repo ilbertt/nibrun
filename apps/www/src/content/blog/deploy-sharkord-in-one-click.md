@@ -66,7 +66,7 @@ which is a paid feature. After deploying, open the app in the dashboard and choo
 port** under **Configuration**, or send a request from the CLI:
 
 ```sh
-nib paid-request --type extra-public-port --app sharkord
+nib paid-request --type extra-public-port --app sharkord --requested-ports-amount 1
 ```
 
 Sending a request records your interest; it does not enable the port or charge you.

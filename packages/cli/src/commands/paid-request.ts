@@ -5,6 +5,10 @@ import { SHARED_OPTIONS } from '#config.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { createOutput } from '#lib/output.ts';
 import {
+  REQUESTED_PORTS_AMOUNT_FLAG,
+  REQUESTED_PORTS_AMOUNT_SCHEMA,
+} from '#lib/paid-port-requests.ts';
+import {
   APP_PAID_REQUEST_TYPE_SCHEMA,
   completePaidRequest,
   PAID_REQUEST_OUTPUT,
@@ -29,6 +33,11 @@ export const command = defineCommand('paid-request', {
     [REQUESTED_APPS_AMOUNT_FLAG]: {
       schema: REQUESTED_APPS_AMOUNT_SCHEMA.optional(),
       description: `Total apps you need (${MIN_PAID_APPS_REQUEST}–${MAX_PAID_APPS_REQUEST}). Only for --type apps; asked when omitted in a terminal.`,
+    },
+    [REQUESTED_PORTS_AMOUNT_FLAG]: {
+      schema: REQUESTED_PORTS_AMOUNT_SCHEMA.optional(),
+      description:
+        'Total extra public ports needed for this app. Only for --type extra-public-port; asked when omitted in a terminal.',
     },
     [REQUESTED_VCPU_COUNT_FLAG]: {
       schema: PAID_RESOURCE_OPTIONS_SCHEMA.shape[REQUESTED_VCPU_COUNT_FLAG],

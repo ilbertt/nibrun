@@ -32,7 +32,11 @@ export const PaidRequestSchema = Type.Union([
     { additionalProperties: false },
   ),
   Type.Object(
-    { requestType: Type.Literal('extra-public-port'), appId: AppIdSchema },
+    {
+      requestType: Type.Literal('extra-public-port'),
+      appId: AppIdSchema,
+      requestedPortsAmount: RequestedResourceAmountSchema,
+    },
     { additionalProperties: false },
   ),
   Type.Object(

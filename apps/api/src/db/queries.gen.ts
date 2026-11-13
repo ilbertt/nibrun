@@ -1173,6 +1173,7 @@ export interface IUpsertPaidRequestResult {
     requested_vcpu_count: IPaidRequestsColumns["requested_vcpu_count"];
     requested_memory_mib: IPaidRequestsColumns["requested_memory_mib"];
     requested_volume_gib: IPaidRequestsColumns["requested_volume_gib"];
+    requested_ports_amount: IPaidRequestsColumns["requested_ports_amount"];
 }
 
 /** Result of query `InsertSqliteConnection`. */
@@ -2125,6 +2126,7 @@ export interface IPaidRequestsColumns {
     requested_vcpu_count: number | null;
     requested_memory_mib: number | null;
     requested_volume_gib: number | null;
+    requested_ports_amount: number | null;
 }
 
 /** Schema of `paid_requests`. */
@@ -2860,7 +2862,8 @@ export const schema = {
             app_id: { _columnName: "app_id", _foreignKeys: { paid_requests_app_id_fkey: { _constraintName: "paid_requests_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
             requested_vcpu_count: { _columnName: "requested_vcpu_count", _foreignKeys: {} },
             requested_memory_mib: { _columnName: "requested_memory_mib", _foreignKeys: {} },
-            requested_volume_gib: { _columnName: "requested_volume_gib", _foreignKeys: {} }
+            requested_volume_gib: { _columnName: "requested_volume_gib", _foreignKeys: {} },
+            requested_ports_amount: { _columnName: "requested_ports_amount", _foreignKeys: {} }
         },
         _indexes: {
             paid_requests_app_id_idx: { _indexName: "paid_requests_app_id_idx" },
@@ -2875,6 +2878,7 @@ export const schema = {
             paid_requests_pkey: { _constraintName: "paid_requests_pkey" },
             paid_requests_requested_apps_amount_check: { _constraintName: "paid_requests_requested_apps_amount_check" },
             paid_requests_requested_memory_mib_check: { _constraintName: "paid_requests_requested_memory_mib_check" },
+            paid_requests_requested_ports_amount_check: { _constraintName: "paid_requests_requested_ports_amount_check" },
             paid_requests_requested_vcpu_count_check: { _constraintName: "paid_requests_requested_vcpu_count_check" },
             paid_requests_requested_volume_gib_check: { _constraintName: "paid_requests_requested_volume_gib_check" },
             paid_requests_type_check: { _constraintName: "paid_requests_type_check" }

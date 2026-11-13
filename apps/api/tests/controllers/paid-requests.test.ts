@@ -8,6 +8,7 @@ import { ORIGIN, sendJson } from '#tests/controllers/support/api.ts';
 import {
   APP_PAID_REQUESTS,
   CUSTOM_BUCKET_REQUEST,
+  EXTRA_PUBLIC_PORT_REQUEST,
   paidRequestBody,
   RESOURCES_REQUEST,
 } from '#tests/support/paid-requests.ts';
@@ -16,7 +17,7 @@ const { auth, AppsServicePlugin, PaidRequestsServicePlugin } = await import('#se
 const URL = `${ORIGIN}/api/paid-requests`;
 const REQUEST = { requestType: 'apps' as const, requestedAppsAmount: 10 };
 const APPS_ALLOWED = 3;
-const FRACTIONAL_RESOURCE_AMOUNT = 1.5;
+const FRACTIONAL_REQUEST_AMOUNT = 1.5;
 
 afterEach(function restoreMocks() {
   mock.restore();
@@ -144,7 +145,7 @@ test.each(['requestedVcpuCount', 'requestedMemoryMib', 'requestedVolumeGib'])(
       null,
       0,
       -1,
-      FRACTIONAL_RESOURCE_AMOUNT,
+      FRACTIONAL_REQUEST_AMOUNT,
       '1',
       MAX_PAID_RESOURCE_AMOUNT + 1,
     ]) {
@@ -225,3 +226,40 @@ test('a quota refusal carries the account limit and paid-app question', async ()
   expect(await response.json()).toEqual(refusal.response);
   expect(refusal.message).toContain('Paid apps are coming. How many apps do you need?');
 });
+
+test('extra port requests require a positive whole total', async () => {
+  const account = await registeredAccount();
+  const save = spyOn(PaidRequestsServicePlugin.decorator.paidRequestsService, 'save');
+  for (const requestedPortsAmount of [
+    undefined,
+    null,
+    0,
+    -1,
+    FRACTIONAL_REQUEST_AMOUNT,
+    '2',
+    MAX_PAID_RESOURCE_AMOUNT + 1,
+  ]) {
+    const response = await sendJson({
+      method: 'PUT',
+      url: `${URL}/${EXTRA_PUBLIC_PORT_REQUEST.requestType}`,
+      body: { appId: EXTRA_PUBLIC_PORT_REQUEST.appId, requestedPortsAmount },
+      headers: { cookie: account.cookie },
+    });
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  }
+  expect(save).not.toHaveBeenCalled();
+});
+
+test.each(APP_PAID_REQUESTS.filter((request) => request.requestType !== 'extra-public-port'))(
+  'port quantities cannot be attached to $requestType requests',
+  async (request) => {
+    const account = await registeredAccount();
+    const response = await sendJson({
+      method: 'PUT',
+      url: `${URL}/${request.requestType}`,
+      body: { ...paidRequestBody(request), requestedPortsAmount: 2 },
+      headers: { cookie: account.cookie },
+    });
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  },
+);
