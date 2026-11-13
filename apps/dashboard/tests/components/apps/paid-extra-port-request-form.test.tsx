@@ -38,6 +38,7 @@ test('the port form asks for the app’s requested total, starting with one', ()
   expect(inputs).toHaveLength(1);
   expect(inputs[0]).toContain('type="number"');
   expect(inputs[0]).toContain('min="1"');
+  expect(inputs[0]).toContain('max="5"');
   expect(inputs[0]).toContain('step="1"');
   expect(inputs[0]).toContain('value="1"');
   expect(inputs[0]).toContain('required');

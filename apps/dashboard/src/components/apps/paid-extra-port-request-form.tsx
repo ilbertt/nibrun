@@ -1,4 +1,4 @@
-import { MAX_PAID_RESOURCE_AMOUNT } from '@repo/api-constants';
+import { MAX_PAID_PORTS_REQUEST, MIN_PAID_PORTS_REQUEST } from '@repo/api-constants';
 import { Button } from '@repo/ui/components/button';
 import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
@@ -24,8 +24,8 @@ export function PaidExtraPortRequestForm() {
           id={inputId}
           type="number"
           inputMode="numeric"
-          min={1}
-          max={MAX_PAID_RESOURCE_AMOUNT}
+          min={MIN_PAID_PORTS_REQUEST}
+          max={MAX_PAID_PORTS_REQUEST}
           step={1}
           required
           value={form.value}
@@ -33,7 +33,8 @@ export function PaidExtraPortRequestForm() {
           disabled={form.pending}
         />
         <FieldDescription>
-          Enter the total number of extra ports you need for this app.
+          Enter the total number of extra ports you need for this app ({MIN_PAID_PORTS_REQUEST}–
+          {MAX_PAID_PORTS_REQUEST}).
         </FieldDescription>
       </Field>
       <Button type="submit" disabled={!form.submittable}>

@@ -1,5 +1,9 @@
 import { afterEach, expect, mock, spyOn, test } from 'bun:test';
-import { MAX_PAID_RESOURCE_AMOUNT } from '@repo/api-constants';
+import {
+  MAX_PAID_PORTS_REQUEST,
+  MAX_PAID_RESOURCE_AMOUNT,
+  MIN_PAID_PORTS_REQUEST,
+} from '@repo/api-constants';
 import { StatusMap } from 'elysia';
 import { AppQuotaExceededError } from '#lib/app-quota.ts';
 import { NotFoundError } from '#lib/errors.ts';
@@ -237,7 +241,7 @@ test('extra port requests require a positive whole total', async () => {
     -1,
     FRACTIONAL_REQUEST_AMOUNT,
     '2',
-    MAX_PAID_RESOURCE_AMOUNT + 1,
+    MAX_PAID_PORTS_REQUEST + 1,
   ]) {
     const response = await sendJson({
       method: 'PUT',
@@ -261,5 +265,26 @@ test.each(APP_PAID_REQUESTS.filter((request) => request.requestType !== 'extra-p
       headers: { cookie: account.cookie },
     });
     expect(response.status).toBe(StatusMap['Bad Request']);
+  },
+);
+
+test.each([MIN_PAID_PORTS_REQUEST, MAX_PAID_PORTS_REQUEST])(
+  'extra port requests accept a total of %s',
+  async (requestedPortsAmount) => {
+    const account = await registeredAccount();
+    const request = { ...EXTRA_PUBLIC_PORT_REQUEST, requestedPortsAmount };
+    const save = spyOn(
+      PaidRequestsServicePlugin.decorator.paidRequestsService,
+      'save',
+    ).mockResolvedValue(request);
+    const response = await sendJson({
+      method: 'PUT',
+      url: `${URL}/${request.requestType}`,
+      body: paidRequestBody(request),
+      headers: { cookie: account.cookie },
+    });
+    expect(response.status).toBe(StatusMap.OK);
+    expect(await response.json()).toEqual(request);
+    expect(save).toHaveBeenCalledWith({ ownerId: account.ownerId, request });
   },
 );

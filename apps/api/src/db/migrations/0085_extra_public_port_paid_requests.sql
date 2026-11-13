@@ -2,7 +2,7 @@ ALTER TABLE nibrun.paid_requests
   ADD COLUMN requested_ports_amount integer,
   ADD CONSTRAINT paid_requests_requested_ports_amount_check CHECK (
     CASE WHEN request_type = 'extra-public-port'
-      THEN requested_ports_amount IS NOT NULL AND requested_ports_amount > 0
+      THEN requested_ports_amount IS NOT NULL AND requested_ports_amount BETWEEN 1 AND 5
       ELSE requested_ports_amount IS NULL
     END
   ),

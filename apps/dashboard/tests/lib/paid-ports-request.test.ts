@@ -1,8 +1,8 @@
 import { expect, test } from 'bun:test';
-import { MAX_PAID_RESOURCE_AMOUNT } from '@repo/api-constants';
+import { MAX_PAID_PORTS_REQUEST } from '@repo/api-constants';
 import { paidPortsAmount } from '#lib/paid-ports-request.ts';
 
-test.each(['1', '3', ' 10 '])('a whole port total of %s can be submitted', (value) => {
+test.each(['1', '3', ' 5 '])('a whole port total of %s can be submitted', (value) => {
   expect(paidPortsAmount(value)).toBe(Number(value));
 });
 
@@ -15,7 +15,7 @@ test.each([
   'NaN',
   'Infinity',
   'two',
-  String(MAX_PAID_RESOURCE_AMOUNT + 1),
+  String(MAX_PAID_PORTS_REQUEST + 1),
 ])('invalid port total %s cannot be submitted', (value) => {
   expect(paidPortsAmount(value)).toBeUndefined();
 });

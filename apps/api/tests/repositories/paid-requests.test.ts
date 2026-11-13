@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { withTypes } from '@ilbertt/bun-sqlgen';
-import { MAX_PAID_APPS_REQUEST } from '@repo/api-constants';
+import { MAX_PAID_APPS_REQUEST, MAX_PAID_PORTS_REQUEST } from '@repo/api-constants';
 import { AppIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
@@ -342,7 +342,7 @@ test('resubmitting a port total updates the existing app request', async () => {
     'SELECT id FROM nibrun.paid_requests WHERE owner_id = $1 AND request_type = $2 AND app_id = $3',
     [OWNER_ID, EXTRA_PUBLIC_PORT_REQUEST.requestType, EXTRA_PUBLIC_PORT_REQUEST.appId],
   );
-  const request = { ...EXTRA_PUBLIC_PORT_REQUEST, requestedPortsAmount: 3 };
+  const request = { ...EXTRA_PUBLIC_PORT_REQUEST, requestedPortsAmount: MAX_PAID_PORTS_REQUEST };
   expect(await repository().save({ ownerId: OWNER_ID, request })).toEqual(paidRequestRow(request));
   const [after] = await sql.unsafe(
     'SELECT id FROM nibrun.paid_requests WHERE owner_id = $1 AND request_type = $2 AND app_id = $3',
@@ -353,7 +353,7 @@ test('resubmitting a port total updates the existing app request', async () => {
 });
 
 test('port quantities are required only for extra port requests', async () => {
-  for (const amount of [null, 0, -1]) {
+  for (const amount of [null, 0, -1, MAX_PAID_PORTS_REQUEST + 1]) {
     await expect(
       sql
         .unsafe(

@@ -1,11 +1,15 @@
 import { text } from '@clack/prompts';
-import { MAX_PAID_RESOURCE_AMOUNT } from '@repo/api-constants';
+import { MAX_PAID_PORTS_REQUEST, MIN_PAID_PORTS_REQUEST } from '@repo/api-constants';
 import { z } from 'zod';
 import { UsageError } from '#lib/errors.ts';
 import { answered } from '#lib/prompts.ts';
 
 export const REQUESTED_PORTS_AMOUNT_FLAG = 'requested-ports-amount';
-export const REQUESTED_PORTS_AMOUNT_SCHEMA = z.number().int().min(1).max(MAX_PAID_RESOURCE_AMOUNT);
+export const REQUESTED_PORTS_AMOUNT_SCHEMA = z
+  .number()
+  .int()
+  .min(MIN_PAID_PORTS_REQUEST)
+  .max(MAX_PAID_PORTS_REQUEST);
 
 export async function completePaidPortAmount({
   amount,
@@ -25,7 +29,7 @@ export async function completePaidPortAmount({
   const value = answered(
     await text({
       message: 'How many extra public ports do you need for this app?',
-      defaultValue: '1',
+      defaultValue: String(MIN_PAID_PORTS_REQUEST),
       validate: validateAmount,
     }),
   );
@@ -35,5 +39,5 @@ export async function completePaidPortAmount({
 function validateAmount(value: string | undefined): string | undefined {
   return REQUESTED_PORTS_AMOUNT_SCHEMA.safeParse(Number(value)).success
     ? undefined
-    : 'Enter a positive whole number.';
+    : `Enter a whole number from ${MIN_PAID_PORTS_REQUEST} to ${MAX_PAID_PORTS_REQUEST}.`;
 }

@@ -4,8 +4,10 @@ import { createCli } from '@parshjs/core';
 import {
   APP_QUOTA_EXCEEDED_CODE,
   MAX_PAID_APPS_REQUEST,
+  MAX_PAID_PORTS_REQUEST,
   MAX_PAID_RESOURCE_AMOUNT,
   MIN_PAID_APPS_REQUEST,
+  MIN_PAID_PORTS_REQUEST,
 } from '@repo/api-constants';
 import { commandTree } from '#command-tree.gen.ts';
 import { createApi } from '#lib/api.ts';
@@ -761,7 +763,7 @@ test.each([NAME, SLUG])('a port request preserves its total for app %s', async (
   });
 });
 
-test.each(['0', '-1', '1.5', 'NaN', String(MAX_PAID_RESOURCE_AMOUNT + 1)])(
+test.each(['0', '-1', '1.5', 'NaN', String(MAX_PAID_PORTS_REQUEST + 1)])(
   'an invalid port total %s is rejected before API calls',
   async (amount) => {
     expect(
@@ -835,5 +837,28 @@ test.each(['apps', ...APP_REQUEST_TYPES, 'resources'])(
       ]),
     ).toBe(1);
     expect(requests).toEqual([]);
+  },
+);
+
+test.each([MIN_PAID_PORTS_REQUEST, MAX_PAID_PORTS_REQUEST])(
+  'the CLI accepts a port total of %s',
+  async (requestedPortsAmount) => {
+    expect(
+      await paidRequestCli().run([
+        'paid-request',
+        '--type',
+        'extra-public-port',
+        '--app',
+        NAME,
+        '--requested-ports-amount',
+        String(requestedPortsAmount),
+        '--json',
+      ]),
+    ).toBe(0);
+    expect(JSON.parse(output.join(''))).toEqual({
+      requestType: 'extra-public-port',
+      appId: APP_ID,
+      requestedPortsAmount,
+    });
   },
 );

@@ -1,7 +1,9 @@
 import {
   MAX_PAID_APPS_REQUEST,
+  MAX_PAID_PORTS_REQUEST,
   MAX_PAID_RESOURCE_AMOUNT,
   MIN_PAID_APPS_REQUEST,
+  MIN_PAID_PORTS_REQUEST,
 } from '@repo/api-constants';
 import { AppIdSchema } from '@repo/protocol';
 import { type Static, Type } from '@sinclair/typebox';
@@ -9,6 +11,11 @@ import { type Static, Type } from '@sinclair/typebox';
 const RequestedResourceAmountSchema = Type.Integer({
   minimum: 1,
   maximum: MAX_PAID_RESOURCE_AMOUNT,
+});
+
+const RequestedPortsAmountSchema = Type.Integer({
+  minimum: MIN_PAID_PORTS_REQUEST,
+  maximum: MAX_PAID_PORTS_REQUEST,
 });
 
 export const PaidRequestSchema = Type.Union([
@@ -35,7 +42,7 @@ export const PaidRequestSchema = Type.Union([
     {
       requestType: Type.Literal('extra-public-port'),
       appId: AppIdSchema,
-      requestedPortsAmount: RequestedResourceAmountSchema,
+      requestedPortsAmount: RequestedPortsAmountSchema,
     },
     { additionalProperties: false },
   ),

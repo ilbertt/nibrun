@@ -1,4 +1,5 @@
 import { unwrap } from '@repo/api-client/unwrap';
+import { MIN_PAID_PORTS_REQUEST } from '@repo/api-constants';
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { api } from '#lib/api.ts';
@@ -17,7 +18,7 @@ type PaidExtraPortRequestForm = {
 
 export function usePaidExtraPortRequest(): PaidExtraPortRequestForm {
   const appId = useAppId();
-  const [value, setValue] = useState('1');
+  const [value, setValue] = useState(String(MIN_PAID_PORTS_REQUEST));
   const amount = paidPortsAmount(value);
   const save = useMutation({
     mutationFn: async function savePaidExtraPortRequest(requestedPortsAmount: number) {
