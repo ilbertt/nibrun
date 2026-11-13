@@ -116,6 +116,26 @@ async function createApp(slug: string): Promise<AppId> {
   return created.app.id;
 }
 
+test('owner configuration changes preserve an existing platform-enabled extra port', async () => {
+  const slug = Value.Parse(DnsLabelSchema, 'enabled-extra-port');
+  const created = requireCreated(
+    await repo.create({
+      anonymousAppsAtMost: null,
+      ownerId: OWNER_ID,
+      name: Value.Parse(AppNameSchema, slug),
+      slug,
+      hostname: Value.Parse(HostnameSchema, `${slug}.apps.example.com`),
+      config: { ...configWithDefaults(), hasExtraPublicPort: true, environment: {} },
+    }),
+  );
+  const updated = await repo.update({
+    appId: created.app.id,
+    ownerId: OWNER_ID,
+    patch: { name: undefined, args: ['serve'] },
+  });
+  expect(updated?.has_extra_public_port).toBe(true);
+});
+
 async function createHostedUsageApp(slug: string): Promise<AppId> {
   const appId = await createApp(slug);
   const [artifact] = await sql.unsafe(

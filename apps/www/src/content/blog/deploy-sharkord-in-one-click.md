@@ -44,17 +44,11 @@ What is left:
 
 **HTTP port**: `4991`, Sharkord's own default.
 
-**Additional ports**: tick *Give this app a public port besides HTTPS*. That's the one voice needs.
-You don't pick the number — nibrun assigns one, TCP and UDP, and tells the app which address and
-port it got.
-
 **Environment variables**:
 
 ```
 SHARKORD_DATA_PATH=data
 SHARKORD_AUTOUPDATE=false
-SHARKORD_WEBRTC_PORT=${NIBRUN_EXTRA_PUBLIC_PORT}
-SHARKORD_WEBRTC_ANNOUNCED_ADDRESS=${NIBRUN_PUBLIC_IPV4}
 ```
 
 Deploy. Or follow this link, which is that same screen already configured, the binary included:
@@ -67,9 +61,18 @@ it's the one you can't leave out: without it Sharkord falls back to `~/.config/s
 ever binds a port. `SHARKORD_AUTOUPDATE=false` because the artifact you deployed is what boots;
 upgrading is a redeploy.
 
-The last two are the firewall rule you didn't have to write. The guest expands `${…}` before the
-process starts, so Sharkord binds the port this deployment was actually assigned and announces the
-address it is actually reached at.
+WebRTC calls, including voice, video and screen sharing, require an extra public TCP/UDP port,
+which is a paid feature. After deploying, open the app in the dashboard and choose **Request extra
+port** under **Configuration**, or send a request from the CLI:
+
+```sh
+nib paid-request --type extra-public-port --app sharkord --requested-ports-amount 1
+```
+
+Sending a request records your interest; it does not enable the port or charge you.
+
+Once the port is enabled, configure `SHARKORD_WEBRTC_PORT` with `${NIBRUN_EXTRA_PUBLIC_PORT}` and
+`SHARKORD_WEBRTC_ANNOUNCED_ADDRESS` with `${NIBRUN_PUBLIC_IPV4}` in the app’s environment variables.
 
 There is a CLI too, if your mouse click doesn't work anymore:
 
@@ -82,15 +85,10 @@ The same deploy in one command, with the binary as a url so nothing is uploaded 
 
 ```sh
 nib run https://github.com/sharkord/sharkord/releases/latest/download/sharkord-linux-x64 \
-  --name sharkord --port 4991 --extra-public-port \
+  --name sharkord --port 4991 \
   --env SHARKORD_DATA_PATH=data \
-  --env SHARKORD_AUTOUPDATE=false \
-  --env 'SHARKORD_WEBRTC_PORT=${NIBRUN_EXTRA_PUBLIC_PORT}' \
-  --env 'SHARKORD_WEBRTC_ANNOUNCED_ADDRESS=${NIBRUN_PUBLIC_IPV4}'
+  --env SHARKORD_AUTOUPDATE=false
 ```
-
-The single quotes on the last two matter. Without them your own shell expands the names first, and
-the app is handed two empty strings.
 
 ## The owner token
 

@@ -12,6 +12,11 @@ import { selectApp } from '#lib/apps.ts';
 import { UsageError } from '#lib/errors.ts';
 import { defineOutput } from '#lib/output.ts';
 import {
+  completePaidPortAmount,
+  REQUESTED_PORTS_AMOUNT_FLAG,
+  REQUESTED_PORTS_AMOUNT_SCHEMA,
+} from '#lib/paid-port-requests.ts';
+import {
   completePaidResourceAmounts,
   PAID_RESOURCE_AMOUNTS_SCHEMA,
   PAID_RESOURCE_OPTIONS_SCHEMA,
@@ -23,6 +28,7 @@ const REQUEST_TYPES = [
   'custom-bucket',
   'always-on',
   'resources',
+  'extra-public-port',
 ] as const satisfies readonly PaidRequestType[];
 type CliPaidRequestType = (typeof REQUEST_TYPES)[number];
 
@@ -31,7 +37,10 @@ export const PAID_REQUEST_TYPE_SCHEMA = z.enum(REQUEST_TYPES, {
 });
 
 export const APP_PAID_REQUEST_TYPE_SCHEMA = PAID_REQUEST_TYPE_SCHEMA.exclude(['apps']);
-const AppFeatureRequestTypeSchema = APP_PAID_REQUEST_TYPE_SCHEMA.exclude(['resources']);
+const AppFeatureRequestTypeSchema = APP_PAID_REQUEST_TYPE_SCHEMA.exclude([
+  'resources',
+  'extra-public-port',
+]);
 
 export const REQUESTED_APPS_AMOUNT_FLAG = 'requested-apps-amount';
 
@@ -49,6 +58,11 @@ const PaidRequestOptionsSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: AppFeatureRequestTypeSchema,
     [SHARED_OPTIONS.app.name]: SHARED_OPTIONS.app.option.schema,
+  }),
+  z.strictObject({
+    type: z.literal(PAID_REQUEST_TYPE_SCHEMA.enum['extra-public-port']),
+    [SHARED_OPTIONS.app.name]: SHARED_OPTIONS.app.option.schema,
+    [REQUESTED_PORTS_AMOUNT_FLAG]: REQUESTED_PORTS_AMOUNT_SCHEMA.optional(),
   }),
   z.strictObject({
     type: z.literal(PAID_REQUEST_TYPE_SCHEMA.enum.resources),
@@ -69,6 +83,11 @@ export const PAID_REQUEST_OUTPUT = defineOutput({
       requestType: AppFeatureRequestTypeSchema,
       appId: z.string(),
     }),
+    z.object({
+      requestType: z.literal(PAID_REQUEST_TYPE_SCHEMA.enum['extra-public-port']),
+      appId: z.string(),
+      requestedPortsAmount: REQUESTED_PORTS_AMOUNT_SCHEMA,
+    }),
     PAID_RESOURCE_AMOUNTS_SCHEMA.safeExtend({
       requestType: z.literal(PAID_REQUEST_TYPE_SCHEMA.enum.resources),
       appId: z.string(),
@@ -85,6 +104,12 @@ export const PAID_REQUEST_OUTPUT = defineOutput({
     if (value.requestType === PAID_REQUEST_TYPE_SCHEMA.enum.resources) {
       out.success(
         `Thanks! We recorded your request for ${value.requestedVcpuCount} vCPUs, ${value.requestedMemoryMib} MiB RAM, and ${value.requestedVolumeGib} GiB volume in total for app ${value.appId}. This does not resize the app or charge you.`,
+      );
+      return;
+    }
+    if (value.requestType === PAID_REQUEST_TYPE_SCHEMA.enum['extra-public-port']) {
+      out.success(
+        `Thanks! We recorded your request for ${value.requestedPortsAmount} extra public port${value.requestedPortsAmount === 1 ? '' : 's'} for app ${value.appId}. This does not enable the ports or charge you.`,
       );
       return;
     }
@@ -133,6 +158,16 @@ export async function completePaidRequest({
     name: parsed.data[SHARED_OPTIONS.app.name],
     interactive,
   });
+  if (parsed.data.type === PAID_REQUEST_TYPE_SCHEMA.enum['extra-public-port']) {
+    return {
+      requestType: parsed.data.type,
+      appId: app.id,
+      requestedPortsAmount: await completePaidPortAmount({
+        amount: parsed.data[REQUESTED_PORTS_AMOUNT_FLAG],
+        interactive,
+      }),
+    };
+  }
   if (parsed.data.type === PAID_REQUEST_TYPE_SCHEMA.enum.resources) {
     const selected = unwrap(await api.api.apps({ appId: app.id }).get());
     return {

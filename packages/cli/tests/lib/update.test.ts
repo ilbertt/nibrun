@@ -79,18 +79,6 @@ test('arguments nobody named are not arguments cleared', async () => {
   expect(patched).toEqual([{ httpPort: 8080 }]);
 });
 
-// Which port an app is given is nibrun's to decide, so the flag carries a yes or a no and never a
-// number — and the no has to travel, or there would be no way to give the port up.
-test('asking for a public port sends the answer, and so does giving it up', async () => {
-  const patched: unknown[] = [];
-  const api = apiHoldingPatchable({ patched });
-
-  await updateApp({ api, ui: uiRecording(), appId: APP_ID, extraPublicPort: true });
-  await updateApp({ api, ui: uiRecording(), appId: APP_ID, extraPublicPort: false });
-
-  expect(patched).toEqual([{ hasExtraPublicPort: true }, { hasExtraPublicPort: false }]);
-});
-
 test('a flag nobody passed says nothing about the port', async () => {
   const patched: unknown[] = [];
 

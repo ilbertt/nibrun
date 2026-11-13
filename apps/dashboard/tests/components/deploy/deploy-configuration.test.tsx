@@ -10,9 +10,6 @@ import type { AppSummary } from '#queries/apps.ts';
 
 const INITIAL_DATA = 'Initial data';
 const PORT = '8080';
-const PORT_AFTER_SIGNING_IN = 'Sign in to open one.';
-// The one checkbox the form has, read the way assistive technology reads it.
-const GREYED_CHECKBOX = /role="checkbox"[^>]*aria-disabled="true"/;
 
 /**
  * The api client is built against the origin it is same-origin with as it is imported, and the form
@@ -29,7 +26,6 @@ const UNTOUCHED: DeployFormValues = {
   binary: undefined,
   name: '',
   port: undefined,
-  extraPublicPort: undefined,
   args: undefined,
   environment: undefined,
   initialData: undefined,
@@ -39,13 +35,7 @@ const UNTOUCHED: DeployFormValues = {
 const RUNNING = { config: { args: [], environment: [] } } as unknown as AppSummary;
 
 /** The form as this file needs it: a real api, and around it what the hook would have read. */
-function Configuration({
-  replacing,
-  portOffered,
-}: {
-  replacing: AppSummary | undefined;
-  portOffered: boolean;
-}) {
+function Configuration({ replacing }: { replacing: AppSummary | undefined }) {
   const api: DeployFormApi = useForm({ defaultValues: UNTOUCHED });
   const form: DeployFormState = {
     api,
@@ -54,9 +44,7 @@ function Configuration({
     replacing,
     targetResolved: true,
     defaultPort: PORT,
-    defaultExtraPublicPort: false,
     defaultArgs: '',
-    portOffered,
   };
 
   return <DeployConfiguration form={form} suggested={undefined} />;
@@ -64,7 +52,7 @@ function Configuration({
 
 describe('what a deploy is beyond the binary itself', () => {
   test('an app being created is offered the data its filesystem starts as', () => {
-    const markup = renderToStaticMarkup(<Configuration replacing={undefined} portOffered={true} />);
+    const markup = renderToStaticMarkup(<Configuration replacing={undefined} />);
 
     expect(markup).toContain(INITIAL_DATA);
     expect(markup).toContain('.tar.gz');
@@ -77,34 +65,17 @@ describe('what a deploy is beyond the binary itself', () => {
    * and a field only ever answered with a 409 is worse than no field.
    */
   test('an app that already has one is not asked for it again', () => {
-    const markup = renderToStaticMarkup(<Configuration replacing={RUNNING} portOffered={true} />);
+    const markup = renderToStaticMarkup(<Configuration replacing={RUNNING} />);
 
     expect(markup).not.toContain(INITIAL_DATA);
     expect(markup).toContain('Environment variables');
   });
 });
 
-/**
- * The api makes a stranger's app without a port besides HTTPS whatever was asked, so the box is
- * greyed with the way to get one rather than offered and then quietly not honoured.
- */
-describe('a port besides HTTPS waits for an identity', () => {
-  test('a visitor without one is told so, and cannot tick the box', () => {
-    const markup = renderToStaticMarkup(
-      <Configuration replacing={undefined} portOffered={false} />,
-    );
-
-    expect(markup).toContain(PORT_AFTER_SIGNING_IN);
-    expect(markup).toMatch(GREYED_CHECKBOX);
-  });
-
-  test('one with an identity is offered it, and told what it sets', () => {
-    const markup = renderToStaticMarkup(<Configuration replacing={undefined} portOffered={true} />);
-
-    expect(markup).not.toContain(PORT_AFTER_SIGNING_IN);
-    expect(markup).toContain('NIBRUN_EXTRA_PUBLIC_PORT');
-    expect(markup).not.toMatch(GREYED_CHECKBOX);
-  });
+test('extra ports cannot be configured in the deploy form', () => {
+  const markup = renderToStaticMarkup(<Configuration replacing={undefined} />);
+  expect(markup).not.toContain('Additional ports');
+  expect(markup).not.toContain('deploy-extra-public-port');
 });
 
 test('remote initial data is validated as an HTTPS URL rather than as an uploaded file', async () => {

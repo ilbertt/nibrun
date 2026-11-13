@@ -243,3 +243,19 @@ describe('a malformed request is a bad request', () => {
     expect(response.status).toBe(StatusMap['Bad Request']);
   });
 });
+
+test.each([true, false])(
+  'owners cannot set extra ports to %s through app writes',
+  async (hasExtraPublicPort) => {
+    for (const request of [
+      {
+        method: 'POST' as const,
+        url: APPS_URL,
+        body: { name: 'pocketbase', config: { hasExtraPublicPort } },
+      },
+      { method: 'PATCH' as const, url: APP_URL, body: { hasExtraPublicPort } },
+    ]) {
+      expect((await sendJson(request)).status).toBe(StatusMap['Bad Request']);
+    }
+  },
+);

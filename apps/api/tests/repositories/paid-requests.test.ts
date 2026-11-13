@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { withTypes } from '@ilbertt/bun-sqlgen';
-import { MAX_PAID_APPS_REQUEST } from '@repo/api-constants';
+import { MAX_PAID_APPS_REQUEST, MAX_PAID_PORTS_REQUEST } from '@repo/api-constants';
 import { AppIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
@@ -15,6 +15,7 @@ import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts'
 import {
   APP_PAID_REQUESTS,
   CUSTOM_BUCKET_REQUEST,
+  EXTRA_PUBLIC_PORT_REQUEST,
   paidRequestRow,
   RESOURCES_REQUEST,
 } from '#tests/support/paid-requests.ts';
@@ -59,7 +60,7 @@ function repository() {
 async function savedRequests(ownerId: OwnerId): Promise<PaidRequestRow[]> {
   return (await sql.unsafe(
     `SELECT request_type, requested_apps_amount, app_id, requested_vcpu_count,
-       requested_memory_mib, requested_volume_gib FROM nibrun.paid_requests WHERE owner_id = $1`,
+       requested_memory_mib, requested_volume_gib, requested_ports_amount FROM nibrun.paid_requests WHERE owner_id = $1`,
     [ownerId],
   )) as PaidRequestRow[];
 }
@@ -88,6 +89,9 @@ test('the upgrade preserves valid requests and requires app IDs for app features
       [OWNER_ID],
     );
     await transaction.unsafe(await migrations.get('0076_resources_paid_requests.sql')!.text());
+    await transaction.unsafe(
+      await migrations.get('0085_extra_public_port_paid_requests.sql')!.text(),
+    );
     const after = await transaction.unsafe(
       'SELECT id, request_type, requested_apps_amount, app_id FROM nibrun.paid_requests WHERE owner_id = $1 ORDER BY request_type',
       [OWNER_ID],
@@ -332,6 +336,42 @@ test.each(['requested_vcpu_count', 'requested_memory_mib', 'requested_volume_gib
     ).rejects.toMatchObject({ errno: '23514' });
   },
 );
+
+test('resubmitting a port total updates the existing app request', async () => {
+  const [before] = await sql.unsafe(
+    'SELECT id FROM nibrun.paid_requests WHERE owner_id = $1 AND request_type = $2 AND app_id = $3',
+    [OWNER_ID, EXTRA_PUBLIC_PORT_REQUEST.requestType, EXTRA_PUBLIC_PORT_REQUEST.appId],
+  );
+  const request = { ...EXTRA_PUBLIC_PORT_REQUEST, requestedPortsAmount: MAX_PAID_PORTS_REQUEST };
+  expect(await repository().save({ ownerId: OWNER_ID, request })).toEqual(paidRequestRow(request));
+  const [after] = await sql.unsafe(
+    'SELECT id FROM nibrun.paid_requests WHERE owner_id = $1 AND request_type = $2 AND app_id = $3',
+    [OWNER_ID, request.requestType, request.appId],
+  );
+  expect(after.id).toBe(before.id);
+  expect(await savedRequests(OWNER_ID)).toContainEqual(paidRequestRow(request));
+});
+
+test('port quantities are required only for extra port requests', async () => {
+  for (const amount of [null, 0, -1, MAX_PAID_PORTS_REQUEST + 1]) {
+    await expect(
+      sql
+        .unsafe(
+          'UPDATE nibrun.paid_requests SET requested_ports_amount = $1 WHERE owner_id = $2 AND request_type = $3',
+          [amount, OWNER_ID, EXTRA_PUBLIC_PORT_REQUEST.requestType],
+        )
+        .execute(),
+    ).rejects.toMatchObject({ errno: '23514' });
+  }
+  await expect(
+    sql
+      .unsafe(
+        'UPDATE nibrun.paid_requests SET requested_ports_amount = 1 WHERE owner_id = $1 AND request_type <> $2',
+        [OWNER_ID, EXTRA_PUBLIC_PORT_REQUEST.requestType],
+      )
+      .execute(),
+  ).rejects.toMatchObject({ errno: '23514' });
+});
 
 test('deleted apps cannot be requested and hard deletion removes their requests', async () => {
   await sql.unsafe('UPDATE nibrun.apps SET state = $2 WHERE id = $1 AND owner_id = $3', [

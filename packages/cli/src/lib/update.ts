@@ -12,7 +12,6 @@ export type UpdateInput = {
   name?: string | undefined;
   args?: TenantArguments | undefined;
   port?: number | undefined;
-  extraPublicPort?: boolean | undefined;
   env?: string[] | undefined;
   unset?: string[] | undefined;
   detach?: boolean | undefined;
@@ -32,7 +31,6 @@ export async function updateApp({
   name,
   args,
   port,
-  extraPublicPort,
   env,
   unset,
   detach,
@@ -43,7 +41,6 @@ export async function updateApp({
     name,
     args,
     port,
-    extraPublicPort,
     environment: environmentEdit({ env, unset }),
     onStep: (step) => announce({ step, ui }),
   });

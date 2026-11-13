@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol/runtime-values';
 import type { Queries } from '#db/queries.gen.ts';
 import type { AppActivation, AppState } from '#lib/api/app.ts';
 import type { DeploymentState } from '#lib/api/deployment.ts';
@@ -72,6 +73,23 @@ describe('what a host is told to run with', () => {
     });
 
     expect(instance.config.environment).toEqual({ OPENCLAW_STATE_DIR: SECRET } as never);
+  });
+
+  test('an existing enabled port and its runtime references still reach the agent', () => {
+    const environment = {
+      ANNOUNCED_IP: interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name),
+      ANNOUNCED_PORT: interpolableRuntimeValue(RUNTIME_VALUES.EXTRA_PUBLIC_PORT.name),
+    } as never;
+    const instance = toDesiredInstance({
+      row: { ...deploymentRow(), has_extra_public_port: true },
+      hostnames: new Map(),
+      environments: new Map([
+        [DEPLOYMENT, sealEnvironment({ key: TEST_SECRETS_KEY, environment })],
+      ]),
+      secretsKey: TEST_SECRETS_KEY,
+    });
+    expect(instance.config.hasExtraPublicPort).toBe(true);
+    expect(instance.config.environment).toEqual(environment);
   });
 
   test('an instance nothing was stored for runs with none', () => {
@@ -177,6 +195,7 @@ function deploymentRow() {
     object_key: 'artifacts/app-1/a',
     original_file_name: 'my-server',
     http_port: 8080,
+    has_extra_public_port: false,
     args: [],
     vcpu_count: 1,
     memory_mib: 512,

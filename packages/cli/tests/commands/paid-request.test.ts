@@ -4,8 +4,10 @@ import { createCli } from '@parshjs/core';
 import {
   APP_QUOTA_EXCEEDED_CODE,
   MAX_PAID_APPS_REQUEST,
+  MAX_PAID_PORTS_REQUEST,
   MAX_PAID_RESOURCE_AMOUNT,
   MIN_PAID_APPS_REQUEST,
+  MIN_PAID_PORTS_REQUEST,
 } from '@repo/api-constants';
 import { commandTree } from '#command-tree.gen.ts';
 import { createApi } from '#lib/api.ts';
@@ -22,6 +24,7 @@ const APPS_ALLOWED = 3;
 const ASKED_TOTAL = 10;
 const APP_REQUEST_TYPES = ['custom-bucket', 'always-on'] as const;
 const NO_RESOURCE_OPTIONS = {
+  'requested-ports-amount': undefined,
   'requested-vcpu-count': undefined,
   'requested-memory-mib': undefined,
   'requested-volume-gib': undefined,
@@ -124,6 +127,9 @@ function responseFor([resource, init]: Parameters<typeof fetch>): Response {
   }
   if (responseStatus !== SUCCESS_STATUS) {
     return Response.json({ error: 'Please retry this request.' }, { status: responseStatus });
+  }
+  if (url === `${API_URL}/api/paid-requests/extra-public-port`) {
+    return Response.json({ requestType: 'extra-public-port', ...body });
   }
   if (url === `${API_URL}/api/paid-requests/resources`) {
     return Response.json({ requestType: 'resources', ...body });
@@ -729,3 +735,130 @@ test('failed resources requests emit no JSON success', async () => {
   expect(errors.join('')).toContain('Please retry this request');
   expect(output).toEqual([]);
 });
+
+test.each([NAME, SLUG])('a port request preserves its total for app %s', async (app) => {
+  expect(
+    await paidRequestCli().run([
+      'paid-request',
+      '--type',
+      'extra-public-port',
+      '--app',
+      app,
+      '--requested-ports-amount',
+      '3',
+      '--json',
+    ]),
+  ).toBe(0);
+  expect(errors).toEqual([]);
+  expect(JSON.parse(output.join(''))).toEqual({
+    requestType: 'extra-public-port',
+    appId: APP_ID,
+    requestedPortsAmount: 3,
+  });
+  expect(requests.at(-1)).toEqual({
+    url: `${API_URL}/api/paid-requests/extra-public-port`,
+    method: 'PUT',
+    authorization: `Bearer ${TOKEN}`,
+    body: { appId: APP_ID, requestedPortsAmount: 3 },
+  });
+});
+
+test.each(['0', '-1', '1.5', 'NaN', String(MAX_PAID_PORTS_REQUEST + 1)])(
+  'an invalid port total %s is rejected before API calls',
+  async (amount) => {
+    expect(
+      await paidRequestCli().run([
+        'paid-request',
+        '--type',
+        'extra-public-port',
+        '--app',
+        NAME,
+        '--requested-ports-amount',
+        amount,
+        '--json',
+      ]),
+    ).toBe(1);
+    expect(requests).toEqual([]);
+    expect(output).toEqual([]);
+  },
+);
+
+test('scripts must specify how many ports they need without prompting or submitting', async () => {
+  const ask = spyOn(prompts, 'text').mockResolvedValue('3');
+  expect(
+    await paidRequestCli().run([
+      'paid-request',
+      '--type',
+      'extra-public-port',
+      '--app',
+      NAME,
+      '--json',
+    ]),
+  ).toBe(1);
+  expect(errors.join('')).toContain('--requested-ports-amount');
+  expect(ask).not.toHaveBeenCalled();
+  expect(requests.every((request) => request.method === 'GET')).toBe(true);
+});
+
+test('the CLI prompts for a port total and allows cancellation', async () => {
+  const ask = spyOn(prompts, 'text').mockResolvedValue('3');
+  const options = {
+    ...NO_RESOURCE_OPTIONS,
+    type: 'extra-public-port' as const,
+    app: NAME,
+    'requested-apps-amount': undefined,
+  };
+  expect(await completePaidRequest({ options, interactive: true, api: paidRequestApi() })).toEqual({
+    requestType: 'extra-public-port',
+    appId: APP_ID,
+    requestedPortsAmount: 3,
+  });
+  expect(ask.mock.calls[0]?.[0].message).toContain('How many extra public ports');
+  const cancellation = Symbol('cancel');
+  spyOn(prompts, 'isCancel').mockImplementation((value) => value === cancellation);
+  ask.mockResolvedValue(cancellation);
+  await expect(
+    completePaidRequest({ options, interactive: true, api: paidRequestApi() }),
+  ).rejects.toThrow('Cancelled.');
+  expect(requests.every((request) => request.method === 'GET')).toBe(true);
+});
+
+test.each(['apps', ...APP_REQUEST_TYPES, 'resources'])(
+  'port totals are refused for --type %s',
+  async (type) => {
+    expect(
+      await paidRequestCli().run([
+        'paid-request',
+        '--type',
+        type,
+        '--requested-ports-amount',
+        '3',
+        '--json',
+      ]),
+    ).toBe(1);
+    expect(requests).toEqual([]);
+  },
+);
+
+test.each([MIN_PAID_PORTS_REQUEST, MAX_PAID_PORTS_REQUEST])(
+  'the CLI accepts a port total of %s',
+  async (requestedPortsAmount) => {
+    expect(
+      await paidRequestCli().run([
+        'paid-request',
+        '--type',
+        'extra-public-port',
+        '--app',
+        NAME,
+        '--requested-ports-amount',
+        String(requestedPortsAmount),
+        '--json',
+      ]),
+    ).toBe(0);
+    expect(JSON.parse(output.join(''))).toEqual({
+      requestType: 'extra-public-port',
+      appId: APP_ID,
+      requestedPortsAmount,
+    });
+  },
+);

@@ -349,7 +349,7 @@ Everything the binary can count on, and nothing else:
 | Persistent volume | `/app/data` — 8 GiB, survives every redeploy. `NIBRUN_DATA_DIR` names it. Not `noexec`: a file unpacked here can be exec'd in place |
 | Port | `NIBRUN_HTTP_PORT`, and `PORT` beside it; the app **must** listen on it, on `0.0.0.0` |
 | Own hostname | `NIBRUN_HOSTNAME` is set by the guest to the app's own `<slug>.nibrun.app` |
-| Second port | Only with `--extra-public-port`: `NIBRUN_EXTRA_PUBLIC_PORT` on `NIBRUN_PUBLIC_IPV4`, TCP and UDP, assigned rather than chosen, and reached at that number and no other |
+| Second port | Only for an app with an enabled extra port: `NIBRUN_EXTRA_PUBLIC_PORT` on `NIBRUN_PUBLIC_IPV4`, TCP and UDP, assigned rather than chosen, and reached at that number and no other |
 | Ephemeral | `TMPDIR=/tmp` is a tmpfs of **64 MiB** — a quarter of the RAM — and is lost on restart. So is everything outside `/app/data` |
 | Programs | `/bin/sh` and `crontab` are available. Ship other tools yourself; there is no `tar` or `unzip` |
 | Resources | 1 vCPU, 256 MiB RAM |
@@ -382,16 +382,23 @@ literal. A complete reference to an unknown `NIBRUN_` name is refused when you d
 
 ## A second public port
 
-An app needing a port HTTP cannot carry — WebRTC media, a game server, anything on UDP — asks for
-one with `--extra-public-port`, and is told where it landed as `NIBRUN_PUBLIC_IPV4` and
-`NIBRUN_EXTRA_PUBLIC_PORT`. Neither is discoverable from inside the guest, so an app that tells a
-peer where to reach it announces that pair: it is the same number end to end, which is what makes
-announcing it correct.
-
-Ask for the port in the same change that names it:
+Extra public ports are a paid feature. Request one from **Request extra port** in the app’s
+configuration, or with the CLI:
 
 ```sh
-nib apps update --app my-app --extra-public-port --env 'ANNOUNCED_IP=${NIBRUN_PUBLIC_IPV4}'
+nib paid-request --type extra-public-port --app my-app --requested-ports-amount 1
+```
+
+A request records interest; it does not enable the port or charge the owner. Deployment presets,
+the deploy form, CLI deploy/update flags and public API configuration cannot enable one.
+Existing enabled ports keep working and remain visible in the app’s configuration.
+
+Once enabled, the guest receives `NIBRUN_PUBLIC_IPV4` and `NIBRUN_EXTRA_PUBLIC_PORT`. A binary
+announcing its own address uses that pair, which is the same number end to end. An app that
+expects its own variable names can reference them:
+
+```sh
+nib apps update --app my-app --env 'ANNOUNCED_IP=${NIBRUN_PUBLIC_IPV4}'
 ```
 
 ## Cron jobs

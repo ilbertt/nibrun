@@ -31,15 +31,12 @@ import { useApps } from '#lib/hooks/use-apps.ts';
 import type { ReleaseRequest } from '#lib/hooks/use-deploy.ts';
 import { useDeployFormAnalytics } from '#lib/hooks/use-deploy-form-analytics.ts';
 import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
-import { useSessionIdentity } from '#lib/hooks/use-session-identity.ts';
-import { SessionIdentity } from '#lib/session-identity.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 export type DeployFormValues = {
   binary: FileSource | undefined;
   name: string;
   port: string | undefined;
-  extraPublicPort: boolean | undefined;
   args: string | undefined;
   environment: EnvironmentVariable[] | undefined;
   initialData: FileSource | undefined;
@@ -72,17 +69,13 @@ export type DeployFormState = {
   replacing: AppSummary | undefined;
   targetResolved: boolean;
   defaultPort: string;
-  defaultExtraPublicPort: boolean;
   defaultArgs: string;
-  /** Whether a port besides HTTPS may be asked for, which waits for an identity. */
-  portOffered: boolean;
 };
 
 const UNTOUCHED: DeployFormValues = {
   binary: undefined,
   name: '',
   port: undefined,
-  extraPublicPort: undefined,
   args: undefined,
   environment: undefined,
   initialData: undefined,
@@ -183,7 +176,6 @@ export function useDeployForm({
   const { start } = useDeployRun();
   useDeployFormAnalytics({ appId, suggested });
   const apps = useApps();
-  const portOffered = useSessionIdentity() === SessionIdentity.WithAccount;
   const owned = apps.data ?? [];
   const locked = appId !== undefined;
   const replacing = owned.find((app) => app.id === appId);
@@ -192,7 +184,7 @@ export function useDeployForm({
   const api: DeployFormApi = useForm({
     // Read once, at mount. A binary handed over from the landing page is only rendered into
     // this form after it has been read out of storage, so there is nothing to arrive later.
-    defaultValues: suggestedValues({ binary, suggested, portOffered }),
+    defaultValues: suggestedValues({ binary, suggested }),
     onSubmit: ({ value }) => {
       const request = targetResolved ? asReleaseRequest({ value, replacing }) : undefined;
       if (request !== undefined) {
@@ -208,9 +200,7 @@ export function useDeployForm({
     replacing,
     targetResolved,
     defaultPort: String(replacing?.config.httpPort ?? DEFAULT_HTTP_PORT),
-    defaultExtraPublicPort: replacing?.config.hasExtraPublicPort ?? false,
     defaultArgs: replacing?.config.args.join('\n') ?? '',
-    portOffered,
   };
 }
 
@@ -242,11 +232,9 @@ function binaryFieldListeners(binary: File | undefined): BinaryFieldListeners {
 function suggestedValues({
   binary,
   suggested,
-  portOffered,
 }: {
   binary: File | undefined;
   suggested: DeploySuggestion | undefined;
-  portOffered: boolean;
 }): DeployFormValues {
   return {
     ...UNTOUCHED,
@@ -260,9 +248,6 @@ function suggestedValues({
     initialData: sourceFromUrl(suggested?.initialData ?? ''),
     name: suggested?.name ?? namedByUrl(suggested?.binary ?? '') ?? UNTOUCHED.name,
     port: suggested?.port === undefined ? undefined : String(suggested.port),
-    // The api makes a stranger's app without the port whatever the link asked, so the form asks
-    // for what it will get.
-    extraPublicPort: portOffered ? suggested?.extraPublicPort : undefined,
     args: suggested?.args?.join('\n'),
     environment: suggested?.environment && askedVariables(suggested.environment),
   };
@@ -297,7 +282,6 @@ function asReleaseRequest({
     // the table no longer does goes as null, the only way to say a variable should be removed.
     ...(edits.length === 0 ? {} : { environment: parseEnvironmentPatch(edits) }),
     port,
-    extraPublicPort: value.extraPublicPort ?? replacing?.config.hasExtraPublicPort ?? false,
   };
 
   if (value.binary === undefined) {

@@ -316,7 +316,10 @@ class StubAppsRepository implements AppsRepositoryContract {
     if (!this.owns) {
       return Promise.resolve(null);
     }
-    const row = appRow(Value.Parse(DnsLabelSchema, APP_NAME));
+    const row = {
+      ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)),
+      ...configColumns(this.current),
+    };
     return Promise.resolve(patch.name === undefined ? row : { ...row, name: patch.name });
   }
 
@@ -624,44 +627,19 @@ describe('an app is created with the environment it was given, and never reports
   });
 });
 
-describe('an app asks for a public port besides HTTP, and is never handed one it did not', () => {
-  test('an app that asks has it recorded', async () => {
-    const appsRepo = new StubAppsRepository({ failures: 0 });
+test('owner edits retain a platform-enabled extra port', async () => {
+  const appsRepo = new StubAppsRepository({ failures: 0 });
+  appsRepo.owns = true;
+  appsRepo.current = { ...DEFAULT_CONFIG, hasExtraPublicPort: true };
 
-    await createApp({ appsRepo, config: { hasExtraPublicPort: true } });
-
-    expect(appsRepo.offeredConfigs).toEqual([
-      { ...DEFAULT_STORED_CONFIG, hasExtraPublicPort: true },
-    ]);
+  const app = await serviceWith({ appsRepo }).update({
+    appId: APP_ID,
+    ownerId: OWNER_ID,
+    patch: { args: ['serve'] },
   });
 
-  // Absent rather than false: the repository carries forward what a patch says nothing about, so
-  // an edit to something else must not be able to take the port away.
-  test('a patch about something else says nothing about it', async () => {
-    const appsRepo = new StubAppsRepository({ failures: 0 });
-    appsRepo.owns = true;
-
-    await serviceWith({ appsRepo }).update({
-      appId: APP_ID,
-      ownerId: OWNER_ID,
-      patch: { args: ['serve'] },
-    });
-
-    expect('hasExtraPublicPort' in (appsRepo.offeredPatches[0] ?? {})).toBe(false);
-  });
-
-  test('a patch giving one up carries the answer rather than the silence', async () => {
-    const appsRepo = new StubAppsRepository({ failures: 0 });
-    appsRepo.owns = true;
-
-    await serviceWith({ appsRepo }).update({
-      appId: APP_ID,
-      ownerId: OWNER_ID,
-      patch: { hasExtraPublicPort: false },
-    });
-
-    expect(appsRepo.offeredPatches[0]?.hasExtraPublicPort).toBe(false);
-  });
+  expect(app.config.hasExtraPublicPort).toBe(true);
+  expect(appsRepo.offeredPatches[0]).not.toHaveProperty('hasExtraPublicPort');
 });
 
 /**
@@ -680,20 +658,6 @@ describe('a value may name the port an app has, and not one it has not', () => {
     await expect(
       createApp({ appsRepo, config: { environment: asEnvironment({ ANNOUNCED_IP: ADDRESS }) } }),
     ).rejects.toBeInstanceOf(BadRequestError);
-  });
-
-  test('an app created with one may', async () => {
-    const appsRepo = new StubAppsRepository({ failures: 0 });
-
-    await createApp({
-      appsRepo,
-      config: {
-        hasExtraPublicPort: true,
-        environment: asEnvironment({ ANNOUNCED_IP: ADDRESS }),
-      },
-    });
-
-    expect(appsRepo.offeredConfigs).toHaveLength(1);
   });
 
   // The port the edit leaves behind, not the one it carries: naming one is allowed by an app that
@@ -724,21 +688,6 @@ describe('a value may name the port an app has, and not one it has not', () => {
       }),
     ).rejects.toBeInstanceOf(BadRequestError);
     expect(appsRepo.offeredPatches).toEqual([]);
-  });
-
-  test('one edit may ask for the port and name it at once', async () => {
-    const appsRepo = new StubAppsRepository({ failures: 0 });
-    appsRepo.owns = true;
-
-    await serviceWith({ appsRepo }).update({
-      appId: APP_ID,
-      ownerId: OWNER_ID,
-      patch: { hasExtraPublicPort: true, environment: asPatch({ ANNOUNCED_IP: ADDRESS }) },
-    });
-
-    expect(appsRepo.offeredPatches).toHaveLength(1);
-    // The edit answers the question itself, so there is nothing to go and look up.
-    expect(appsRepo.reads).toBe(0);
   });
 
   test('a patch naming none of them is the one write it was', async () => {
@@ -1664,60 +1613,18 @@ describe("what a stranger held becomes the person's who they signed in as", () =
   });
 });
 
-/**
- * A raw listener on the public internet is not handed to a person with no identity. The ask is
- * dropped rather than refused, and the values that would name the port go with it: a link written
- * for one still deploys, and the guest is never asked to expand a reference it was not given.
- */
-describe('a stranger is not given a public port besides HTTP', () => {
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being dropped, not an interpolation
-  const ANNOUNCED_IP = '${NIBRUN_PUBLIC_IPV4}';
-  // biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being dropped, not an interpolation
-  const WEBRTC_PORT = '${NIBRUN_EXTRA_PUBLIC_PORT}';
-
-  test('an app created asking for one is made without it', async () => {
+test.each([false, true])(
+  'new apps start without an extra port (anonymous: %s)',
+  async (isAnonymous) => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
-
     const app = await serviceWith({ appsRepo }).create({
       ownerId: OWNER_ID,
-      isAnonymous: true,
+      isAnonymous,
       name: APP_NAME,
-      config: { hasExtraPublicPort: true },
     });
-
     expect(app.config.hasExtraPublicPort).toBe(false);
-    expect(appsRepo.offeredConfigs).toEqual([DEFAULT_STORED_CONFIG]);
-  });
-
-  test('the values that would name the port go with it, and the rest stay', async () => {
-    const appsRepo = new StubAppsRepository({ failures: 0 });
-
-    const app = await serviceWith({ appsRepo }).create({
-      ownerId: OWNER_ID,
-      isAnonymous: true,
-      name: APP_NAME,
-      config: {
-        hasExtraPublicPort: true,
-        environment: asEnvironment({ ANNOUNCED_IP, WEBRTC_PORT, TOKEN: SECRET }),
-      },
-    });
-
-    expect(app.config.environment).toEqual({ TOKEN: REDACTED });
-    expect(Object.keys(appsRepo.offeredConfigs[0]?.environment ?? {})).toEqual(['TOKEN']);
-  });
-
-  test('an app created without asking is theirs', async () => {
-    const appsRepo = new StubAppsRepository({ failures: 0 });
-
-    const app = await serviceWith({ appsRepo }).create({
-      ownerId: OWNER_ID,
-      isAnonymous: true,
-      name: APP_NAME,
-    });
-
-    expect(app.config.hasExtraPublicPort).toBe(false);
-  });
-});
+  },
+);
 
 describe('an owner is told when their app is due to go', () => {
   const owned = { appId: APP_ID, ownerId: OWNER_ID };

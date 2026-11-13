@@ -22,7 +22,7 @@ export type PublicAppConfig = Omit<AppConfig, 'environment'> & {
 // How the binary is started, which is the whole of what an owner chooses. The machine it starts
 // on — vCPUs, memory, filesystem, health probe, restart budget — is nibrun's, and leaving it out
 // of this one type is what keeps it out of every write shape below.
-type OwnedAppConfig = Pick<AppConfig, 'httpPort' | 'hasExtraPublicPort' | 'args'>;
+type OwnedAppConfig = Pick<AppConfig, 'httpPort' | 'args'>;
 
 // What an app is created with: the whole environment, because there is not yet one to edit.
 export type NewAppConfig = Partial<OwnedAppConfig> & {
@@ -111,7 +111,7 @@ export function configWithDefaults(
     healthCheck: DEFAULT_HEALTH_CHECK,
     restartPolicy: DEFAULT_RESTART_POLICY,
     httpPort: patch.httpPort ?? DEFAULT_HTTP_PORT,
-    hasExtraPublicPort: patch.hasExtraPublicPort ?? false,
+    hasExtraPublicPort: false,
     args: patch.args ?? [],
   };
 }
