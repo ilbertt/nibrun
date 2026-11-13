@@ -5,14 +5,13 @@ import { type DeployLink, type DeploySuggestion, deployLink, deploySuggestion } 
 const HOSTNAME = `\${NIBRUN_HOSTNAME}`;
 const CHECKSUM = 'd9403d88cdf0684fbb9d8e97cf3508e9fb4506cf309a34e42653a1c2bc04a298';
 
-const EVERYTHING = `?name=my-app&port=9000&extra-public-port=true&arg=serve&arg=--verbose&env=API_KEY&env=GREETING=hello&env=URL=https://${HOSTNAME}`;
+const EVERYTHING = `?name=my-app&port=9000&arg=serve&arg=--verbose&env=API_KEY&env=GREETING=hello&env=URL=https://${HOSTNAME}`;
 
 const BINARY_URL = 'https://releases.test/v1/my-server';
 
 const ASKED: DeploySuggestion = {
   name: 'my-app',
   port: 9000,
-  extraPublicPort: true,
   args: ['serve', '--verbose'],
   environment: [
     { name: 'API_KEY', value: '' },
@@ -99,10 +98,10 @@ test('a value the router could read as JSON is still the text it was', () => {
   expect(followed(rewritten(link)).environment).toEqual([{ name: 'CONFIG', value: '{"port":1}' }]);
 });
 
-test('a flag is on where it is written at all', () => {
-  expect(followed('?extra-public-port').extraPublicPort).toBe(true);
-  expect(followed(rewritten('?extra-public-port')).extraPublicPort).toBe(true);
-  expect(followed('?extra-public-port=false').extraPublicPort).toBe(false);
+test('old extra port parameters cannot configure a deployment', () => {
+  const link = written('?extra-public-port=true');
+  expect(link).not.toHaveProperty('extra-public-port');
+  expect(deploySuggestion(link)).not.toHaveProperty('extraPublicPort');
 });
 
 test('a name given twice takes its last value', () => {
@@ -123,7 +122,6 @@ test('a link that asks for nothing suggests nothing', () => {
     sha256: undefined,
     initialData: undefined,
     port: undefined,
-    extraPublicPort: undefined,
     args: undefined,
     environment: undefined,
   });

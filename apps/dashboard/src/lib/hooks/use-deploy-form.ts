@@ -37,7 +37,6 @@ export type DeployFormValues = {
   binary: FileSource | undefined;
   name: string;
   port: string | undefined;
-  extraPublicPort: boolean | undefined;
   args: string | undefined;
   environment: EnvironmentVariable[] | undefined;
   initialData: FileSource | undefined;
@@ -70,7 +69,6 @@ export type DeployFormState = {
   replacing: AppSummary | undefined;
   targetResolved: boolean;
   defaultPort: string;
-  defaultExtraPublicPort: boolean;
   defaultArgs: string;
 };
 
@@ -78,7 +76,6 @@ const UNTOUCHED: DeployFormValues = {
   binary: undefined,
   name: '',
   port: undefined,
-  extraPublicPort: undefined,
   args: undefined,
   environment: undefined,
   initialData: undefined,
@@ -203,7 +200,6 @@ export function useDeployForm({
     replacing,
     targetResolved,
     defaultPort: String(replacing?.config.httpPort ?? DEFAULT_HTTP_PORT),
-    defaultExtraPublicPort: replacing?.config.hasExtraPublicPort ?? false,
     defaultArgs: replacing?.config.args.join('\n') ?? '',
   };
 }
@@ -252,7 +248,6 @@ function suggestedValues({
     initialData: sourceFromUrl(suggested?.initialData ?? ''),
     name: suggested?.name ?? namedByUrl(suggested?.binary ?? '') ?? UNTOUCHED.name,
     port: suggested?.port === undefined ? undefined : String(suggested.port),
-    extraPublicPort: suggested?.extraPublicPort,
     args: suggested?.args?.join('\n'),
     environment: suggested?.environment && askedVariables(suggested.environment),
   };
@@ -287,7 +282,6 @@ function asReleaseRequest({
     // the table no longer does goes as null, the only way to say a variable should be removed.
     ...(edits.length === 0 ? {} : { environment: parseEnvironmentPatch(edits) }),
     port,
-    extraPublicPort: value.extraPublicPort ?? replacing?.config.hasExtraPublicPort ?? false,
   };
 
   if (value.binary === undefined) {

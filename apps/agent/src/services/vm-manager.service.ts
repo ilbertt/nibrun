@@ -3,7 +3,6 @@ import type { AppId, DeploymentId, DesiredInstance } from '@repo/protocol';
 import { Duration, Effect, Either, Option } from 'effect';
 import { cronRegistrationSocketPath } from '#lib/cron/registration-protocol.ts';
 import type { CronDeployment } from '#lib/cron/registry.ts';
-import { withoutPublicPortReferences } from '#lib/guest-environment.ts';
 import { writeJsonFile } from '#lib/json-store.ts';
 import { tenantLogSocketPath } from '#lib/logs/vsock.ts';
 import type { AppSlot } from '#lib/network/slot.ts';
@@ -197,9 +196,12 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       const instanceConfigImagePath = yield* buildInstanceConfigImage({
         workingDir: directory,
         httpPort: desired.config.httpPort,
+        ...(desired.config.hasExtraPublicPort && {
+          publicAddress: { ipv4: config.portRelayPublicIpv4, port: slot.extraPublicPort },
+        }),
         hostnames: desired.hostnames,
         args: desired.config.args,
-        environment: withoutPublicPortReferences(desired.config.environment),
+        environment: desired.config.environment,
         restartPolicy: desired.config.restartPolicy,
       });
 

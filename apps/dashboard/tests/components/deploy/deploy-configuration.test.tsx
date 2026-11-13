@@ -10,8 +10,6 @@ import type { AppSummary } from '#queries/apps.ts';
 
 const INITIAL_DATA = 'Initial data';
 const PORT = '8080';
-// The one checkbox the form has, read the way assistive technology reads it.
-const GREYED_CHECKBOX = /role="checkbox"[^>]*aria-disabled="true"/;
 
 /**
  * The api client is built against the origin it is same-origin with as it is imported, and the form
@@ -28,7 +26,6 @@ const UNTOUCHED: DeployFormValues = {
   binary: undefined,
   name: '',
   port: undefined,
-  extraPublicPort: undefined,
   args: undefined,
   environment: undefined,
   initialData: undefined,
@@ -47,7 +44,6 @@ function Configuration({ replacing }: { replacing: AppSummary | undefined }) {
     replacing,
     targetResolved: true,
     defaultPort: PORT,
-    defaultExtraPublicPort: false,
     defaultArgs: '',
   };
 
@@ -76,14 +72,10 @@ describe('what a deploy is beyond the binary itself', () => {
   });
 });
 
-test('the extra port setting records intent without promising activation', () => {
+test('extra ports cannot be configured in the deploy form', () => {
   const markup = renderToStaticMarkup(<Configuration replacing={undefined} />);
-
-  expect(markup).toContain('upcoming paid');
-  expect(markup).toContain('will not be activated by deploying');
-  expect(markup).toContain('Request extra port');
-  expect(markup).not.toMatch(GREYED_CHECKBOX);
-  expect(markup).not.toContain('Free for now');
+  expect(markup).not.toContain('Additional ports');
+  expect(markup).not.toContain('deploy-extra-public-port');
 });
 
 test('remote initial data is validated as an HTTPS URL rather than as an uploaded file', async () => {

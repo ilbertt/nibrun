@@ -61,8 +61,7 @@ included, asking for nothing but the button:
 [**Deploy PocketBase on nibrun**](https://nibrun.com/deploy/pocketbase)
 
 Nothing in it is ours to hand out. It is a short address for the deploy screen reading its own
-query string — `name`, `port`, `arg` per argument, `env` per variable, `extra-public-port` for a
-second one, `minimal` for the form stripped to what is left to do, and `binary` for a url to fetch
+query string — `name`, `port`, `arg` per argument, `env` per variable, `minimal` for the form stripped to what is left to do, and `binary` for a url to fetch
 the executable from, which turns the drop into a click. PocketBase publishes its build zipped, and
 a url that answers with one is unwrapped to the executable inside it.
 

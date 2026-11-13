@@ -3,7 +3,6 @@ import { dirname } from 'node:path';
 import { FileSystem } from '@effect/platform';
 import { SystemError } from '@effect/platform/Error';
 import type { HostVersions } from '@repo/protocol';
-import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol/runtime-values';
 import { Effect, Either, Layer } from 'effect';
 import { ArtifactTransferError } from '#lib/artifacts/store.ts';
 import { writeJsonFile } from '#lib/json-store.ts';
@@ -32,7 +31,6 @@ import {
   desiredState,
   desiredVolume,
   instanceRecord,
-  tenantEnvironment,
   VOLUME_ID,
 } from '#tests/support/fixtures.ts';
 import { installedGuestImage } from '#tests/support/guest-image.ts';
@@ -406,12 +404,10 @@ test('a cold boot pins paths and refuses capture after a subsequent image adopti
       const runtimeDir = yield* temporaryDirectory;
       const snapshotDir = yield* temporaryDirectory;
       const configImageArgument = 2;
-      let renderedEnvironment: string | undefined;
       const commands = recordingCommands(({ command }) => {
         const imagePath = command[configImageArgument];
         if (command[0] === 'mksquashfs' && imagePath !== undefined) {
           return Effect.promise(async () => {
-            renderedEnvironment = await Bun.file(`${command[1]}/instance.env`).text();
             await Bun.write(imagePath, 'config image');
             return { code: 0, stdout: '', stderr: '' };
           });
@@ -456,18 +452,11 @@ test('a cold boot pins paths and refuses capture after a subsequent image adopti
       yield* Effect.gen(function* () {
         const vms = yield* VmManager;
         yield* AgentState.putRecord(instanceRecord());
-        const desired = desiredInstance();
-        desired.config.hasExtraPublicPort = true;
-        desired.config.environment = tenantEnvironment({
-          ANNOUNCED_IP: interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name),
-          ANNOUNCED_PORT: interpolableRuntimeValue(RUNTIME_VALUES.EXTRA_PUBLIC_PORT.name),
-          TOKEN: 'kept',
+        yield* vms.boot({
+          desired: desiredInstance(),
+          slot: SLOT,
+          dataDevicePath: SLOT.nbdDevicePath,
         });
-        yield* vms.boot({ desired, slot: SLOT, dataDevicePath: SLOT.nbdDevicePath });
-        expect(renderedEnvironment).toContain('ENV_TOKEN=kept');
-        expect(renderedEnvironment).not.toContain(RUNTIME_VALUES.PUBLIC_IPV4.name);
-        expect(renderedEnvironment).not.toContain(RUNTIME_VALUES.EXTRA_PUBLIC_PORT.name);
-        expect(renderedEnvironment).not.toContain('ANNOUNCED_');
         const staged = JSON.parse(
           yield* fs.readFileString(`${vms.workingDir(APP_ID)}/firecracker.json`),
         ) as FirecrackerConfig;

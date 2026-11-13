@@ -1,13 +1,14 @@
 import { type DesiredInstance, SecretStringSchema, type TenantEnvironment } from '@repo/protocol';
 import {
   interpolableRuntimeValue,
+  namesExtraPublicPortValues,
   RUNTIME_VALUE_NAMES,
   RUNTIME_VALUES,
 } from '@repo/protocol/runtime-values';
 import { Value } from '@sinclair/typebox/value';
-import { withoutPublicPortReferences } from '#lib/guest-environment.ts';
 import { localArtifactReference } from '#lib/nibrunner/artifact.ts';
 import type { DesiredInstance as NibrunnerInstance } from '#lib/nibrunner/desired.gen.ts';
+import { UnsupportedNibrunnerFeature } from '#lib/nibrunner/failure.ts';
 import {
   NIBRUNNER_APP_DIRECTORY,
   NIBRUNNER_DATA_DIRECTORY,
@@ -18,29 +19,30 @@ function environmentFor(
   instance: DesiredInstance,
 ): NibrunnerInstance['config']['command']['environment'] {
   const environment: TenantEnvironment = Object.fromEntries(
-    Object.entries(withoutPublicPortReferences(instance.config.environment)).flatMap(
-      function translateEntry([name, value]) {
-        if (
-          RUNTIME_VALUE_NAMES.some(function isOwned(owned) {
-            return owned === name;
-          })
-        ) {
-          return [];
-        }
-        return [
-          [
-            name,
-            Value.Parse(
-              SecretStringSchema,
-              value.replaceAll(
-                interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name),
-                NIBRUNNER_DATA_DIRECTORY,
-              ),
+    Object.entries(instance.config.environment).flatMap(function translateEntry([name, value]) {
+      if (namesExtraPublicPortValues(value)) {
+        throw new UnsupportedNibrunnerFeature({ feature: 'public port references' });
+      }
+      if (
+        RUNTIME_VALUE_NAMES.some(function isOwned(owned) {
+          return owned === name;
+        })
+      ) {
+        return [];
+      }
+      return [
+        [
+          name,
+          Value.Parse(
+            SecretStringSchema,
+            value.replaceAll(
+              interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name),
+              NIBRUNNER_DATA_DIRECTORY,
             ),
-          ],
-        ];
-      },
-    ),
+          ),
+        ],
+      ];
+    }),
   );
   return {
     ...environment,
@@ -49,6 +51,9 @@ function environmentFor(
 }
 
 export function nibrunnerInstance(instance: DesiredInstance): NibrunnerInstance {
+  if (instance.config.hasExtraPublicPort) {
+    throw new UnsupportedNibrunnerFeature({ feature: 'public ports' });
+  }
   const { path, ...probe } = instance.config.healthCheck;
   return {
     appId: instance.appId,

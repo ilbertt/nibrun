@@ -75,27 +75,21 @@ describe('what a host is told to run with', () => {
     expect(instance.config.environment).toEqual({ OPENCLAW_STATE_DIR: SECRET } as never);
   });
 
-  test('extra port settings stay stored without activating a port or forwarding unresolved references', () => {
-    const row = { ...deploymentRow(), has_extra_public_port: true };
-    const sealed = sealEnvironment({
-      key: TEST_SECRETS_KEY,
-      environment: {
-        ANNOUNCED_IP: interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name),
-        WEBRTC_PORT: interpolableRuntimeValue(RUNTIME_VALUES.EXTRA_PUBLIC_PORT.name),
-        OPENCLAW_STATE_DIR: SECRET,
-      } as never,
-    });
+  test('an existing enabled port and its runtime references still reach the agent', () => {
+    const environment = {
+      ANNOUNCED_IP: interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name),
+      ANNOUNCED_PORT: interpolableRuntimeValue(RUNTIME_VALUES.EXTRA_PUBLIC_PORT.name),
+    } as never;
     const instance = toDesiredInstance({
-      row,
+      row: { ...deploymentRow(), has_extra_public_port: true },
       hostnames: new Map(),
-      environments: new Map([[DEPLOYMENT, sealed]]),
+      environments: new Map([
+        [DEPLOYMENT, sealEnvironment({ key: TEST_SECRETS_KEY, environment })],
+      ]),
       secretsKey: TEST_SECRETS_KEY,
     });
-
-    expect(instance.config.hasExtraPublicPort).toBe(false);
-    expect(instance.config.environment).toEqual({ OPENCLAW_STATE_DIR: SECRET } as never);
-    expect(row.has_extra_public_port).toBe(true);
-    expect(sealed).toHaveProperty('ANNOUNCED_IP');
+    expect(instance.config.hasExtraPublicPort).toBe(true);
+    expect(instance.config.environment).toEqual(environment);
   });
 
   test('an instance nothing was stored for runs with none', () => {
@@ -201,6 +195,7 @@ function deploymentRow() {
     object_key: 'artifacts/app-1/a',
     original_file_name: 'my-server',
     http_port: 8080,
+    has_extra_public_port: false,
     args: [],
     vcpu_count: 1,
     memory_mib: 512,

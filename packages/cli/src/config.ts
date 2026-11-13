@@ -19,10 +19,6 @@ export const DEPLOYMENT_APP_ID_FLAG = 'app-id';
  * what genuinely differs there: whether it forwards, and a description where the same value means a
  * different thing to each command.
  */
-// Reached by two of the descriptions below, and a record cannot read its own entries while it is
-// being built — so the one flag another flag has to name is a constant before either of them.
-const EXTRA_PUBLIC_PORT_FLAG = 'extra-public-port';
-
 export const SHARED_OPTIONS = {
   app: {
     name: 'app',
@@ -50,14 +46,7 @@ export const SHARED_OPTIONS = {
     name: 'env',
     option: {
       schema: z.array(z.string()).optional(),
-      description: `Set an environment variable for the binary, as NAME=value. Repeatable. Anything the app already has and this does not name is left as it is. Runtime values are listed in the dashboard. Quote a reference, as in 'URL=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}', or the shell expands it here instead. References to the assigned public port and address need --${EXTRA_PUBLIC_PORT_FLAG} on the same app.`,
-    },
-  },
-  extraPublicPort: {
-    name: EXTRA_PUBLIC_PORT_FLAG,
-    option: {
-      schema: z.boolean().optional(),
-      description: `Save that the app needs an extra public TCP/UDP port. This upcoming paid feature stays inactive. Request it in the dashboard or with paid-request --type extra-public-port. Pass --${EXTRA_PUBLIC_PORT_FLAG}=false to clear the setting.`,
+      description: `Set an environment variable for the binary, as NAME=value. Repeatable. Anything the app already has and this does not name is left as it is. Runtime values are listed in the dashboard. Quote a reference, as in 'URL=https://${interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name)}', or the shell expands it here instead. References to an assigned public port and address require an extra port enabled for the app. Request one with paid-request --type extra-public-port.`,
     },
   },
   unset: {

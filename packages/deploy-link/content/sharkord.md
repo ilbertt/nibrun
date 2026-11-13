@@ -10,5 +10,5 @@ See [sharkord.com](https://sharkord.com/) for what it can do.
 
 ## Good to know
 
-Voice and video need a port that HTTP cannot carry. nibrun gives this app a second public port
-and tells Sharkord where it landed, so calls work with nothing for you to configure.
+Voice and video need an extra public port. After deploying, choose **Request extra port** in the
+app’s configuration to request this paid feature. Calls need the port to be enabled and configured.

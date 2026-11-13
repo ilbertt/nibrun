@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import { MIN_IDLE_TIMEOUT_MS } from '@repo/protocol';
 import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol/runtime-values';
+import { UnsupportedNibrunnerFeature } from '#lib/nibrunner/failure.ts';
 import { nibrunnerInstance } from '#lib/nibrunner/instance.ts';
 import { APP_HOSTNAME, desiredInstance, tenantEnvironment } from '#tests/support/fixtures.ts';
 
@@ -73,19 +74,22 @@ test('data references resolve while hostname and HTTP references reach the engin
   );
 });
 
-test('a requested public port stays inactive and its references do not prevent deployment', () => {
+test('public ports and their references are refused without exposing tenant values', () => {
   const instance = desiredInstance();
   instance.config.hasExtraPublicPort = true;
+  expect(function translatePort() {
+    nibrunnerInstance(instance);
+  }).toThrow(UnsupportedNibrunnerFeature);
+  instance.config.hasExtraPublicPort = false;
   instance.config.environment = tenantEnvironment({
-    ANNOUNCED_IP: interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name),
-    ANNOUNCED_PORT: interpolableRuntimeValue(RUNTIME_VALUES.EXTRA_PUBLIC_PORT.name),
-    TOKEN: 'kept',
+    SECRET: `sensitive-${interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name)}`,
   });
-  const converted = nibrunnerInstance(instance);
-  expect(converted.config.command.environment).toEqual(
-    tenantEnvironment({ TOKEN: 'kept', NIBRUN_DATA_DIR: '/app/data' }),
-  );
-  expect(converted.config).not.toHaveProperty('hasExtraPublicPort');
-  expect(instance.config.hasExtraPublicPort).toBe(true);
-  expect(instance.config.environment).toHaveProperty('ANNOUNCED_IP');
+  expect(function translateReference() {
+    nibrunnerInstance(instance);
+  }).toThrow('public port references');
+  try {
+    nibrunnerInstance(instance);
+  } catch (error) {
+    expect(String(error)).not.toContain('sensitive');
+  }
 });

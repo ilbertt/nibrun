@@ -54,7 +54,6 @@ export const command = defineCommand('run [command]', {
         "A folder on this machine the app's data/ is created holding, a local .tar.gz or .zip already holding it, or an https archive url nibrun fetches. A folder is packed here; either way it is the root of the archive that becomes the root of data/, so a folder is not itself a directory inside it. Only for an app being created: the data of one that already exists was created when it was.",
     },
     [SHARED_OPTIONS.port.name]: SHARED_OPTIONS.port.option,
-    [SHARED_OPTIONS.extraPublicPort.name]: SHARED_OPTIONS.extraPublicPort.option,
     [SHARED_OPTIONS.env.name]: SHARED_OPTIONS.env.option,
     [SHARED_OPTIONS.unset.name]: SHARED_OPTIONS.unset.option,
     [SHARED_OPTIONS.detach.name]: SHARED_OPTIONS.detach.option,
@@ -91,7 +90,6 @@ export const command = defineCommand('run [command]', {
       [DEPLOYMENT_APP_ID_FLAG]: _appId,
       detach,
       sha256,
-      [SHARED_OPTIONS.extraPublicPort.name]: extraPublicPort,
       [DATA_FOLDER_FLAG]: dataFolderPath,
       ...flags
     } = options;
@@ -112,7 +110,7 @@ export const command = defineCommand('run [command]', {
     ui.open('nib run');
     const app =
       flags.app === undefined ? undefined : await selectApp({ api, name: flags.app, interactive });
-    const given = { ...flags, app, extraPublicPort, dataFolder };
+    const given = { ...flags, app, dataFolder };
 
     const resolved = interactive
       ? await completeOptions({ api, options: given, binarySource, args })

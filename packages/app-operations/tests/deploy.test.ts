@@ -361,20 +361,6 @@ test('a new app omits environment deletion markers', async () => {
   });
 });
 
-test('an app created asking for a public port asks for it in the same request', async () => {
-  const sent: Sent[] = [];
-  storeAnswering({ sent });
-
-  await deploy({
-    api: apiHolding({ apps: [], sent }),
-    binary: binary(),
-    args: [],
-    extraPublicPort: true,
-  });
-
-  expect(sent[0]).toMatchObject({ what: 'create', body: { config: { hasExtraPublicPort: true } } });
-});
-
 // A deployment snapshots the app's config as it stands, so the flags a caller just typed only run
 // if they were written first.
 test('config is written before the deployment that snapshots it', async () => {

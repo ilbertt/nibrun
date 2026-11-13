@@ -254,18 +254,7 @@ export class AppsService extends Service {
     return new AppQuotaExceededError(allowed);
   }
 
-  /**
-   * The same rule as on create, against the config the edit leaves behind rather than the one it
-   * carries: a value naming these is allowed by an app that already has the port, and refused by
-   * one whose port this very edit is taking away.
-   *
-   * Only ever a read when a value names one, which is almost never — so a patch that says nothing
-   * about them is the one write it was.
-   *
-   * The other direction is not guarded: an app that gives up its port while a variable it is not
-   * restating still names one fails its next boot, loudly, having asked for exactly that. What is
-   * worth an answer here is the value someone is typing now.
-   */
+  /** Only look up the enabled port when an edited value needs its runtime address. */
   private async refuseValuesTheEditLeavesUngiven({
     appId,
     ownerId,
@@ -278,9 +267,9 @@ export class AppsService extends Service {
       return;
     }
 
-    const hasExtraPublicPort =
-      patch.hasExtraPublicPort ??
-      requireApp(await this.appsRepo.findById({ appId, ownerId })).has_extra_public_port;
+    const hasExtraPublicPort = requireApp(
+      await this.appsRepo.findById({ appId, ownerId }),
+    ).has_extra_public_port;
 
     refuseValuesNeedingAPort({
       environment: Object.fromEntries(naming) as TenantEnvironment,
@@ -725,7 +714,7 @@ function refuseValuesNeedingAPort({
     .map(([name]) => name);
   if (naming.length > 0) {
     throw new BadRequestError(
-      `${EXTRA_PUBLIC_PORT_VALUES.map((value) => interpolableRuntimeValue(value.name)).join(' and ')} are only set for an app with a public port besides HTTP, which this one has not asked for: ${naming.join(', ')}.`,
+      `${EXTRA_PUBLIC_PORT_VALUES.map((value) => interpolableRuntimeValue(value.name)).join(' and ')} are only set for an app with a public port besides HTTP, which this app does not have: ${naming.join(', ')}.`,
     );
   }
 }
