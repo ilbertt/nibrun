@@ -10,5 +10,12 @@ See [sharkord.com](https://sharkord.com/) for what it can do.
 
 ## Good to know
 
-Voice and video need an extra public port. After deploying, choose **Request extra port** in the
-app’s configuration to request this paid feature. Calls need the port to be enabled and configured.
+WebRTC calls, including voice, video and screen sharing, require an extra public TCP/UDP port,
+which is a paid feature. After deploying, open the app in the dashboard and choose **Request extra
+port** under **Configuration**, or send a request from the CLI:
+
+```sh
+nib paid-request --type extra-public-port --app sharkord
+```
+
+Sending a request records your interest; it does not enable the port or charge you.

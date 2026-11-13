@@ -61,9 +61,15 @@ it's the one you can't leave out: without it Sharkord falls back to `~/.config/s
 ever binds a port. `SHARKORD_AUTOUPDATE=false` because the artifact you deployed is what boots;
 upgrading is a redeploy.
 
-Voice and video require an extra public port, which is a paid feature. After deploying, choose
-**Request extra port** in the app’s configuration. Sending a request does not enable the port or
-charge you. Existing enabled ports keep working and retain their address display.
+WebRTC calls, including voice, video and screen sharing, require an extra public TCP/UDP port,
+which is a paid feature. After deploying, open the app in the dashboard and choose **Request extra
+port** under **Configuration**, or send a request from the CLI:
+
+```sh
+nib paid-request --type extra-public-port --app sharkord
+```
+
+Sending a request records your interest; it does not enable the port or charge you.
 
 Once the port is enabled, configure `SHARKORD_WEBRTC_PORT` with `${NIBRUN_EXTRA_PUBLIC_PORT}` and
 `SHARKORD_WEBRTC_ANNOUNCED_ADDRESS` with `${NIBRUN_PUBLIC_IPV4}` in the app’s environment variables.
