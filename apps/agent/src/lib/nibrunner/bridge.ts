@@ -270,29 +270,29 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
         reportLoop,
         supervised({
           once: filesystemOnce,
-          onFailure: () => Effect.logWarning('nibrunner filesystem query failed'),
+          onFailure: (cause) => Effect.logWarning('nibrunner filesystem query failed', cause),
           schedule: CONTROL_PLANE_BACKOFF,
         }),
         supervised({
           once: cronOnce,
-          onFailure: () => Effect.logWarning('nibrunner cron query failed'),
+          onFailure: (cause) => Effect.logWarning('nibrunner cron query failed', cause),
           schedule: CONTROL_PLANE_BACKOFF,
         }),
         supervised({
           once: sqliteOnce,
-          onFailure: () => Effect.logWarning('nibrunner SQLite query failed'),
+          onFailure: (cause) => Effect.logWarning('nibrunner SQLite query failed', cause),
           schedule: CONTROL_PLANE_BACKOFF,
         }),
         supervised({
           once: exportsOnce.pipe(Effect.andThen(Effect.sleep(EXPORT_IDLE_POLL))),
-          onFailure: () => Effect.logWarning('nibrunner export publication failed'),
+          onFailure: (cause) => Effect.logWarning('nibrunner export publication failed', cause),
           schedule: CONTROL_PLANE_BACKOFF,
         }),
         supervised({
           once: logOnce.pipe(
             Effect.flatMap((sent) => (sent ? Effect.void : Effect.sleep(LOG_IDLE_POLL))),
           ),
-          onFailure: () => Effect.logWarning('nibrunner tenant log delivery failed'),
+          onFailure: (cause) => Effect.logWarning('nibrunner tenant log delivery failed', cause),
           schedule: CONTROL_PLANE_BACKOFF,
         }),
       ],
