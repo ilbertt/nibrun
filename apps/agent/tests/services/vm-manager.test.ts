@@ -24,6 +24,7 @@ import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { agentConfig } from '#tests/support/config.ts';
 import { servingFirecracker } from '#tests/support/firecracker.ts';
+import { verifiedFirewall } from '#tests/support/firewall.ts';
 import {
   APP_ID,
   DEPLOYMENT_ID,
@@ -190,6 +191,7 @@ function hostAsleepAndRefusing() {
       Layer.provideMerge(
         Layer.mergeAll(
           AgentState.Default,
+          verifiedFirewall,
           noArtifactImages,
           TenantLogReceiver.Default,
           Layer.succeed(
@@ -428,6 +430,7 @@ test('a cold boot pins paths and refuses capture after a subsequent image adopti
         Layer.provideMerge(
           Layer.mergeAll(
             AgentState.Default,
+            verifiedFirewall,
             Layer.succeed(
               ArtifactImages,
               ArtifactImages.make({ ensure: () => Effect.succeed('/images/artifact.squashfs') }),

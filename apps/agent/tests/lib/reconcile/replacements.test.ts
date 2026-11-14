@@ -13,6 +13,7 @@ import { HostFirewall } from '#services/host-firewall.service.ts';
 import { SlotAllocator } from '#services/slot-allocator.service.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
 import { agentConfig } from '#tests/support/config.ts';
+import { kernelRuleset } from '#tests/support/firewall.ts';
 import {
   APP_ID,
   desiredInstance,
@@ -31,6 +32,12 @@ const plan: ReconcilePlan = {
 function host({ refuseFirewall, refuseProxy }: { refuseFirewall: boolean; refuseProxy: boolean }) {
   const steps: string[] = [];
   const commands = recordingCommands((request) => {
+    if (request.command[0] === 'ip') {
+      return succeeding({ stdout: '[]' });
+    }
+    if (request.command[0] === 'nft' && !request.command.includes('-f')) {
+      return succeeding({ stdout: JSON.stringify(kernelRuleset()) });
+    }
     if (request.command.includes('-f')) {
       steps.push('withdraw');
       return refuseFirewall
@@ -40,7 +47,7 @@ function host({ refuseFirewall, refuseProxy }: { refuseFirewall: boolean; refuse
               result: { code: 1, stdout: '', stderr: 'refused' },
             }),
           )
-        : succeeding();
+        : succeeding({ stdout: JSON.stringify(kernelRuleset()) });
     }
     return succeeding();
   });

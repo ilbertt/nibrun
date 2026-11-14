@@ -44,10 +44,13 @@ jobs:
       - name: Install native test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y nbd-client nbdkit fuse3 openssl curl e2fsprogs util-linux
+          sudo apt-get install -y nbd-client nbdkit fuse3 openssl curl e2fsprogs util-linux nftables iproute2 python3
 
       - name: Run Tests
         run: bun run test
+
+      - name: Test tenant firewall isolation
+        run: sudo env "PATH=$PATH" NIBRUN_TEST_ISOLATION=1 NIBRUN_TEST_NETWORK_PROBES=1 unshare --mount --net "$(command -v bun)" run --filter @repo/agent test tests/services/host-firewall-linux.test.ts tests/services/network-isolation-linux.test.ts
 
       - name: Test NBD attachment
         env:

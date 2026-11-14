@@ -1,44 +1,99 @@
 import { NFTABLES_FAMILIES, NFTABLES_TABLE } from '#lib/network/firewall.ts';
 
-/**
- * Which of this agent's tables the kernel is holding, as one comparable value. The kernel
- * allocates a handle when a table is created, so a ruleset something else flushed and rebuilt
- * carries different ones and a ruleset that is simply gone carries none — which is what tells a
- * kernel still holding what was written from one that would merely be sent the same text again.
- */
-export type KernelTables = string;
+type JsonObject = { [key: string]: unknown };
+type Table = { objects: Map<string, string>; rules: Map<string, string[]> };
 
-/**
- * `nft -j list tables` answers with one object per table under a top-level `nftables` array,
- * mixed in with a `metainfo` entry — the shape `parseAppTraffic` reads, and defensive about it
- * for the same reason: this is another process's output. An entry that cannot be read counts as
- * a table that is not there, so the ruleset is written again rather than assumed to be in place.
- */
-export function parseKernelTables(json: string): KernelTables {
-  const handles = new Map<string, number>();
-  let parsed: unknown;
+function object(value: unknown): JsonObject | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? (value as JsonObject)
+    : undefined;
+}
+
+function canonical(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(canonical);
+  }
+  const fields = object(value);
+  return fields === undefined
+    ? value
+    : Object.fromEntries(
+        Object.keys(fields)
+          .sort()
+          .map((key) => [key, canonical(fields[key])]),
+      );
+}
+
+function readEntry(entry: unknown) {
+  const fields = object(entry);
+  const command = object(fields?.add) ?? fields;
+  if (command === undefined) {
+    return undefined;
+  }
+  const [kind, body] = Object.entries(command)[0] ?? [];
+  const value = object(body);
+  if (
+    kind === undefined ||
+    value === undefined ||
+    (kind === 'table' ? value.name : value.table) !== NFTABLES_TABLE
+  ) {
+    return undefined;
+  }
+  return { kind, value };
+}
+
+function remember({ table, kind, value }: { table: Table; kind: string; value: JsonObject }) {
+  if (kind === 'rule') {
+    const chain = String(value.chain);
+    const rules = table.rules.get(chain) ?? [];
+    rules.push(JSON.stringify(canonical(value)));
+    table.rules.set(chain, rules);
+    return;
+  }
+  const fields = { ...value };
+  if (kind === 'counter') {
+    delete fields.packets;
+    delete fields.bytes;
+  }
+  table.objects.set(`${kind}:${value.name}`, JSON.stringify(canonical(fields)));
+}
+
+function fingerprint(table: Table | undefined) {
+  if (
+    table === undefined ||
+    ['input', 'forward'].some(
+      (name) => !table.objects.has(`chain:${name}`) || !table.rules.get(name)?.length,
+    )
+  ) {
+    return undefined;
+  }
+  return { objects: [...table.objects].sort(), rules: [...table.rules].sort() };
+}
+
+export function parseKernelRuleset(json: string): string | undefined {
   try {
-    parsed = JSON.parse(json);
+    const entries = object(JSON.parse(json))?.nftables;
+    if (!Array.isArray(entries)) {
+      return undefined;
+    }
+    const tables = new Map<string, Table>();
+    for (const entry of entries) {
+      const item = readEntry(entry);
+      if (item === undefined || !NFTABLES_FAMILIES.some((family) => family === item.value.family)) {
+        continue;
+      }
+      const family = String(item.value.family);
+      if (item.kind === 'table') {
+        tables.set(family, { objects: new Map(), rules: new Map() });
+      }
+      const table = tables.get(family);
+      if (table === undefined) {
+        return undefined;
+      }
+      remember({ table, ...item });
+    }
+    const result = NFTABLES_FAMILIES.map((family) => fingerprint(tables.get(family)));
+    return result.some((table) => table === undefined) ? undefined : JSON.stringify(result);
   } catch {
-    return '';
+    return undefined;
   }
-  const entries = (parsed as { nftables?: unknown })?.nftables;
-  if (!Array.isArray(entries)) {
-    return '';
-  }
-  for (const entry of entries) {
-    const table = (entry as { table?: unknown })?.table;
-    if (typeof table !== 'object' || table === null) {
-      continue;
-    }
-    const { family, name, handle } = table as Record<string, unknown>;
-    if (name === NFTABLES_TABLE && typeof family === 'string' && typeof handle === 'number') {
-      handles.set(family, handle);
-    }
-  }
-  // Named in the order the ruleset writes them, so the same pair of tables never renders two ways.
-  return NFTABLES_FAMILIES.flatMap((family) => {
-    const handle = handles.get(family);
-    return handle === undefined ? [] : [`${family}:${handle}`];
-  }).join(' ');
 }

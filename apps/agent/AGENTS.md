@@ -276,3 +276,10 @@ mocked tests do not establish those guarantees.
   and whether ZeroFS reads its own `disk_size_gb` as GiB or GB, are not.
 - **No test builds the full layer graph**, so a service wired wrong in `index.ts` is caught by
   `tsc` and by starting the binary, not by `bun test`.
+
+Tenant firewall health compares the echoed write transaction with the complete kernel rules,
+including rule order, chain policy and both IP families. Counter values are excluded. Unknown
+or damaged isolation disconnects all tenant TAPs; only verified recovery reconnects them.
+Every operation that brings a TAP up must hold `HostFirewall.whileIsolated`.
+The isolated Linux CI tests exercise rule loss, failed repairs, read-back races and actual
+traffic to host, neighboring-tenant, metadata and VPC endpoints.

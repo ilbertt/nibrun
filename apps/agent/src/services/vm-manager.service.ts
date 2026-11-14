@@ -41,6 +41,7 @@ import { ArtifactImages } from '#services/artifact-images.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
 import { CronRegistrationReceiver } from '#services/cron-registration-receiver.service.ts';
 import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
+import { HostFirewall } from '#services/host-firewall.service.ts';
 import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
 import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
@@ -68,6 +69,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     const agentState = yield* AgentState;
     const desiredCache = yield* DesiredStateCache;
     const commands = yield* CommandRunner;
+    const firewall = yield* HostFirewall;
 
     function requireDataVolume({ appId, devicePath }: { appId: AppId; devicePath: string }) {
       return Effect.gen(function* () {
@@ -176,11 +178,13 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
       artifactImagePath: string;
       image: GuestImage;
     }) {
-      yield* ensureTap({
-        tapName: slot.tapName,
-        hostIpv4: slot.hostIpv4,
-        subnetPrefixLength: slot.subnetPrefixLength,
-      });
+      yield* firewall.whileIsolated(
+        ensureTap({
+          tapName: slot.tapName,
+          hostIpv4: slot.hostIpv4,
+          subnetPrefixLength: slot.subnetPrefixLength,
+        }),
+      );
       // Written before the guest exists rather than after it answers, because nothing has to ask
       // the guest for it: the MAC is the slot's, and the config below is what hands it over. Left
       // to ARP, the host's first probe of a new guest pays the resolution `refreshNeighbour`
@@ -525,6 +529,7 @@ export class VmManager extends Effect.Service<VmManager>()('VmManager', {
     AgentState.Default,
     ArtifactImages.Default,
     CommandRunner.Default,
+    HostFirewall.Default,
     TenantLogReceiver.Default,
     CronRegistrationReceiver.Default,
     ZerofsTopology.Default,

@@ -1,84 +1,52 @@
 import { describe, expect, test } from 'bun:test';
-import { parseKernelTables } from '#lib/network/tables.ts';
+import { parseKernelRuleset } from '#lib/network/tables.ts';
+import { kernelRuleset } from '#tests/support/firewall.ts';
 
-const METAINFO =
-  '{"metainfo": {"version": "1.0.4", "release_name": "Lester Gooch #3", "json_schema_version": 1}}';
+function fingerprint(value: unknown) {
+  return parseKernelRuleset(JSON.stringify(value));
+}
 
-const listing = (...tables: readonly string[]) =>
-  `{"nftables": [${[METAINFO, ...tables].join(', ')}]}`;
-
-const nibrun = ({ family, handle }: { family: string; handle: number }) =>
-  `{"table": {"family": "${family}", "name": "nibrun", "handle": ${handle}}}`;
-
-/** What AL2023 with nft 1.0.4 answers right after the agent has written both tables. */
-const HOLDING_BOTH = listing(
-  nibrun({ family: 'ip', handle: 2 }),
-  nibrun({ family: 'ip6', handle: 4 }),
-);
-
-/** The same host after `nft flush ruleset`, which succeeds and names no table at all. */
-const FLUSHED = listing();
-
-describe('what the kernel is holding', () => {
-  test('a host holding both tables reads back as itself', () => {
-    expect(parseKernelTables(HOLDING_BOTH)).toBe(parseKernelTables(HOLDING_BOTH));
-    expect(parseKernelTables(HOLDING_BOTH)).not.toBe('');
+describe('the installed rules, including their order and policy, establish isolation', () => {
+  test('the echoed transaction and kernel listing describe the same rules', () => {
+    const snapshot = kernelRuleset();
+    const echo = { nftables: [snapshot.nftables[0], ...snapshot.nftables].map((add) => ({ add })) };
+    expect(fingerprint(snapshot)).toBeDefined();
+    expect(fingerprint(echo)).toBe(fingerprint(snapshot));
   });
 
-  test('a flushed ruleset is not the host that was holding them', () => {
-    expect(parseKernelTables(FLUSHED)).not.toBe(parseKernelTables(HOLDING_BOTH));
+  test('a chain flushed without replacing its table is no longer verified', () => {
+    const original = kernelRuleset();
+    const flushed = { nftables: original.nftables.filter((entry) => !('rule' in entry)) };
+    expect(fingerprint(flushed)).toBeUndefined();
   });
 
-  test('tables rebuilt by something else carry new handles and read back different', () => {
-    const rebuilt = listing(
-      nibrun({ family: 'ip', handle: 8 }),
-      nibrun({ family: 'ip6', handle: 10 }),
+  test('a changed verdict cannot hide behind unchanged table handles', () => {
+    const original = JSON.stringify(kernelRuleset());
+    expect(parseKernelRuleset(original.replaceAll('"reject":null', '"accept":null'))).not.toBe(
+      parseKernelRuleset(original),
     );
-    expect(parseKernelTables(rebuilt)).not.toBe(parseKernelTables(HOLDING_BOTH));
   });
 
-  test('half the pair is not the pair', () => {
-    const onlyV4 = listing(nibrun({ family: 'ip', handle: 2 }));
-    expect(parseKernelTables(onlyV4)).not.toBe(parseKernelTables(HOLDING_BOTH));
+  test('counter activity and unrelated tables do not invalidate isolation', () => {
+    const original = kernelRuleset();
+    const changed = JSON.parse(JSON.stringify(original).replaceAll('"bytes":0', '"bytes":12345'));
+    changed.nftables.push({ table: { family: 'inet', name: 'other', handle: 9 } });
+    expect(fingerprint(changed)).toBe(fingerprint(original));
   });
 
-  test('the families are named in one order, whatever order the kernel lists them in', () => {
-    const reversed = listing(
-      nibrun({ family: 'ip6', handle: 4 }),
-      nibrun({ family: 'ip', handle: 2 }),
-    );
-    expect(parseKernelTables(reversed)).toBe(parseKernelTables(HOLDING_BOTH));
-  });
+  test.each(['', 'not json', '{}', '{"nftables":[]}', '{"nftables":null}'])(
+    'invalid output is never verified: %s',
+    (value) => {
+      expect(parseKernelRuleset(value)).toBeUndefined();
+    },
+  );
 
-  test('a table belonging to something else on the host is not ours', () => {
-    const alongside = listing(
-      '{"table": {"family": "inet", "name": "filter", "handle": 1}}',
-      nibrun({ family: 'ip', handle: 2 }),
-      nibrun({ family: 'ip6', handle: 4 }),
-    );
-    expect(parseKernelTables(alongside)).toBe(parseKernelTables(HOLDING_BOTH));
-  });
-
-  test('a name that matches in another family is not one of the two written', () => {
-    const bridged = listing(
-      nibrun({ family: 'ip', handle: 2 }),
-      nibrun({ family: 'ip6', handle: 4 }),
-      nibrun({ family: 'bridge', handle: 6 }),
-    );
-    expect(parseKernelTables(bridged)).toBe(parseKernelTables(HOLDING_BOTH));
-  });
-});
-
-describe('output that cannot be read is a host holding nothing', () => {
-  test('output that is not json', () => {
-    expect(parseKernelTables('nft: command not found')).toBe('');
-  });
-
-  test('json that is not an nftables answer', () => {
-    expect(parseKernelTables('{"other": []}')).toBe('');
-  });
-
-  test('a table the kernel named without a handle', () => {
-    expect(parseKernelTables(listing('{"table": {"family": "ip", "name": "nibrun"}}'))).toBe('');
+  test('a missing IPv6 table is not a verified firewall', () => {
+    const snapshot = kernelRuleset();
+    expect(
+      fingerprint({
+        nftables: snapshot.nftables.filter((entry) => JSON.stringify(entry).includes('"ip"')),
+      }),
+    ).toBeUndefined();
   });
 });

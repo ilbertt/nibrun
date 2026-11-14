@@ -1,117 +1,170 @@
 import { describe, expect, test } from 'bun:test';
-import { Effect, Layer } from 'effect';
-import type { CommandRequest } from '#lib/exec.ts';
+import { Deferred, Effect, Fiber, Layer } from 'effect';
 import type { FirewallState } from '#lib/network/firewall.ts';
+import type { CommandRunner } from '#services/command-runner.service.ts';
 import { HostFirewall } from '#services/host-firewall.service.ts';
 import { recordingCommands, succeeding } from '#tests/support/commands.ts';
+import { kernelRuleset } from '#tests/support/firewall.ts';
 
-const METAINFO =
-  '{"metainfo": {"version": "1.0.4", "release_name": "Lester Gooch #3", "json_schema_version": 1}}';
+const STATE: FirewallState = { instances: [], controlPlaneCidrsV4: [], controlPlaneCidrsV6: [] };
 
-const holding = (handle: number) =>
-  `{"nftables": [${METAINFO}, {"table": {"family": "ip", "name": "nibrun", "handle": ${handle}}}, {"table": {"family": "ip6", "name": "nibrun", "handle": ${handle + 1}}}]}`;
-
-/** A host after `nft flush ruleset`: the command succeeds and names no table of ours. */
-const FLUSHED = `{"nftables": [${METAINFO}]}`;
-
-const LISTING_FAILED = 1;
-
-/** What AL2023 answered after a first write, and after the pair had been rebuilt under the agent. */
-const WRITTEN_HANDLE = 2;
-const REBUILT_HANDLE = 8;
-
-const state = (overrides: Partial<FirewallState> = {}): FirewallState => ({
-  instances: [],
-  controlPlaneCidrsV4: [],
-  controlPlaneCidrsV6: [],
-  ...overrides,
-});
-
-const isListing = ({ command }: CommandRequest) => command.includes('list');
-
-/** What each call did, in order, which is what says whether the kernel was consulted before a skip. */
-const stepsOf = (commands: readonly CommandRequest[]) =>
-  commands.map((request) => (isListing(request) ? 'list' : 'write'));
-
-/**
- * Each `nft -j list tables` takes the next answer and the last one stands for every call after,
- * so a script says what the kernel does between two applies and nothing about how often it is
- * asked. `undefined` is a listing that could not be run at all.
- */
-function host(answers: readonly (string | undefined)[]) {
-  let index = 0;
-  const recorder = recordingCommands((request) => {
-    if (!isListing(request)) {
-      return succeeding();
+function fixture() {
+  const expected = JSON.stringify(kernelRuleset());
+  const kernel = {
+    installed: expected,
+    writeFails: false,
+    readFails: false,
+    corruptAfterWrite: false,
+    downFails: false,
+  };
+  function write() {
+    if (kernel.writeFails) {
+      return succeeding({ code: 1 });
     }
-    const answer = answers[Math.min(index, answers.length - 1)];
-    index += 1;
-    return answer === undefined
-      ? succeeding({ code: LISTING_FAILED, stderr: 'nft: unknown option' })
-      : succeeding({ stdout: answer });
-  });
-  // Merged rather than only provided: `apply` reaches for the runner when it is called, not when
-  // the service is built, so the caller needs it in context too.
-  return { recorder, layer: HostFirewall.Default.pipe(Layer.provideMerge(recorder.layer)) };
-}
-
-function applying({
-  answers,
-  states,
-}: {
-  answers: readonly (string | undefined)[];
-  states: readonly FirewallState[];
-}) {
-  const { recorder, layer } = host(answers);
-  return Effect.runPromise(
-    Effect.gen(function* () {
-      const firewall = yield* HostFirewall;
-      for (const each of states) {
-        yield* firewall.apply(Effect.succeed(each));
+    kernel.installed = kernel.corruptAfterWrite ? '{"nftables":[]}' : expected;
+    return succeeding({ stdout: expected });
+  }
+  const recorder = recordingCommands((request) => {
+    if (request.command[0] === 'ip') {
+      if (request.command.includes('-json')) {
+        return succeeding({ stdout: '[{"ifname":"nbr0"},{"ifname":"nbr1"},{"ifname":"eth0"}]' });
       }
-      return stepsOf(recorder.commands);
-    }).pipe(Effect.provide(layer)),
-  );
+      return succeeding({
+        code:
+          kernel.downFails && request.command.includes('nbr0') && request.command.includes('down')
+            ? 1
+            : 0,
+      });
+    }
+    if (request.command.includes('-f')) {
+      return write();
+    }
+    return succeeding({ code: kernel.readFails ? 1 : 0, stdout: kernel.installed });
+  });
+  const layer = HostFirewall.Default.pipe(Layer.provideMerge(recorder.layer));
+  function run<A, E>(effect: Effect.Effect<A, E, HostFirewall | CommandRunner>) {
+    return Effect.runPromise(effect.pipe(Effect.provide(layer)));
+  }
+  return { kernel, recorder, run };
 }
 
-describe('an unchanged ruleset is written again only when the kernel stopped holding it', () => {
-  test('a host still holding what was written is left alone', async () => {
-    const steps = await applying({
-      answers: [holding(WRITTEN_HANDLE)],
-      states: [state(), state()],
-    });
-    expect(steps).toEqual(['write', 'list', 'list']);
+const apply = Effect.flatMap(HostFirewall, (firewall) => firewall.apply(Effect.succeed(STATE)));
+
+describe('firewall verification and containment', () => {
+  test('unchanged rules preserve counters by avoiding a rewrite', async () => {
+    const host = fixture();
+    await host.run(
+      Effect.gen(function* () {
+        yield* apply;
+        yield* apply;
+      }),
+    );
+    expect(host.recorder.commands.filter((request) => request.command.includes('-f'))).toHaveLength(
+      1,
+    );
   });
 
-  test('a ruleset flushed out of band is written again', async () => {
-    const steps = await applying({
-      answers: [holding(WRITTEN_HANDLE), FLUSHED],
-      states: [state(), state()],
-    });
-    expect(steps).toEqual(['write', 'list', 'list', 'write', 'list']);
+  test('a flush preserving table handles disconnects guests before repair', async () => {
+    const host = fixture();
+    await host.run(
+      Effect.gen(function* () {
+        yield* apply;
+        host.recorder.commands.length = 0;
+        host.kernel.installed = '{"nftables":[]}';
+        yield* apply;
+      }),
+    );
+    const steps = host.recorder.commands.map((request) => request.command.join(' '));
+    expect(steps.indexOf('ip link set dev nbr0 down')).toBeLessThan(
+      steps.indexOf('nft -j -e -f -'),
+    );
+    expect(steps.at(-1)).toBe('ip link set dev nbr1 up');
+    expect(steps.some((step) => step.includes('dev eth0'))).toBe(false);
   });
 
-  test('tables something else rebuilt are written again, though the text has not changed', async () => {
-    const steps = await applying({
-      answers: [holding(WRITTEN_HANDLE), holding(REBUILT_HANDLE)],
-      states: [state(), state()],
-    });
-    expect(steps).toEqual(['write', 'list', 'list', 'write', 'list']);
+  test.each(['writeFails', 'readFails', 'corruptAfterWrite'] as const)(
+    '%s keeps existing guests disconnected and refuses concurrent network setup until recovery',
+    async (failure) => {
+      const host = fixture();
+      await host.run(
+        Effect.gen(function* () {
+          const firewall = yield* HostFirewall;
+          yield* apply;
+          host.recorder.commands.length = 0;
+          host.kernel.installed = '{"nftables":[]}';
+          host.kernel[failure] = true;
+          expect((yield* Effect.either(apply))._tag).toBe('Left');
+          let connected = false;
+          const attempt = yield* Effect.either(
+            firewall.whileIsolated(
+              Effect.sync(() => {
+                connected = true;
+              }),
+            ),
+          );
+          expect(attempt._tag).toBe('Left');
+          expect(connected).toBe(false);
+          expect(host.recorder.commands.some((request) => request.command.at(-1) === 'up')).toBe(
+            false,
+          );
+          host.kernel[failure] = false;
+          yield* apply;
+          yield* firewall.whileIsolated(
+            Effect.sync(() => {
+              connected = true;
+            }),
+          );
+          expect(connected).toBe(true);
+        }),
+      );
+    },
+  );
+
+  test('failure to disconnect one tap does not skip the other guests', async () => {
+    const host = fixture();
+    await host.run(
+      Effect.gen(function* () {
+        yield* apply;
+        host.kernel.downFails = true;
+        host.kernel.installed = '{"nftables":[]}';
+        expect((yield* Effect.either(apply))._tag).toBe('Left');
+      }),
+    );
+    expect(
+      host.recorder.commands.some(
+        (request) => request.command.join(' ') === 'ip link set dev nbr1 down',
+      ),
+    ).toBe(true);
   });
 
-  test('a listing that could not be run leaves nothing to skip on', async () => {
-    const steps = await applying({
-      answers: [undefined],
-      states: [state(), state()],
-    });
-    expect(steps).toEqual(['write', 'list', 'write', 'list']);
-  });
-
-  test('a changed ruleset is written without asking the kernel anything first', async () => {
-    const steps = await applying({
-      answers: [holding(WRITTEN_HANDLE)],
-      states: [state(), state({ controlPlaneCidrsV4: ['10.43.0.0/16'] })],
-    });
-    expect(steps).toEqual(['write', 'list', 'write', 'list']);
+  test('containment waits for network setup already holding the isolation lock', async () => {
+    const host = fixture();
+    await host.run(
+      Effect.gen(function* () {
+        yield* apply;
+        const firewall = yield* HostFirewall;
+        const entered = yield* Deferred.make<void>();
+        const release = yield* Deferred.make<void>();
+        const setup = yield* Effect.fork(
+          firewall.whileIsolated(
+            Deferred.succeed(entered, undefined).pipe(Effect.andThen(Deferred.await(release))),
+          ),
+        );
+        yield* Deferred.await(entered);
+        host.kernel.writeFails = true;
+        host.kernel.installed = '{"nftables":[]}';
+        const repair = yield* Effect.fork(Effect.either(apply));
+        yield* Effect.yieldNow();
+        expect(host.recorder.commands.some((request) => request.command.at(-1) === 'down')).toBe(
+          false,
+        );
+        yield* Deferred.succeed(release, undefined);
+        yield* Fiber.join(setup);
+        expect((yield* Fiber.join(repair))._tag).toBe('Left');
+        expect(host.recorder.commands.some((request) => request.command.at(-1) === 'down')).toBe(
+          true,
+        );
+      }),
+    );
   });
 });

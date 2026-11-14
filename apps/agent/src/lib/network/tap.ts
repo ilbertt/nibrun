@@ -1,5 +1,5 @@
 import type { Ipv4Address } from '@repo/protocol';
-import { Effect } from 'effect';
+import { Data, Effect } from 'effect';
 import { TAP_NAME_PREFIX } from '#lib/network/slot.ts';
 import { stdoutOf } from '#services/command-runner.service.ts';
 
@@ -8,8 +8,8 @@ const SYSCTL = 'sysctl';
 
 export function parseLinkNames(output: string): string[] {
   const parsed: unknown = JSON.parse(output);
-  if (!Array.isArray(parsed)) {
-    return [];
+  if (!Array.isArray(parsed) || parsed.some((entry) => typeof entry?.ifname !== 'string')) {
+    throw new Error('The kernel did not return a complete interface listing.');
   }
   return parsed
     .map((entry) => (entry as { ifname?: unknown }).ifname)
@@ -19,9 +19,19 @@ export function parseLinkNames(output: string): string[] {
 export const isTapName = (name: string) =>
   name.startsWith(TAP_NAME_PREFIX) && /^\d+$/.test(name.slice(TAP_NAME_PREFIX.length));
 
-export const listTapNames = Effect.map(
-  stdoutOf({ command: [IP, '-json', 'link', 'show'] }),
-  (output) => parseLinkNames(output).filter(isTapName),
+export class TapListingFailed extends Data.TaggedError('TapListingFailed') {
+  override get message() {
+    return 'The tenant network interfaces could not be enumerated.';
+  }
+}
+
+export const listTapNames = Effect.flatMap(
+  stdoutOf({ command: [IP, '-json', 'link', 'show'], timeout: '5 seconds' }),
+  (output) =>
+    Effect.try({
+      try: () => parseLinkNames(output).filter(isTapName),
+      catch: () => new TapListingFailed(),
+    }),
 );
 
 export type TapInterface = {
