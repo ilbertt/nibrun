@@ -139,6 +139,12 @@ domain arrives whenever an owner adds one — which is what the token is for.
 `.github/workflows/cd.yml`, on every push to main. No SSH and no key material in CI: the last leg
 triggers `on_box_deploy.sh` over SSM RunCommand.
 
+Bridge installation prunes obsolete SHA-named builds after its service health gate, under the
+deployment lock. It shares the legacy agent's retention implementation: keep the active build,
+the two newest other complete builds, and every executable still running. Bridge builds contain
+only `nibrun-agent`; legacy builds additionally require their `.installed` marker. Artifact caches,
+guest images, and tenant data are outside this cleanup.
+
 **No secret may pass through the workflow's own environment.** RunCommand keeps its parameters in
 command history, in the clear, for 30 days — so Terraform writes secrets into SSM parameters the
 instance decrypts with its own role. Both GHCR packages must be public for the same reason: the box

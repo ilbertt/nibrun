@@ -3,10 +3,28 @@ set -euo pipefail
 
 nibrun_dir=${1:-/opt/nibrun}
 proc_dir=${2:-/proc}
+layout=${3:-legacy}
 
-[ -d "$nibrun_dir/versions/agent" ] || exit 0
-versions_dir=$(cd "$nibrun_dir/versions/agent" && pwd -P)
-active_dir=$(cd "$nibrun_dir/bin/agent" && pwd -P)
+case "$layout" in
+  legacy)
+    versions_path="$nibrun_dir/versions/agent"
+    active_link="$nibrun_dir/bin/agent"
+    marker=.installed
+    ;;
+  bridge)
+    versions_path="$nibrun_dir/versions"
+    active_link="$nibrun_dir/current"
+    marker=
+    ;;
+  *)
+    echo "Unknown agent installation layout: $layout" >&2
+    exit 1
+    ;;
+esac
+
+[ -d "$versions_path" ] || exit 0
+versions_dir=$(cd "$versions_path" && pwd -P)
+active_dir=$(cd "$active_link" && pwd -P)
 [ -d "$proc_dir" ] || exit 1
 
 if [ "$(dirname "$active_dir")" != "$versions_dir" ]; then
@@ -19,9 +37,11 @@ for directory in "$versions_dir"/*; do
   [ -d "$directory" ] && [ ! -L "$directory" ] || continue
   version=${directory##*/}
   [[ "$version" =~ ^[[:xdigit:]]{40}$ ]] || continue
-  [ -f "$directory/.installed" ] && [ ! -L "$directory/.installed" ] || continue
+  if [ -n "$marker" ]; then
+    [ -f "$directory/$marker" ] && [ ! -L "$directory/$marker" ] || continue
+  fi
   [ -f "$directory/nibrun-agent" ] && [ ! -L "$directory/nibrun-agent" ] || continue
-  [ -z "$(find "$directory" -mindepth 1 -maxdepth 1 ! -name .installed ! -name nibrun-agent -print -quit)" ] || continue
+  [ -z "$(find "$directory" -mindepth 1 -maxdepth 1 ! -name "$marker" ! -name nibrun-agent -print -quit)" ] || continue
   installed_dirs+=("$directory")
 done
 
@@ -47,7 +67,7 @@ is_running() {
 }
 
 rollback_count=0
-# SHA names have no order; installation creates the marker last and updates the directory's mtime.
+# SHA names have no order; installing the binary updates the directory's mtime.
 while IFS= read -r directory; do
   [ "$directory" != "$active_dir" ] || continue
   if [ "$rollback_count" -lt 2 ]; then
@@ -55,7 +75,7 @@ while IFS= read -r directory; do
     continue
   fi
   is_running "$directory" && continue
-  if [ "$(cd "$nibrun_dir/bin/agent" && pwd -P)" != "$active_dir" ]; then
+  if [ "$(cd "$active_link" && pwd -P)" != "$active_dir" ]; then
     echo "Refusing to prune: active agent changed during cleanup" >&2
     exit 1
   fi

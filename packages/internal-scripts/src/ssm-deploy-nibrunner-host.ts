@@ -50,6 +50,9 @@ const tunnelUnit = await Bun.file(
   join(hostDirectory, 'systemd/nibrun-nibrunner-tunnel.service'),
 ).text();
 const bridgeInstaller = await Bun.file(join(hostDirectory, 'deploy/install_bridge.sh')).text();
+const agentVersionPruner = await Bun.file(
+  join(repoRoot, 'infra/app-host/deploy/prune_agent_versions.sh'),
+).text();
 const bridgeUnit = await Bun.file(join(hostDirectory, 'systemd/nibrun-nibrunner-bridge.service'))
   .text()
   .then((unit) => unit.replaceAll('{{EXPORTS_DIRECTORY}}', NIBRUNNER_EXPORTS_DIRECTORY));
@@ -81,6 +84,7 @@ const script = [
   writeRemoteFile({ name: 'install_tunnel.sh', content: tunnelInstaller }),
   writeRemoteFile({ name: 'nibrun-nibrunner-tunnel.service', content: tunnelUnit }),
   writeRemoteFile({ name: 'install_bridge.sh', content: bridgeInstaller }),
+  writeRemoteFile({ name: 'prune_agent_versions.sh', content: agentVersionPruner }),
   writeRemoteFile({ name: 'nibrun-nibrunner-bridge.service', content: bridgeUnit }),
   writeRemoteFile({ name: 'bridge.env', content: `${environmentFile}\n` }),
   `export ${exportLine({
