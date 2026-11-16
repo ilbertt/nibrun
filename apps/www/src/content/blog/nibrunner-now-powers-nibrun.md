@@ -15,8 +15,7 @@ The key decision was to make one file,
 [`desired.json`](https://nibrunner.dev/docs/reference/desired), the source of truth
 for the host's desired state. It describes the apps, their binaries, volumes and hostnames.
 nibrunner reads it and makes the running system match, reporting the result in
-`reported.json`. It handles the microVM lifecycle, request routing, and
-[sleeping and waking idle apps](https://nibrunner.dev/docs/guides/sleep-and-wake).
+`reported.json`.
 
 nibrun still needs an agent beside nibrunner to connect it to the rest of the
 platform. The agent talks to nibrun's REST API, downloads the binaries, writes
@@ -31,7 +30,11 @@ single binaries. Its native
 lets us add Access protection too, verifying tokens before forwarding requests or
 waking an app.
 
-nibrunner also gave us more detailed
+We also dropped Caddy. nibrunner's embedded proxy now handles the whole request:
+it [wakes a sleeping app](https://nibrunner.dev/docs/guides/sleep-and-wake), waits for
+it to be ready, forwards the request and returns the response.
+
+That path is instrumented inside nibrunner, with more detailed
 [metrics](https://nibrunner.dev/docs/guides/logs-and-metrics#metrics) for VM lifecycle
 timings, request outcomes and resource usage. These help us find bottlenecks and
 check whether our fixes improve performance.
