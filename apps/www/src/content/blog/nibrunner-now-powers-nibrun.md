@@ -31,11 +31,16 @@ single binaries. Its native
 lets us add Access protection too, verifying tokens before forwarding requests or
 waking an app.
 
-If you deploy on nibrun, the workflow is the same: upload a binary, get an HTTPS URL,
-and keep persistent files in `data/`. The [nibrunner.dev](https://nibrunner.dev)
-documentation site itself runs on nibrun.
+nibrunner also gave us more detailed
+[metrics](https://nibrunner.dev/docs/guides/logs-and-metrics#metrics) for VM lifecycle
+timings, request outcomes and resource usage. These help us find bottlenecks and
+check whether our fixes improve performance.
+
+The [nibrunner.dev](https://nibrunner.dev) documentation site itself runs on nibrun.
 
 To run nibrunner yourself, you'll need a Linux x86_64 machine with `/dev/kvm`, either
 bare metal or a VPS with nested virtualization. Start with the
 [installation guide](https://nibrunner.dev/docs/getting-started/installation), then
 [deploy an app](https://nibrunner.dev/docs/getting-started/deploy-an-app).
+
+Click **Deploy on nibrun** below to try the faster runtime with your own app.
