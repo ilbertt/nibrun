@@ -1,4 +1,5 @@
 import { defineCommand } from '@parshjs/core';
+import { imageFromReference } from '@repo/app-operations';
 import { z } from 'zod';
 import { DEPLOYMENT_APP_ID_FLAG, GITHUB_TRUSTED_OIDC_FLAG, SHARED_OPTIONS } from '#config.ts';
 import { selectApp } from '#lib/apps.ts';
@@ -21,11 +22,25 @@ const DATA_FOLDER_FLAG = 'data-folder';
 
 export const command = defineCommand('run [command]', {
   description:
-    'Deploy a compiled binary and run it, from this machine or from an https url nibrun fetches it at. Quote the binary with its arguments to pass them on: nib run "./my-server serve --port 8080". Every option a deploy takes is listed by nib run anything --help — any word will do in place of the binary, because the help does not read it.',
+    'Deploy a compiled binary or a public digest-pinned OCI image and run it, from this machine or from an https url nibrun fetches it at. Quote the binary with its arguments to pass them on: nib run "./my-server serve --port 8080". Every option a deploy takes is listed by nib run anything --help — any word will do in place of the binary, because the help does not read it.',
   params: {
     command: { schema: z.string().min(1) },
   },
   options: {
+    image: {
+      schema: z.boolean().optional(),
+      description:
+        'Run a public Linux amd64 OCI image pinned as registry/repository@sha256:digest.',
+    },
+    program: {
+      schema: z.string().optional(),
+      description:
+        'Absolute program path inside the image. Required with --image; image ENTRYPOINT and CMD are not imported.',
+    },
+    'working-directory': {
+      schema: z.string().optional(),
+      description: 'Working directory inside the image. Defaults to /app. Only with --image.',
+    },
     [GITHUB_TRUSTED_OIDC_FLAG]: {
       schema: z.boolean().optional(),
       hidden: true,
@@ -60,6 +75,13 @@ export const command = defineCommand('run [command]', {
   },
   beforeHandler: ({ context, options }) => {
     if (options[GITHUB_TRUSTED_OIDC_FLAG] === true) {
+      if (
+        options.image ||
+        options.program !== undefined ||
+        options['working-directory'] !== undefined
+      ) {
+        throw new UsageError('GitHub deployment credentials only support compiled binaries.');
+      }
       return;
     }
     if (options[DEPLOYMENT_APP_ID_FLAG] !== undefined) {
@@ -90,6 +112,9 @@ export const command = defineCommand('run [command]', {
       [DEPLOYMENT_APP_ID_FLAG]: _appId,
       detach,
       sha256,
+      image,
+      program,
+      'working-directory': workingDirectory,
       [DATA_FOLDER_FLAG]: dataFolderPath,
       ...flags
     } = options;
@@ -105,7 +130,21 @@ export const command = defineCommand('run [command]', {
     // Before anything is asked, so a path nobody can read costs one line rather than a
     // questionnaire whose answers are then thrown away. A url is not opened here at all: the api
     // is the end that fetches it, and it is the end that says whether it could.
-    const binary = await binaryFrom({ source: binarySource, sha256 });
+    if (!image && (program !== undefined || workingDirectory !== undefined)) {
+      throw new UsageError('--program and --working-directory require --image.');
+    }
+    if (image && (program === undefined || sha256 !== undefined)) {
+      throw new UsageError(
+        '--image requires --program and a digest in the image reference; omit --sha256.',
+      );
+    }
+    const binary = image
+      ? imageFromReference({
+          reference: binarySource,
+          program: program!,
+          workingDirectory: workingDirectory ?? '/app',
+        })
+      : await binaryFrom({ source: binarySource, sha256 });
     const dataFolder = await initialDataFrom({ path: dataFolderPath, app: flags.app });
     ui.open('nib run');
     const app =
