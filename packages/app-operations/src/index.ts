@@ -26,6 +26,7 @@ export { readCrons } from '#crons.ts';
 export { deleteApp } from '#delete.ts';
 export {
   awaitDeploymentSettled,
+  type DeployableArtifact,
   type DeployableBinary,
   type DeployInput,
   deploy,
@@ -55,6 +56,7 @@ export {
   removeGitHubWorkflow,
   setGitHubWorkflow,
 } from '#github-workflows.ts';
+export { imageFromReference, type RegistryImage } from '#image.ts';
 export {
   type DeployableArchive,
   type FetchableArchive,

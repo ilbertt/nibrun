@@ -466,3 +466,11 @@ test('a direct app ID cannot select an account deployment', async () => {
   expect(errors).toEqual(['--app-id requires --github-trusted-oidc.']);
   expect(requests).toHaveLength(0);
 });
+
+test('image options are refused before obtaining GitHub deployment credentials', async () => {
+  const { cli } = workflowCli();
+  expect(await cli.run(trustedArguments(['--image', '--program', '/bin/busybox']))).toBe(1);
+  expect(errors.join('')).toContain('only support compiled binaries');
+  expect(identityRequests).toEqual([]);
+  expect(requests).toEqual([]);
+});
