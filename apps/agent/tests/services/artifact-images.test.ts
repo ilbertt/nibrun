@@ -9,6 +9,7 @@ import { ARTIFACT_BYTES, ARTIFACT_DIGEST, artifactStore } from '#tests/support/a
 import { recordingCommands } from '#tests/support/commands.ts';
 import { agentConfig } from '#tests/support/config.ts';
 import { artifact } from '#tests/support/fixtures.ts';
+import { ociImage } from '#tests/support/oci-image.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
 const run = provided(platform);
@@ -191,4 +192,21 @@ describe('one digest is built once for the process, not once per caller', () => 
     expect(Either.isRight(retried)).toBe(true);
     expect(opens).toBe(FIRST_ATTEMPT + ONE_BUILD);
   });
+});
+
+test('the legacy engine refuses OCI images before fetching or packing a binary', async () => {
+  await run(
+    Effect.gen(function* () {
+      const images = yield* ArtifactImages;
+      expect((yield* Effect.flip(images.ensure(ociImage())))._tag).toBe('UnsupportedArtifact');
+    }).pipe(
+      Effect.provide(
+        ArtifactImages.DefaultWithoutDependencies.pipe(
+          Layer.provide(
+            Layer.mergeAll(platform, agentConfig(), artifactStore(), recordingCommands().layer),
+          ),
+        ),
+      ),
+    ),
+  );
 });

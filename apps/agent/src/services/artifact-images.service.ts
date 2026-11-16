@@ -1,6 +1,7 @@
 import { FileSystem, Path } from '@effect/platform';
-import type { DesiredArtifact, Sha256Digest } from '@repo/protocol';
+import type { DesiredArtifact, DesiredRuntimeArtifact, Sha256Digest } from '@repo/protocol';
 import { Deferred, Duration, Effect, Option, Ref } from 'effect';
+import { UnsupportedArtifact } from '#lib/artifacts/store.ts';
 import {
   artifactImagePath,
   BINARY_MODE,
@@ -143,7 +144,10 @@ export class ArtifactImages extends Effect.Service<ArtifactImages>()('ArtifactIm
     const building = yield* Ref.make(new Map<Sha256Digest, Building>());
 
     return {
-      ensure: Effect.fn('ArtifactImages.ensure')(function* (artifact: DesiredArtifact) {
+      ensure: Effect.fn('ArtifactImages.ensure')(function* (artifact: DesiredRuntimeArtifact) {
+        if ('kind' in artifact) {
+          return yield* new UnsupportedArtifact();
+        }
         yield* Effect.annotateCurrentSpan({ digest: artifact.digest });
         const claim = yield* Deferred.make<ImagePath, BuildFailure>();
         const held = yield* Ref.modify(building, (current) => {

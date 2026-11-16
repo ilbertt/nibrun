@@ -77,6 +77,7 @@ export const makeNibrunnerExports = Effect.fn('makeNibrunnerExports')(function* 
       const bundle = yield* writeNibrunnerExportBundle({
         preparedDirectory: preparedPath(desired.exportId),
         artifact: desired.artifact,
+        config: desired.config,
         artifactBucket,
         stagingDir,
       });

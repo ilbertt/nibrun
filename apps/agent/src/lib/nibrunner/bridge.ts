@@ -50,6 +50,7 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
     control,
     hostIdFile: config.hostIdFile,
     versions: initial.report.versions,
+    supportsOciImages: true,
     capacity: readNibrunnerReport(config.reportedStateFile).pipe(
       Effect.map(({ report }) => report.capacity),
     ),

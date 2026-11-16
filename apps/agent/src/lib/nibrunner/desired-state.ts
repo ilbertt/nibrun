@@ -41,10 +41,16 @@ export function nibrunnerDesiredState({
     checkpoints: desired.checkpoints,
     exports: desired.exports
       .filter((item) => item.desiredState === 'absent' || item.exportId === nextExportId)
-      .map(({ artifact: _artifact, ...item }): NibrunnerDesiredState['exports'][number] => ({
-        ...item,
-        format: 'directory',
-        objectKey: nibrunnerExportKey(item.exportId),
-      })),
+      .map(
+        ({
+          artifact: _artifact,
+          config: _config,
+          ...item
+        }): NibrunnerDesiredState['exports'][number] => ({
+          ...item,
+          format: 'directory',
+          objectKey: nibrunnerExportKey(item.exportId),
+        }),
+      ),
   };
 }

@@ -31,7 +31,7 @@ function normalizedInstance(value: NibrunnerReport['instances'][number]) {
   }
   const layers = value.layerDigests;
   if (layers !== undefined && (!Array.isArray(layers) || layers.length > 1)) {
-    throw new NibrunnerReportMismatch({ reason: 'does not describe a single executable layer' });
+    throw new NibrunnerReportMismatch({ reason: 'does not describe a single artifact layer' });
   }
   return { ...value, artifactDigest: Array.isArray(layers) ? layers[0] : undefined };
 }

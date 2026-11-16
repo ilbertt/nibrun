@@ -4,6 +4,7 @@ import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol/runtime
 import { UnsupportedNibrunnerFeature } from '#lib/nibrunner/failure.ts';
 import { nibrunnerInstance } from '#lib/nibrunner/instance.ts';
 import { APP_HOSTNAME, desiredInstance, tenantEnvironment } from '#tests/support/fixtures.ts';
+import { ociImage } from '#tests/support/oci-image.ts';
 
 const DATA_REFERENCE = interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name);
 const HOSTNAME_REFERENCE = interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name);
@@ -92,4 +93,19 @@ test('public ports and their references are refused without exposing tenant valu
   } catch (error) {
     expect(String(error)).not.toContain('sensitive');
   }
+});
+
+test('a registry image supplies the filesystem and explicit command without a binary layer', () => {
+  const image = ociImage();
+  const instance = desiredInstance({ artifact: image });
+  instance.config.args = ['httpd', '-f', '-p', '3000'];
+  const converted = nibrunnerInstance(instance);
+  expect(converted.layers).toEqual([
+    { kind: image.kind, repository: image.repository, digest: image.digest },
+  ]);
+  expect(converted.config.command).toMatchObject({
+    program: image.program,
+    workingDirectory: image.workingDirectory,
+    args: instance.config.args,
+  });
 });
