@@ -47,3 +47,4 @@ systemctl daemon-reload
 systemctl enable nibrun-nibrunner-bridge.service
 systemctl restart nibrun-nibrunner-bridge.service
 systemctl is-active --quiet nibrun-nibrunner-bridge.service
+bash prune_agent_versions.sh "$base" /proc bridge
