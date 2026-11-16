@@ -11,8 +11,9 @@ The first versions of nibrun used a TypeScript agent to manage the microVMs. Aft
 few iterations, we designed nibrunner to extract that work into a separate project
 that could be self-hosted.
 
-The key decision was to make one file, `desired.json`, the source of truth for the
-host's desired state. It describes the apps, their binaries, volumes and hostnames.
+The key decision was to make one file,
+[`desired.json`](https://nibrunner.dev/docs/reference/desired), the source of truth
+for the host's desired state. It describes the apps, their binaries, volumes and hostnames.
 nibrunner reads it and makes the running system match, reporting the result in
 `reported.json`. It handles the microVM lifecycle, request routing, and
 [sleeping and waking idle apps](https://nibrunner.dev/docs/guides/sleep-and-wake).
