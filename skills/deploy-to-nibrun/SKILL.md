@@ -1,16 +1,16 @@
 ---
 name: deploy-to-nibrun
-description: Deploy a compiled binary to nibrun and run it as an HTTPS service. Use when asked to deploy, ship, host or run a self-contained server binary (Bun, Go, Rust, Zig, C) or a folder of static assets on nibrun, when working in a repo that targets nibrun, or when deciding whether nibrun fits an app.
+description: Deploy a compiled binary or public OCI image to nibrun as an HTTPS service. Use when asked to deploy, ship, host or run a self-contained server binary (Bun, Go, Rust, Zig, C) a public Docker/OCI image, or a folder of static assets on nibrun, when working in a repo that targets nibrun, or when deciding whether nibrun fits an app.
 ---
 
 # Deploy to nibrun
 
-nibrun takes one compiled binary and gives it a microVM of its own, a persistent filesystem, and
-an HTTPS URL. No Dockerfile, no YAML, no cluster.
+nibrun runs one compiled binary or public OCI image in its own microVM, with a persistent
+filesystem and an HTTPS URL. For an existing image, follow [Docker and OCI images](#docker-and-oci-images).
 
 Build for Linux x86_64, deploy through nibrun's MCP server or CLI, then ask the URL for something.
 
-What that path does not need is below it: [copying an app](#copying-an-app), [the guest contract](#the-guest-contract),
+What that path does not need is below it: [copying an app](#copying-an-app), [the guest contract](#the-binary-guest-contract),
 [naming a runtime value](#naming-a-runtime-value), [a second public port](#a-second-public-port),
 [cron jobs](#cron-jobs), and [what nibrun does not do](#tradeoffs).
 
@@ -310,6 +310,57 @@ temporary token scoped to this app. Deployments reuse its saved startup argument
 created, without waiting for it to serve. If the trust rule requires a GitHub environment,
 set `jobs.deploy.environment` to match.
 
+## Docker and OCI images
+
+Sign in with an owner account. Use a public Linux amd64 image from `docker.io`, `ghcr.io`,
+`quay.io` or `public.ecr.aws`, with its full repository path and a verified SHA256 manifest or
+index digest. Tags, private registry credentials and uploaded image archives are not supported
+by this deployment path. A multi-platform index must include Linux amd64.
+
+Choose the absolute program path, working directory, arguments and required environment from
+the image's documentation or configuration. Set these explicitly: image `ENTRYPOINT`, `CMD`,
+`WORKDIR`, `ENV`, `EXPOSE` and `HEALTHCHECK` defaults are not imported. Apps run as UID/GID 65534;
+root-dependent entrypoints and directories that account cannot write need adapting. The HTTP
+server must bind `0.0.0.0` on the configured port. Have users enter credentials in the dashboard.
+
+With MCP, pass `image` as the source to `deploy_app`, alongside `name` or `appId`:
+
+```json
+{
+  "name": "my-image-app",
+  "image": {
+    "kind": "oci",
+    "repository": "docker.io/library/busybox",
+    "digest": "<verified 64-character SHA256 hex digest, without sha256:>",
+    "program": "/bin/busybox",
+    "workingDirectory": "/app"
+  },
+  "config": { "httpPort": 3000, "args": ["httpd", "-f", "-p", "3000", "-h", "/app/data"] }
+}
+```
+
+`config` applies only when creating the app. Existing apps reuse their saved port, arguments
+and environment. Reuse the returned app ID for later deployments. Do not combine `image` with
+`binary`, `url`, `artifactId` or the binary-only `sha256` input.
+
+With the CLI, replace the digest placeholder with that same verified digest:
+
+```sh
+nib run "docker.io/library/busybox@sha256:<digest> httpd -f -p 3000 -h /app/data" --image --program /bin/busybox --working-directory /app --port 3000 --name my-image-app
+```
+
+Use `--app my-image-app` for later releases. Arguments follow the image reference inside the
+quoted positional. `--working-directory` defaults to `/app`; `--program` is required.
+GitHub deployment credentials currently support compiled binaries only.
+
+Keep application data under `/app/data`, which the Files and SQLite tools expose and initial
+data imports populate. Image exports preserve the entire writable filesystem under `data/`,
+plus `image.json` with the pinned source, startup paths, arguments and HTTP port, and `.env`
+when available. The app's normal data is therefore under `data/app/data` in an image export.
+To create a new app using that supported data directory, use it as the initial data source and
+redeploy the image from `image.json`. Restoring other filesystem paths requires a separate
+volume restore; the binary export recipe below does not restore an image's full filesystem.
+
 ## 4. Verify
 
 Run the compiled server locally and check its main flows with HTTP/API requests. After deployment,
@@ -356,7 +407,7 @@ The app can continue writing to its database.
 
 ## Copying an app
 
-An export is a `.tar.gz` holding `data/`, the binary that ran against it, and a `.env` of the
+A binary export is a `.tar.gz` holding `data/`, the binary that ran against it, and a `.env` of the
 variables it was deployed with — which is everything a second app is rebuilt from, whether that is
 a staging copy, a restore, or a move to another account:
 
@@ -371,7 +422,7 @@ and the `.env` unpacked beside it were never on it. Nothing outside the volume c
 — port, arguments and environment are given to the copy the way any new app is given them, with the
 exported `.env` as the record of what the original had.
 
-## The guest contract
+## The binary guest contract
 
 Apps and persistent storage are hosted in Frankfurt, Germany (AWS `eu-central-1`). Uploaded
 binaries, data imports, exports and platform database backups are stored in the same region.
@@ -474,7 +525,7 @@ Worth saying out loud before recommending it:
   still disconnect. No blue/green or canary.
 - **A local disk, not a distributed one.** Ideal for SQLite, uploads, caches. It is not
   replicated, so an export (`nib apps export`) is your backup.
-- **The binary is the unit.** The guest boots yours and nothing else — no sidecar, no cron
+- **One app per guest.** A binary or image supplies the app — no sidecar, no cron
   container, no managed database next to it.
 - **256 MiB and 1 vCPU**, sized by nibrun rather than configured by you, and the OOM killer
   reaches for the tenant first.
