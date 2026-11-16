@@ -23,6 +23,14 @@ platform. The agent talks to nibrun's REST API, downloads the binaries, writes
 `desired.json`, and sends nibrunner's reported state back to the API. When you
 self-host nibrunner, you can write the file yourself.
 
+nibrunner also runs
+[Linux amd64 OCI images, including Docker images](https://nibrunner.dev/docs/guides/layers#from-an-oci-image)
+inside microVMs. That gives us a way to support image deployments on nibrun alongside
+single binaries. Its native
+[Cloudflare Access support](https://nibrunner.dev/docs/guides/cloudflare-access)
+lets us add Access protection too, verifying tokens before forwarding requests or
+waking an app.
+
 If you deploy on nibrun, the workflow is the same: upload a binary, get an HTTPS URL,
 and keep persistent files in `data/`. The [nibrunner.dev](https://nibrunner.dev)
 documentation site itself runs on nibrun.
