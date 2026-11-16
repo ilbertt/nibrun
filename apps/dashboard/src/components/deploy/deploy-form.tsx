@@ -6,7 +6,7 @@ import { AdvancedConfiguration } from '#components/deploy/advanced-configuration
 import { DeployBinaryField } from '#components/deploy/deploy-binary-field.tsx';
 import { asksForVariables, DeployConfiguration } from '#components/deploy/deploy-configuration.tsx';
 import { MinimalBinaryField } from '#components/deploy/minimal-binary-field.tsx';
-import { sourceName } from '#lib/file-source.ts';
+import { appSourceName, isImageSource } from '#lib/app-source.ts';
 import { type DeployFormValues, useDeployForm } from '#lib/hooks/use-deploy-form.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
@@ -31,10 +31,11 @@ export function DeployForm({
 }) {
   const form = useDeployForm({ appId, binary, suggested });
   const { api, replacing, targetResolved } = form;
-  const picked = useStore(api.store, (state) => state.values.binary !== undefined);
+  const source = useStore(api.store, (state) => state.values.binary);
+  const picked = source !== undefined;
   const appName = useStore(api.store, (state) => deployedName({ values: state.values, replacing }));
   // One form either way, so the binary survives the way out of the stripped one.
-  const stripped = minimal && !asksForVariables(suggested);
+  const stripped = minimal && !asksForVariables(suggested) && !isImageSource(source);
 
   return (
     <form
@@ -55,7 +56,7 @@ export function DeployForm({
       {replacing !== undefined && (
         <p className="wrap-anywhere rounded-2xl bg-warning/10 px-3 py-2 text-sm text-warning">
           This restarts <span className="font-medium font-mono">{replacing.name}</span>
-          {picked ? ' on the binary above' : ' on the binary it already runs'}. Its hostnames and
+          {picked ? ' using the source above' : ' using its current version'}. Its hostnames and
           everything on its volume stay as they are.
         </p>
       )}
@@ -100,7 +101,7 @@ function deployedName({
   }
   const typed = values.name.trim();
   // Whichever way the binary was given: the file that was picked, or the file the url ends in.
-  return typed === '' ? sourceName(values.binary) : typed;
+  return typed === '' ? appSourceName(values.binary) : typed;
 }
 
 function submitLabel({

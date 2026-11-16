@@ -24,7 +24,7 @@ export function DeployBinaryField({ form }: { form: DeployFormState }) {
         const rejected = field.state.value !== undefined && field.state.meta.errors.length > 0;
         return (
           <Field data-invalid={rejected || undefined}>
-            <FieldLabel htmlFor={BINARY_INPUT_ID}>Binary</FieldLabel>
+            <FieldLabel htmlFor={BINARY_INPUT_ID}>App source</FieldLabel>
             <BinarySourcePicker
               value={field.state.value}
               invalid={rejected}

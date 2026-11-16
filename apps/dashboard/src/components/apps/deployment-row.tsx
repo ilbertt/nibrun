@@ -1,5 +1,5 @@
 import { TableCell, TableRow } from '@repo/ui/components/table';
-import { BinaryLabel } from '#components/apps/binary-label.tsx';
+import { ArtifactLabel } from '#components/apps/artifact-label.tsx';
 import { DeploymentDetails } from '#components/apps/deployment-details.tsx';
 import { SystemDeploymentOrigin } from '#components/apps/system-deployment-origin.tsx';
 import { dayAndMinute } from '#lib/format-timestamp.ts';
@@ -38,7 +38,7 @@ export function DeploymentRow({
         {artifact === undefined ? (
           ABSENT
         ) : (
-          <BinaryLabel
+          <ArtifactLabel
             artifact={artifact}
             github={deployment.github}
             mcp={deployment.mcp}
