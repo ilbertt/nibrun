@@ -1,7 +1,7 @@
 ## Project
 
-nibrun hosts a user-uploaded compiled binary in an isolated guest with a
-persistent volume mounted at `data/`.
+nibrun hosts a user-uploaded compiled binary or a digest-pinned public OCI image in an
+isolated guest. The supported application data directory is `/app/data`.
 
 Bun + TypeScript monorepo (`apps/*`, `packages/*`).
 

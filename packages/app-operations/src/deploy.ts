@@ -245,6 +245,7 @@ async function artifactFor({
     const stored = artifacts.find(
       (artifact) =>
         artifact.digest === binary.digest &&
+        'sizeBytes' in artifact &&
         artifact.sizeBytes === binary.body.size &&
         artifact.originalFileName === binary.name,
     );

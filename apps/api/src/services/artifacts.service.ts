@@ -7,7 +7,7 @@ import {
   type Sha256Digest,
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import type { Artifact } from '#lib/api/artifact.ts';
+import type { BinaryArtifact } from '#lib/api/artifact.ts';
 import type { ArtifactId, OwnerId } from '#lib/api/identifiers.ts';
 import { unwrapExecutable } from '#lib/archive/unwrap.ts';
 import {
@@ -226,7 +226,7 @@ export type ArtifactUpload = {
   url: string;
 };
 
-function toArtifact(row: ArtifactRow): Artifact {
+function toArtifact(row: ArtifactRow): BinaryArtifact {
   return {
     id: row.id,
     appId: row.app_id,
@@ -350,7 +350,7 @@ export class ArtifactsService extends Service {
     appId: AppId;
     ownerId: OwnerId;
     artifactId: ArtifactId;
-  }): Promise<Artifact> {
+  }): Promise<BinaryArtifact> {
     const pending = await this.artifactsRepo.findPending({ appId, artifactId, ownerId });
     if (!pending) {
       return await this.alreadyStored({ appId, artifactId, ownerId });
@@ -383,7 +383,7 @@ export class ArtifactsService extends Service {
    * the bytes are read, so a url serving something else costs the fetch; what it does not cost is
    * a deploy of whatever turned up.
    */
-  async createFromUrl(input: FetchArtifactInput): Promise<Artifact> {
+  async createFromUrl(input: FetchArtifactInput): Promise<BinaryArtifact> {
     const diagnostics = new DownloadDiagnostics({
       logger: this.logger,
       fields: { appId: input.appId, origin: downloadOrigin(input.url) },
@@ -404,7 +404,7 @@ export class ArtifactsService extends Service {
     filename: providedFilename,
     sha256,
     diagnostics,
-  }: FetchArtifactInput & { diagnostics: DownloadDiagnostics }): Promise<Artifact> {
+  }: FetchArtifactInput & { diagnostics: DownloadDiagnostics }): Promise<BinaryArtifact> {
     if (deploymentGrant !== null) {
       throw new ForbiddenError('Deployment grants can only upload binaries.');
     }
@@ -549,7 +549,7 @@ export class ArtifactsService extends Service {
     url: string;
     sourceDigest: Sha256Digest | null;
     diagnostics: DownloadDiagnostics;
-  }): Promise<Artifact | undefined> {
+  }): Promise<BinaryArtifact | undefined> {
     if (sourceDigest === null) {
       return undefined;
     }
@@ -595,7 +595,7 @@ export class ArtifactsService extends Service {
     onlyOne: boolean;
     url: string;
     cached: CachedBinaryRow;
-  }): Promise<Artifact> {
+  }): Promise<BinaryArtifact> {
     const pending = takenPlace(
       await this.artifactsRepo.insertPending({
         appId,
@@ -648,7 +648,7 @@ export class ArtifactsService extends Service {
     expected: Expectation | undefined;
     sourceDigest: Sha256Digest | null;
     diagnostics: DownloadDiagnostics;
-  }): Promise<Artifact> {
+  }): Promise<BinaryArtifact> {
     const source = await diagnostics.phase({
       phase: 'source',
       run: () => this.sourceRepo.open({ url, diagnostics }),
@@ -827,7 +827,7 @@ export class ArtifactsService extends Service {
     staged: ObjectKey;
     inspection: ArtifactInspection;
     diagnostics?: DownloadDiagnostics;
-  }): Promise<Artifact> {
+  }): Promise<BinaryArtifact> {
     if (inspection.outcome !== 'stored') {
       await this.abandon({ appId, artifactId, ownerId });
       throw new BadRequestError(refusalMessage(inspection));
@@ -887,7 +887,7 @@ export class ArtifactsService extends Service {
     appId: AppId;
     artifactId: ArtifactId;
     ownerId: OwnerId;
-  }): Promise<Artifact> {
+  }): Promise<BinaryArtifact> {
     const stored = await this.artifactsRepo.findById({ appId, artifactId, ownerId });
     if (!stored) {
       throw new NotFoundError(NO_SUCH_UPLOAD);
@@ -933,7 +933,7 @@ export class ArtifactsService extends Service {
     }
   }
 
-  async list({ appId, ownerId }: { appId: AppId; ownerId: OwnerId }): Promise<Artifact[]> {
+  async list({ appId, ownerId }: { appId: AppId; ownerId: OwnerId }): Promise<BinaryArtifact[]> {
     const rows = await this.artifactsRepo.listByApp({ appId, ownerId });
     return rows.map(toArtifact);
   }
@@ -946,7 +946,7 @@ export class ArtifactsService extends Service {
     appId: AppId;
     artifactId: ArtifactId;
     ownerId: OwnerId;
-  }): Promise<Artifact> {
+  }): Promise<BinaryArtifact> {
     const row = await this.artifactsRepo.findById({ appId, artifactId, ownerId });
     if (!row) {
       throw new NotFoundError(NO_SUCH_ARTIFACT);

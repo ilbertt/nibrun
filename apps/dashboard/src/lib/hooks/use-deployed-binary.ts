@@ -1,3 +1,4 @@
+import { artifactName } from '@repo/app-ui';
 import { useQuery } from '@tanstack/react-query';
 import { useNewestDeployment } from '#lib/hooks/use-newest-deployment.ts';
 import { artifactQueryOptions } from '#queries/artifacts.ts';
@@ -24,5 +25,8 @@ export function useDeployedBinary(appId: string): DeployedBinary {
   }
   return artifact.data === undefined
     ? LOADING
-    : { status: 'ready', name: artifact.data.originalFileName };
+    : {
+        status: 'ready',
+        name: artifactName(artifact.data),
+      };
 }

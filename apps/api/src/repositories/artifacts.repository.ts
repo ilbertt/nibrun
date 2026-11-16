@@ -100,6 +100,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
         SELECT a.id, ${originalFileName}, ${originalFileUrl}, ${sourceDigest}
         FROM nibrun.live_apps a
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+        /* @notNull original_file_name */
         RETURNING id, app_id, original_file_name, original_file_url, created_at
       `;
       return row ? { outcome: 'created', row } : { outcome: 'no-app' };
@@ -119,6 +120,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
     objectKey,
   }: CompleteArtifactInput): Promise<ArtifactRow | null> {
     const [row] = await this.sql.CompleteArtifact`
+      /* @notNull original_file_name */
       /* @notNull digest */
       /* @notNull size_bytes */
       /* @notNull object_key */
@@ -126,7 +128,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
       SET digest = ${digest}, size_bytes = ${sizeBytes}, object_key = ${objectKey}
       FROM nibrun.live_apps a
       WHERE ar.id = ${artifactId} AND ar.app_id = ${appId} AND a.id = ar.app_id
-        AND a.owner_id = ${ownerId} AND ar.digest IS NULL
+        AND a.owner_id = ${ownerId} AND ar.digest IS NULL AND ar.image_repository IS NULL
       RETURNING ar.id, ar.app_id, ar.digest, ar.size_bytes, ar.object_key, ar.original_file_name,
                 ar.original_file_url, ar.created_at
     `;
@@ -146,7 +148,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
       DELETE FROM nibrun.artifacts ar
       USING nibrun.live_apps a
       WHERE ar.id = ${artifactId} AND ar.app_id = ${appId} AND a.id = ar.app_id
-        AND a.owner_id = ${ownerId} AND ar.digest IS NULL
+        AND a.owner_id = ${ownerId} AND ar.digest IS NULL AND ar.image_repository IS NULL
     `;
   }
 
@@ -160,11 +162,12 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
     ownerId: OwnerId;
   }): Promise<PendingArtifactRow | null> {
     const [row] = await this.sql.SelectPendingArtifact`
+      /* @notNull original_file_name */
       SELECT ar.id, ar.app_id, ar.original_file_name, ar.original_file_url, ar.created_at
       FROM nibrun.artifacts ar
       JOIN nibrun.live_apps a ON a.id = ar.app_id
       WHERE ar.id = ${artifactId} AND ar.app_id = ${appId} AND a.owner_id = ${ownerId}
-        AND ar.digest IS NULL
+        AND ar.digest IS NULL AND ar.image_repository IS NULL
     `;
     return row ?? null;
   }
@@ -194,12 +197,13 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
   async removeAbandoned({ artifactId }: { artifactId: ArtifactId }): Promise<void> {
     await this.sql.DeleteAbandonedArtifact`
       DELETE FROM nibrun.artifacts ar
-      WHERE ar.id = ${artifactId} AND ar.digest IS NULL
+      WHERE ar.id = ${artifactId} AND ar.digest IS NULL AND ar.image_repository IS NULL
     `;
   }
 
   listByApp({ appId, ownerId }: { appId: AppId; ownerId: OwnerId }): Promise<ArtifactRow[]> {
     return this.sql.SelectArtifactsByApp`
+      /* @notNull original_file_name */
       /* @notNull digest */
       /* @notNull size_bytes */
       /* @notNull object_key */
@@ -207,7 +211,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
              ar.original_file_url, ar.created_at
       FROM nibrun.artifacts ar
       JOIN nibrun.live_apps a ON a.id = ar.app_id
-      WHERE ar.app_id = ${appId} AND a.owner_id = ${ownerId} AND ar.digest IS NOT NULL
+      WHERE ar.app_id = ${appId} AND a.owner_id = ${ownerId} AND ar.digest IS NOT NULL AND ar.image_repository IS NULL
       ORDER BY ar.id DESC
     `;
   }
@@ -222,6 +226,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
     ownerId: OwnerId;
   }): Promise<ArtifactRow | null> {
     const [row] = await this.sql.SelectArtifactById`
+      /* @notNull original_file_name */
       /* @notNull digest */
       /* @notNull size_bytes */
       /* @notNull object_key */
@@ -230,7 +235,7 @@ export class ArtifactsRepository extends Repository implements ArtifactsReposito
       FROM nibrun.artifacts ar
       JOIN nibrun.live_apps a ON a.id = ar.app_id
       WHERE ar.id = ${artifactId} AND ar.app_id = ${appId} AND a.owner_id = ${ownerId}
-        AND ar.digest IS NOT NULL
+        AND ar.digest IS NOT NULL AND ar.image_repository IS NULL
     `;
     return row ?? null;
   }

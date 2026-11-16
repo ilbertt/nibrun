@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { StatusMap } from 'elysia';
 import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
+import { ociImage } from '#tests/support/oci-image.ts';
 
 const APP_ID = '0199c0de-0000-7000-8000-000000000001';
 const ARTIFACT_ID = '0199c0de-0000-7000-8000-000000000002';
@@ -84,4 +85,24 @@ describe('a request that could not name a binary is not one', () => {
     expect((await report({ upload: 'probably' })).status).toBe(StatusMap['Bad Request']);
     expect((await report({})).status).toBe(StatusMap['Bad Request']);
   });
+});
+
+test('registering a valid public image requires a session', async () => {
+  expect((await create({ image: ociImage() })).status).toBe(StatusMap.Unauthorized);
+});
+
+test('an image source cannot be combined with a binary source', async () => {
+  expect((await create({ image: ociImage(), url: 'https://releases.test/server' })).status).toBe(
+    StatusMap['Bad Request'],
+  );
+});
+
+test('image tags and relative commands are refused at the boundary', async () => {
+  expect(
+    (await create({ image: { ...ociImage(), repository: 'docker.io/library/busybox:latest' } }))
+      .status,
+  ).toBe(StatusMap['Bad Request']);
+  expect((await create({ image: { ...ociImage(), program: 'busybox' } })).status).toBe(
+    StatusMap['Bad Request'],
+  );
 });

@@ -130,6 +130,12 @@ class FakeAppsService {
 }
 
 class FakeDeploymentsService {
+  readonly unsupportedHosts: HostId[] = [];
+  failUnsupportedImages({ hostId }: { hostId: HostId }) {
+    this.unsupportedHosts.push(hostId);
+    return Promise.resolve();
+  }
+
   readonly reports: HostReportedState[] = [];
 
   applyHostReport({ reported }: { reported: HostReportedState }): Promise<void> {
@@ -350,3 +356,17 @@ describe('a report is read by whatever owns what it talks about', () => {
     expect(volumeStorageMigrations.swept).toBe(1);
   });
 });
+
+test.each([true, false, undefined])(
+  'registration fences unsupported image deployments when image support is %s',
+  async (supportsOciImages) => {
+    const { service, deployments } = build();
+    const fail = spyOn(deployments, 'failUnsupportedImages');
+    const session = await service.openSession({ ...SESSION_REQUEST, supportsOciImages });
+    if (supportsOciImages === true) {
+      expect(fail).not.toHaveBeenCalled();
+    } else {
+      expect(fail).toHaveBeenCalledWith({ hostId: session.hostId });
+    }
+  },
+);

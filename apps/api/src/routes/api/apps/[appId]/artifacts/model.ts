@@ -1,4 +1,4 @@
-import { ByteSizeSchema, FilenameSchema, Sha256DigestSchema } from '@repo/protocol';
+import { ByteSizeSchema, FilenameSchema, OciImageSchema, Sha256DigestSchema } from '@repo/protocol';
 import { t } from 'elysia';
 import { ArtifactSchema } from '#lib/api/artifact.ts';
 import { ArtifactIdSchema } from '#lib/api/identifiers.ts';
@@ -10,10 +10,13 @@ import { MAX_REMOTE_URL_LENGTH, REMOTE_URL_PATTERN } from '#lib/remote-url.ts';
 //
 // The size is answered before anything is signed, and then signed into the url: the store holds
 // the upload to exactly it.
-const UploadedBinarySchema = t.Object({
-  filename: FilenameSchema,
-  sizeBytes: ByteSizeSchema,
-});
+const UploadedBinarySchema = t.Object(
+  {
+    filename: FilenameSchema,
+    sizeBytes: ByteSizeSchema,
+  },
+  { additionalProperties: false },
+);
 
 // Bytes the caller does not hold: no name and no size, because the api is the one fetching and so
 // the one that finds out how large the binary is and what the file at the end of the url is called.
@@ -22,18 +25,25 @@ const UploadedBinarySchema = t.Object({
 // end will take their word about — as an expectation to hold the download to rather than as a fact
 // about it. Over the file the url serves, which for an archive is the archive: that is what a
 // release publishes a checksum for, and the only form one is ever written down in.
-const FetchedBinarySchema = t.Object({
-  url: t.String({
-    description: 'Public https url the api fetches the binary from.',
-    pattern: REMOTE_URL_PATTERN,
-    maxLength: MAX_REMOTE_URL_LENGTH,
-  }),
-  sha256: t.Optional(Sha256DigestSchema),
-});
+const FetchedBinarySchema = t.Object(
+  {
+    url: t.String({
+      description: 'Public https url the api fetches the binary from.',
+      pattern: REMOTE_URL_PATTERN,
+      maxLength: MAX_REMOTE_URL_LENGTH,
+    }),
+    sha256: t.Optional(Sha256DigestSchema),
+  },
+  { additionalProperties: false },
+);
 
 // Where the binary is, however that is answered. One request either way: what differs is who ends
 // up moving the bytes, which is not a different thing to have asked for.
-export const CreateArtifactBodySchema = t.Union([UploadedBinarySchema, FetchedBinarySchema]);
+export const CreateArtifactBodySchema = t.Union([
+  UploadedBinarySchema,
+  FetchedBinarySchema,
+  t.Object({ image: OciImageSchema }, { additionalProperties: false }),
+]);
 
 const StagedUploadSchema = t.Object({
   artifactId: ArtifactIdSchema,

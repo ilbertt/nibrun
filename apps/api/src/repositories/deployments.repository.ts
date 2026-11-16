@@ -49,6 +49,7 @@ export type CreatedDeployment =
   | { outcome: 'no-grant' }
   | { outcome: 'no-import' }
   | { outcome: 'no-host' }
+  | { outcome: 'no-image-host' }
   | { outcome: 'data-exists' }
   | { outcome: 'held' };
 
@@ -116,6 +117,9 @@ export abstract class DeploymentsRepositoryContract {
     at: Date;
     hostId: HostId;
   }): Promise<void>;
+  abstract listUnsupportedImages(input: {
+    hostId: HostId;
+  }): Promise<Queries['SelectUnsupportedImageDeployments'][]>;
   abstract fail(input: {
     deploymentId: DeploymentId;
     message: string;
@@ -194,11 +198,12 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       // `digest IS NOT NULL` is what makes an artifact one: a row without it is an upload still
       // in flight, and a host sent to fetch it would find a key that names nothing yet.
       const [deployable] = await tx.SelectDeployableArtifact`
-        SELECT ar.id
+        SELECT ar.id, ar.image_repository
         FROM nibrun.artifacts ar
         JOIN nibrun.live_apps a ON a.id = ar.app_id
         WHERE ar.id = ${artifactId} AND ar.app_id = ${appId} AND a.owner_id = ${ownerId}
           AND ar.digest IS NOT NULL
+          AND (${deploymentGrantId}::uuid IS NULL OR ar.image_repository IS NULL)
       `;
       if (!deployable) {
         return { outcome: 'no-artifact' };
@@ -211,9 +216,14 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
         return refusal;
       }
       await lockAppForMutation({ tx, appId, ownerId });
-      const hostId = await this.hostForDeployment({ tx, appId, ownerId });
+      const hostId = await this.hostForDeployment({
+        tx,
+        appId,
+        ownerId,
+        requiresOci: deployable.image_repository !== null,
+      });
       if (hostId === undefined) {
-        return { outcome: 'no-host' };
+        return { outcome: deployable.image_repository === null ? 'no-host' : 'no-image-host' };
       }
       await supersedeLiveDeployment({ tx, appId, ownerId });
 
@@ -265,19 +275,21 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     tx,
     appId,
     ownerId,
-  }: OwnedApp & { tx: Transaction }): Promise<HostId | undefined> {
+    requiresOci,
+  }: OwnedApp & { tx: Transaction; requiresOci: boolean }): Promise<HostId | undefined> {
     const [previous] = await tx.SelectPreviousDeploymentHost`
-      SELECT d.host_id FROM nibrun.deployments d
+      SELECT d.host_id, h.supports_oci_images FROM nibrun.deployments d
+      JOIN nibrun.hosts h ON h.id = d.host_id
       JOIN nibrun.live_apps a ON a.id = d.app_id
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
       ORDER BY d.id DESC LIMIT 1
     `;
     if (previous !== undefined) {
-      return previous.host_id;
+      return requiresOci && !previous.supports_oci_images ? undefined : previous.host_id;
     }
     const [host] = await tx.SelectReadyDeploymentHost`
       SELECT id FROM nibrun.hosts
-      WHERE reported_state = 'ready'
+      WHERE reported_state = 'ready' AND (NOT ${requiresOci} OR supports_oci_images)
         AND last_seen_at >= now() - ${HOST_REPORT_MAX_AGE_MS} * interval '1 millisecond'
       ORDER BY last_seen_at DESC, id
       LIMIT 1
@@ -300,9 +312,10 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
   }: RollbackDeploymentInput): Promise<DeploymentRow | null> {
     return this.sql.begin(async (tx) => {
       const [replayable] = await tx.SelectDeploymentToReplay`
-        SELECT d.id
+        SELECT d.id, ar.image_repository
         FROM nibrun.deployments d
         JOIN nibrun.live_apps a ON a.id = d.app_id
+        JOIN nibrun.artifacts ar ON ar.id = d.artifact_id
         WHERE d.id = ${rollbackOf} AND d.app_id = ${appId} AND a.owner_id = ${ownerId}
         FOR UPDATE OF a
       `;
@@ -310,6 +323,16 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
         return null;
       }
       await lockAppForMutation({ tx, appId, ownerId });
+      if (
+        (await this.hostForDeployment({
+          tx,
+          appId,
+          ownerId,
+          requiresOci: replayable.image_repository !== null,
+        })) === undefined
+      ) {
+        return null;
+      }
       await supersedeLiveDeployment({ tx, appId, ownerId });
 
       const [inserted] = await tx.InsertReplayedDeployment`
@@ -512,6 +535,15 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       WHERE id = ${deploymentId} AND activated_at IS NULL
         AND state NOT IN ('superseded', 'failed')
         AND host_id = ${hostId}
+    `;
+  }
+
+  listUnsupportedImages({ hostId }: { hostId: HostId }) {
+    return this.sql.SelectUnsupportedImageDeployments`
+      SELECT d.id FROM nibrun.deployments d
+      JOIN nibrun.artifacts ar ON ar.id = d.artifact_id
+      WHERE d.host_id = ${hostId} AND ar.image_repository IS NOT NULL
+        AND d.state NOT IN ('superseded', 'failed')
     `;
   }
 

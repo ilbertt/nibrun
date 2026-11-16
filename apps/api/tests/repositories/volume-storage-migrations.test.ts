@@ -845,7 +845,7 @@ async function createApp({
   if (deployed) {
     const [artifact] = await sql.unsafe(
       `INSERT INTO nibrun.artifacts (app_id, digest, size_bytes, object_key, original_file_name)
-       VALUES ($1, 'sha256:test', 1, 'artifacts/test', 'app') RETURNING id`,
+       VALUES ($1, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 1, 'artifacts/test', 'app') RETURNING id`,
       [app.id],
     );
     await sql.unsafe(

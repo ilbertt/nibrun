@@ -2,6 +2,7 @@ import { AppIdSchema } from '@repo/protocol';
 import { publicSchema } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
+import type { Artifact } from '#lib/api/artifact.ts';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { AuthCaller } from '#lib/auth/caller.ts';
 import {
@@ -17,12 +18,24 @@ export const AppsAppIdArtifactsController = new Elysia()
   .use(ArtifactsServicePlugin)
   .get(
     '/apps/:appId/artifacts',
-    async function listArtifacts({ artifactsService, params, user, status }) {
+    async function listArtifacts({
+      artifactsService,
+      imageArtifactsService,
+      params,
+      user,
+      status,
+    }) {
       const artifacts = await artifactsService.list({
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
       });
-      return status(StatusMap.OK, { artifacts });
+      const images = await imageArtifactsService.list({
+        appId: Value.Parse(AppIdSchema, params.appId),
+        ownerId: Value.Parse(OwnerIdSchema, user.id),
+      });
+      return status(StatusMap.OK, {
+        artifacts: [...artifacts, ...images].sort(newestArtifactFirst),
+      });
     },
     {
       auth: { policies: [AuthCaller.AnonymousAccount, AuthCaller.RegisteredAccount] },
@@ -33,6 +46,7 @@ export const AppsAppIdArtifactsController = new Elysia()
     '/apps/:appId/artifacts',
     async function createArtifact({
       artifactsService,
+      imageArtifactsService,
       params,
       body: bodyInput,
       deploymentAccess,
@@ -40,6 +54,14 @@ export const AppsAppIdArtifactsController = new Elysia()
     }) {
       const body = Value.Parse(CreateArtifactBodySchema, bodyInput);
       const appId = Value.Parse(AppIdSchema, params.appId);
+      if ('image' in body) {
+        const created = await imageArtifactsService.create({
+          appId,
+          ...deploymentAccess,
+          image: body.image,
+        });
+        return status(StatusMap.Created, created);
+      }
       const created =
         'url' in body
           ? await artifactsService.createFromUrl({
@@ -69,3 +91,7 @@ export const AppsAppIdArtifactsController = new Elysia()
       response: { [StatusMap.Created]: publicSchema(CreateArtifactResponseSchema) },
     },
   );
+
+function newestArtifactFirst(...[left, right]: [Artifact, Artifact]): number {
+  return right.id.localeCompare(left.id);
+}
