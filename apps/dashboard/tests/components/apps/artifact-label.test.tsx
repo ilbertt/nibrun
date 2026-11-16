@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import type { BinaryArtifact } from '@repo/api-client/models';
+import type { BinaryArtifact, ImageArtifact } from '@repo/api-client/models';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BinaryLabel } from '#components/apps/binary-label.tsx';
+import { ArtifactLabel } from '#components/apps/artifact-label.tsx';
 import type { DeploymentSummary } from '#queries/deployments.ts';
 
 const SOURCE_URL = 'https://releases.example.com/v1/my-server.tar.gz';
@@ -29,7 +29,7 @@ function artifact(originalFileUrl: BinaryArtifact['originalFileUrl']): BinaryArt
 
 test('downloaded binaries link to their original source beside the name and SHA', () => {
   const markup = renderToStaticMarkup(
-    <BinaryLabel
+    <ArtifactLabel
       showProvenance={true}
       artifact={artifact(SOURCE_URL)}
       github={undefined}
@@ -49,7 +49,7 @@ test('downloaded binaries link to their original source beside the name and SHA'
 
 test('uploaded binaries show their origin without a download link', () => {
   const markup = renderToStaticMarkup(
-    <BinaryLabel
+    <ArtifactLabel
       showProvenance={true}
       artifact={artifact(undefined)}
       github={undefined}
@@ -67,7 +67,7 @@ test.each([undefined, SOURCE_URL])(
   'system deployments retain the binary identity and hide all provenance: %s',
   (originalFileUrl) => {
     const markup = renderToStaticMarkup(
-      <BinaryLabel
+      <ArtifactLabel
         artifact={artifact(originalFileUrl)}
         github={GITHUB}
         mcp={{ clientId: 'registered-client' }}
@@ -89,10 +89,10 @@ test.each([undefined, SOURCE_URL])(
   (originalFileUrl) => {
     const binary = artifact(originalFileUrl);
     const markup = renderToStaticMarkup(
-      <BinaryLabel showProvenance={true} artifact={binary} github={GITHUB} mcp={undefined} />,
+      <ArtifactLabel showProvenance={true} artifact={binary} github={GITHUB} mcp={undefined} />,
     );
     const ownerDeployment = renderToStaticMarkup(
-      <BinaryLabel showProvenance={true} artifact={binary} github={undefined} mcp={undefined} />,
+      <ArtifactLabel showProvenance={true} artifact={binary} github={undefined} mcp={undefined} />,
     );
 
     expect(markup).toContain('my-server');
@@ -119,13 +119,18 @@ test.each([undefined, SOURCE_URL])(
     const binary = artifact(originalFileUrl);
     const clientId = 'https://claude.ai/oauth/mcp-oauth-client-metadata';
     const markup = renderToStaticMarkup(
-      <BinaryLabel showProvenance={true} artifact={binary} github={undefined} mcp={{ clientId }} />,
+      <ArtifactLabel
+        showProvenance={true}
+        artifact={binary}
+        github={undefined}
+        mcp={{ clientId }}
+      />,
     );
     const manual = renderToStaticMarkup(
-      <BinaryLabel showProvenance={true} artifact={binary} github={undefined} mcp={undefined} />,
+      <ArtifactLabel showProvenance={true} artifact={binary} github={undefined} mcp={undefined} />,
     );
     const github = renderToStaticMarkup(
-      <BinaryLabel showProvenance={true} artifact={binary} github={GITHUB} mcp={undefined} />,
+      <ArtifactLabel showProvenance={true} artifact={binary} github={GITHUB} mcp={undefined} />,
     );
     expect(markup).toContain(`aria-label="Deployed via MCP: ${clientId}"`);
     expect(markup).toContain(
@@ -136,3 +141,24 @@ test.each([undefined, SOURCE_URL])(
     expect(github).toContain('Deployed by GitHub Actions');
   },
 );
+
+test('image releases show their repository and digest without an uploaded-binary label', () => {
+  const binary = artifact(undefined);
+  const image: ImageArtifact = {
+    id: binary.id,
+    appId: binary.appId,
+    createdAt: binary.createdAt,
+    digest: binary.digest,
+    kind: 'oci',
+    repository: 'docker.io/library/busybox',
+    program: '/bin/busybox',
+    workingDirectory: '/app',
+  };
+  const markup = renderToStaticMarkup(
+    <ArtifactLabel artifact={image} github={undefined} mcp={undefined} showProvenance={true} />,
+  );
+  expect(markup).toContain(image.repository);
+  expect(markup).toContain('sha256:d9403d88cdf0');
+  expect(markup).toContain('Container image');
+  expect(markup).not.toContain('Uploaded binary');
+});

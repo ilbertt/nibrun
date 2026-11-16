@@ -2,7 +2,6 @@ import { trackEvent } from '@repo/analytics';
 import { DEFAULT_HTTP_PORT } from '@repo/api-constants';
 import {
   type DeployableArchive,
-  type DeployableBinary,
   type FetchableBinary,
   InvalidEnvironmentError,
   parseEnvironmentPatch,
@@ -10,6 +9,12 @@ import {
 } from '@repo/app-operations';
 import { type DeploySuggestion, namedByUrl, refusedChecksum, refusedUrl } from '@repo/deploy-link';
 import { type ReactFormExtendedApi, useForm } from '@tanstack/react-form';
+import {
+  type AppSource,
+  appSourceRefusal,
+  deployableAppSource,
+  isImageSource,
+} from '#lib/app-source.ts';
 import {
   askedVariables,
   type EnvironmentVariable,
@@ -34,7 +39,7 @@ import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 export type DeployFormValues = {
-  binary: FileSource | undefined;
+  binary: AppSource | undefined;
   name: string;
   port: string | undefined;
   args: string | undefined;
@@ -59,7 +64,7 @@ export type DeployFormApi = ReactFormExtendedApi<
 
 /** What a change to the binary field does besides changing it. */
 export type BinaryFieldListeners = {
-  onChange?: (change: { value: FileSource | undefined }) => void;
+  onChange?: (change: { value: AppSource | undefined }) => void;
 };
 
 export type DeployFormState = {
@@ -81,28 +86,16 @@ const UNTOUCHED: DeployFormValues = {
   initialData: undefined,
 };
 
-export function validateBinary({ value }: { value: FileSource | undefined }): string | undefined {
-  if (value === undefined) {
-    return 'Pick the binary to deploy, or give the url it can be fetched at.';
-  }
-  return validateFileSource(value);
+export function validateBinary({ value }: { value: AppSource | undefined }): string | undefined {
+  return appSourceRefusal(value);
 }
 
-/** What an app already running one asks of the field: a binary it could keep, or nothing at all. */
 export function validateKeptBinary({
   value,
 }: {
-  value: FileSource | undefined;
+  value: AppSource | undefined;
 }): string | undefined {
-  return value === undefined ? undefined : validateFileSource(value);
-}
-
-function validateFileSource(source: FileSource): string | undefined {
-  const fetched = fetchedFile(source);
-  if (fetched !== undefined) {
-    return refusedUrl(fetched.url) ?? refusedChecksum(fetched.sha256);
-  }
-  return undefined;
+  return value === undefined ? undefined : appSourceRefusal(value);
 }
 
 /**
@@ -216,7 +209,7 @@ function binaryFieldListeners(binary: File | undefined): BinaryFieldListeners {
       if (binary !== undefined) {
         discardHandedOffBinary();
       }
-      const file = pickedFile(value);
+      const file = isImageSource(value) ? undefined : pickedFile(value);
       if (file) {
         trackEvent({ name: 'binary_selected', data: { size_bytes: file.size } });
       }
@@ -288,7 +281,7 @@ function asReleaseRequest({
     return replacing === undefined ? undefined : { ...configured, appId: replacing.id };
   }
 
-  const binary = deployableFrom(value.binary);
+  const binary = deployableAppSource(value.binary);
   return binary === undefined
     ? undefined
     : {
@@ -321,22 +314,6 @@ function initialDataFrom({
   }
   const local = pickedFile(file);
   return local === undefined ? undefined : { name: local.name, body: local };
-}
-
-/**
- * The source as what the deploy sends: a file goes to the store from here, and a url goes to the
- * api, which is the end that can read it.
- */
-function deployableFrom(source: FileSource): DeployableBinary | undefined {
-  const fetched = fetchedFile(source);
-  if (fetched !== undefined) {
-    return refusedUrl(fetched.url) === undefined ? fetchable(fetched) : undefined;
-  }
-  const file = pickedFile(source);
-  if (file === undefined) {
-    return undefined;
-  }
-  return { name: file.name, body: file };
 }
 
 /** The url as the api takes it. Nothing at all where the checksum beside it is not one. */
