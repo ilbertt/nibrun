@@ -12,6 +12,7 @@ import {
 import { Value } from '@sinclair/typebox/value';
 import type { Queries } from '#db/queries.gen.ts';
 import { toRunConfig } from '#lib/app-config.ts';
+import { runtimeArtifactOf } from '#lib/runtime-artifact.ts';
 import {
   openEnvironment,
   type SealedEnvironment,
@@ -111,13 +112,7 @@ export function toDesiredInstance({
     // Left out for an app whose microVM is kept up either way, so a host is never handed a
     // timeout it would be wrong to act on.
     ...(desiredState === 'on-request' ? { idleTimeoutMs: row.idle_timeout_ms } : {}),
-    artifact: {
-      kind: 'executable',
-      digest: row.digest,
-      sizeBytes: Number(row.size_bytes),
-      objectKey: row.object_key,
-      filename: row.original_file_name,
-    },
+    artifact: runtimeArtifactOf(row),
     config: toDesiredConfig({
       row,
       sealed: environments.get(row.id) ?? {},

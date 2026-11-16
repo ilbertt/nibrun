@@ -252,6 +252,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
         JOIN nibrun.live_apps a ON a.id = ar.app_id
         WHERE ar.id = ${artifactId} AND ar.app_id = ${appId} AND a.owner_id = ${ownerId}
           AND ar.digest IS NOT NULL
+          AND (${deploymentGrantId}::uuid IS NULL OR ar.image_repository IS NULL)
       `;
       if (!deployable) {
         return { outcome: 'no-artifact' };

@@ -28,6 +28,7 @@ import { ExportsRepository } from '#repositories/exports.repository.ts';
 import { GitHubActionsOidcRepository } from '#repositories/github-actions-oidc.repository.ts';
 import { GitHubDeploymentGrantsRepository } from '#repositories/github-deployment-grants.repository.ts';
 import { HealthRepository } from '#repositories/health.repository.ts';
+import { ImageArtifactsRepository } from '#repositories/image-artifacts.repository.ts';
 import { ImportsRepository } from '#repositories/imports.repository.ts';
 import { LogsRepository } from '#repositories/logs.repository.ts';
 import { PaidRequestsRepository } from '#repositories/paid-requests.repository.ts';
@@ -51,6 +52,7 @@ import { GitHubDeploymentGrantsService } from '#services/github-deployment-grant
 import { GitHubDeploymentTokensService } from '#services/github-deployment-tokens.service.ts';
 import { HealthService } from '#services/health.service.ts';
 import { HostnamesService } from '#services/hostnames.service.ts';
+import { ImageArtifactsService } from '#services/image-artifacts.service.ts';
 import { ImportsService } from '#services/imports.service.ts';
 import { LogsService } from '#services/logs.service.ts';
 import { McpAuthorizationService } from '#services/mcp-authorization.service.ts';
@@ -88,6 +90,9 @@ const healthRepository = new HealthRepository({
 const appsRepository = new AppsRepository(sql);
 const appHostnamesRepository = new AppHostnamesRepository(sql);
 const artifactsRepository = new ArtifactsRepository(sql);
+const imageArtifactsService = new ImageArtifactsService({
+  imagesRepo: new ImageArtifactsRepository(sql),
+});
 const deploymentsRepository = new DeploymentsRepository(sql);
 const deploymentHostsRepository = new DeploymentHostsRepository(sql);
 const artifactStorageRepository = new ArtifactStorageRepository({
@@ -274,10 +279,9 @@ export const AppsServicePlugin = new Elysia({ name: 'service.apps' }).decorate(
   appsService,
 );
 
-export const ArtifactsServicePlugin = new Elysia({ name: 'service.artifacts' }).decorate(
-  'artifactsService',
-  artifactsService,
-);
+export const ArtifactsServicePlugin = new Elysia({ name: 'service.artifacts' })
+  .decorate('artifactsService', artifactsService)
+  .decorate('imageArtifactsService', imageArtifactsService);
 
 export const DeploymentsServicePlugin = new Elysia({ name: 'service.deployments' }).decorate(
   'deploymentsService',

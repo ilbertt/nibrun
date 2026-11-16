@@ -1,7 +1,7 @@
 import { afterEach, expect, mock, spyOn, test } from 'bun:test';
 import { Value } from '@sinclair/typebox/value';
 import { StatusMap } from 'elysia';
-import { ArtifactSchema } from '#lib/api/artifact.ts';
+import { BinaryArtifactSchema } from '#lib/api/artifact.ts';
 import { ArtifactIdSchema, DeploymentGrantIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { shortLivedDeploymentTokenConfiguration } from '#lib/auth/deployment-api-keys.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
@@ -73,7 +73,7 @@ test('completion and cancellation accept a fresh grant for the same app', async 
   const freshToken = await deploymentToken({ grantId: freshGrant.id });
   const freshHeaders = { authorization: `Bearer ${freshToken}` };
   authenticate.mockResolvedValue(freshGrant);
-  const artifact = Value.Parse(ArtifactSchema, {
+  const artifact = Value.Parse(BinaryArtifactSchema, {
     id: ARTIFACT_ID,
     appId: GRANT_APP_ID,
     digest: FIXTURE_DIGEST,

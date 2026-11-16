@@ -43,6 +43,9 @@ Bun + Elysia service.
 
 `src/lib/api/` contains public resource schemas and their derived types. API-only defaults,
 DNS record construction, redaction and log deduplication live in `src/lib/`.
+Registry image artifacts have no uploaded object, byte size or original filename. Their digest,
+repository and startup paths use the protocol's OCI schema. Image registration requires an owner
+account. Image deployments use the ordinary host placement and rollback rules.
 Shared static defaults come from `@repo/api-constants`; runtime-reference names, descriptions
 and interpolation come from `@repo/protocol/runtime-values`. Derive from those sources rather
 than copying values or adding an endpoint to expose them.
