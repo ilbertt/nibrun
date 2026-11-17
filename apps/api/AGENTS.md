@@ -32,9 +32,8 @@ Bun + Elysia service.
 DNS record construction, redaction and log deduplication live in `src/lib/`.
 Registry image artifacts have no uploaded object, byte size or original filename. Their digest,
 repository and explicit startup paths come from the protocol's OCI schema. Image registration
-requires an owner account; supported public registries are API policy. Hosts advertise image
-support on session registration, and placement must preserve volume ownership while refusing an
-image on an incapable host. Rollbacks use the same capability requirement.
+requires an owner account; supported public registries are API policy. OCI support is assumed
+on all hosts. Placement and rollbacks preserve each app's execution host and volume ownership.
 
 Shared static defaults come from `@repo/api-constants`; runtime-reference names, descriptions
 and interpolation come from `@repo/protocol/runtime-values`. Derive from those sources rather

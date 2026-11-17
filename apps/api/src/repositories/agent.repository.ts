@@ -31,7 +31,7 @@ export type HostObservation = {
 };
 
 export abstract class AgentRepositoryContract {
-  abstract registerHost(input: { originId: string; supportsOciImages?: boolean }): Promise<HostId>;
+  abstract registerHost(input: { originId: string }): Promise<HostId>;
   abstract hostForIdentity(input: { identity: string }): Promise<HostId | undefined>;
   abstract saveSession(input: {
     sessionToken: SecretString;
@@ -54,23 +54,14 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
     this.#secretsKey = secretsKey;
   }
 
-  async registerHost({
-    originId,
-    supportsOciImages = false,
-  }: {
-    originId: string;
-    supportsOciImages?: boolean;
-  }): Promise<HostId> {
+  async registerHost({ originId }: { originId: string }): Promise<HostId> {
     const existing = await this.hostForIdentity({ identity: originId });
     if (existing !== undefined) {
-      await this.sql.UpdateHostImageCapability`
-        UPDATE nibrun.hosts SET supports_oci_images = ${supportsOciImages} WHERE id = ${existing}
-      `;
       return existing;
     }
     const [registered] = await this.sql.RegisterHost`
-      INSERT INTO nibrun.hosts (origin_id, supports_oci_images) VALUES (${originId}, ${supportsOciImages})
-      ON CONFLICT (origin_id) DO UPDATE SET origin_id = EXCLUDED.origin_id, supports_oci_images = EXCLUDED.supports_oci_images
+      INSERT INTO nibrun.hosts (origin_id) VALUES (${originId})
+      ON CONFLICT (origin_id) DO UPDATE SET origin_id = EXCLUDED.origin_id
       RETURNING id
     `;
     if (registered === undefined) {
@@ -143,16 +134,9 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
     //
     // Together rather than one after another: none of them reads what another returns, and this
     // runs on every poll of every host.
-    const [
-      deployments,
-      volumes,
-      hostnameRows,
-      environmentRows,
-      exports,
-      exportEnvironmentRows,
-      capabilities,
-    ] = await Promise.all([
-      sql.SelectDesiredDeployments`
+    const [deployments, volumes, hostnameRows, environmentRows, exports, exportEnvironmentRows] =
+      await Promise.all([
+        sql.SelectDesiredDeployments`
           /* @notNull digest */
           SELECT id, app_id, state,
                  digest, size_bytes, object_key, original_file_name, image_repository, image_program, image_working_directory,
@@ -167,7 +151,7 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
           WHERE id IN (SELECT deployment_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
           ORDER BY app_id, id
         `,
-      sql.SelectDesiredVolumes`
+        sql.SelectDesiredVolumes`
           SELECT v.app_id, v.state,
                  v.seed_digest, v.seed_size_bytes, v.seed_object_key, v.seed_original_file_name,
                  s.volume_storage_endpoint, s.volume_storage_bucket, s.volume_storage_prefix,
@@ -189,17 +173,17 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
           WHERE v.app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
           ORDER BY v.app_id
         `,
-      sql.SelectDesiredHostnames`
+        sql.SelectDesiredHostnames`
           SELECT app_id, hostname, kind FROM nibrun.desired_hostnames
           WHERE app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
           ORDER BY app_id, hostname
         `,
-      sql.SelectDesiredEnvironment`
+        sql.SelectDesiredEnvironment`
           SELECT deployment_id, name, value FROM nibrun.desired_environment
           WHERE deployment_id IN (SELECT deployment_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
           ORDER BY deployment_id, name
         `,
-      sql.SelectDesiredExports`
+        sql.SelectDesiredExports`
           /* @notNull digest */
           SELECT e.id, e.app_id, e.object_key, e.state,
                  e.digest, e.size_bytes, e.artifact_object_key, e.original_file_name, e.config_id,
@@ -209,7 +193,7 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
           WHERE e.app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
           ORDER BY e.id
         `,
-      sql.SelectDesiredExportEnvironment`
+        sql.SelectDesiredExportEnvironment`
           SELECT export_id, name, value FROM nibrun.desired_export_environment
           WHERE export_id IN (
             SELECT e.id FROM nibrun.exports e
@@ -218,33 +202,22 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
           )
           ORDER BY export_id, name
         `,
-      sql.SelectHostImageCapability`
-          SELECT supports_oci_images FROM nibrun.hosts WHERE id = ${hostId}
-        `,
-    ]);
+      ]);
 
     const hostnames = hostnamesByApp(hostnameRows);
     const environments = environmentByDeployment(environmentRows);
     const exportEnvironments = environmentByExport(exportEnvironmentRows);
 
-    function supportsArtifact(row: Pick<Queries['SelectDesiredDeployments'], 'image_repository'>) {
-      return row.image_repository === null || capabilities[0]?.supports_oci_images === true;
-    }
-
     return {
       hostId,
       volumes: volumes.map((row) => toDesiredVolume({ row, secretsKey: this.#secretsKey })),
-      instances: deployments
-        .filter(supportsArtifact)
-        .map((row) =>
-          toDesiredInstance({ row, hostnames, environments, secretsKey: this.#secretsKey }),
-        ),
+      instances: deployments.map((row) =>
+        toDesiredInstance({ row, hostnames, environments, secretsKey: this.#secretsKey }),
+      ),
       checkpoints: [],
-      exports: exports
-        .filter(supportsArtifact)
-        .map((row) =>
-          toDesiredExport({ row, environments: exportEnvironments, secretsKey: this.#secretsKey }),
-        ),
+      exports: exports.map((row) =>
+        toDesiredExport({ row, environments: exportEnvironments, secretsKey: this.#secretsKey }),
+      ),
     };
   }
 }

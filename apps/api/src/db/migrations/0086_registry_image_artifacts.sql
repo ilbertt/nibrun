@@ -12,8 +12,6 @@ ALTER TABLE nibrun.artifacts
       AND original_file_name IS NULL AND original_file_url IS NULL AND source_digest IS NULL)
   );
 
-ALTER TABLE nibrun.hosts ADD COLUMN supports_oci_images boolean NOT NULL DEFAULT false;
-
 CREATE OR REPLACE VIEW nibrun.desired_deployments AS
   SELECT
          d.id,

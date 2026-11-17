@@ -136,10 +136,6 @@ type FakeBehaviour = {
 };
 
 class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
-  listUnsupportedImages() {
-    return Promise.resolve([]);
-  }
-
   readonly polledHosts: HostId[] = [];
   readonly calls: Array<Record<string, unknown>> = [];
   readonly applied: ReportedDeployment[] = [];

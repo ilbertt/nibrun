@@ -1,7 +1,6 @@
 import type {
   AppId,
   DeploymentId,
-  HostId,
   HostReportedState,
   ReportedInstance,
   ReportedVolume,
@@ -140,17 +139,6 @@ export class DeploymentsService extends Service {
     );
   }
 
-  async failUnsupportedImages({ hostId }: { hostId: HostId }): Promise<void> {
-    const deployments = await this.deploymentsRepo.listUnsupportedImages({ hostId });
-    for (const deployment of deployments) {
-      await this.deploymentsRepo.fail({
-        hostId,
-        deploymentId: deployment.id,
-        message: 'The assigned host no longer supports OCI images.',
-      });
-    }
-  }
-
   async list(input: DeploymentsByAppInput): Promise<PublicDeployment[]> {
     const rows = await this.deploymentsRepo.listByApp(input);
     return rows.map(toPublicDeployment);
@@ -272,9 +260,6 @@ export class DeploymentsService extends Service {
     }
     if (outcome.outcome === 'held') {
       throw new ForbiddenError(ONE_DEPLOYMENT);
-    }
-    if (outcome.outcome === 'no-image-host') {
-      throw new ConflictError('No host with OCI image support is available for this app.');
     }
     if (outcome.outcome === 'no-host') {
       throw new ConflictError(

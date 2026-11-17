@@ -88,11 +88,7 @@ export class AgentService extends Service {
   async openSession(request: AgentSessionRequest): Promise<AgentSession> {
     const hostId = await this.agentRepo.registerHost({
       originId: request.hostId,
-      supportsOciImages: request.supportsOciImages ?? false,
     });
-    if (request.supportsOciImages !== true) {
-      await this.deploymentsService.failUnsupportedImages({ hostId });
-    }
     const sessionToken = Value.Parse(SecretStringSchema, crypto.randomUUID());
     const expiresAt = new Date(Date.now() + SESSION_LIFETIME_MS);
     await this.agentRepo.saveSession({ sessionToken, hostId, expiresAt });

@@ -9,7 +9,6 @@ import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { ExportsRepository } from '#repositories/exports.repository.ts';
 import { ImageArtifactsRepository } from '#repositories/image-artifacts.repository.ts';
-import { DeploymentsService } from '#services/deployments.service.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { createDeployedApp } from '#tests/support/deployed-app.ts';
 import { TEST_HOST_ID } from '#tests/support/hosts.ts';
@@ -64,8 +63,8 @@ test('registry artifacts retain their source without claiming an uploaded object
   expect(stored).toMatchObject({ size_bytes: null, object_key: null, original_file_name: null });
 });
 
-test('an image cannot supersede a binary deployment on an incapable host', async () => {
-  const app = await createDeployedApp({ sql, name: 'incapable-image-host', hostId: TEST_HOST_ID });
+test('an image supersedes the binary deployment on the existing host', async () => {
+  const app = await createDeployedApp({ sql, name: 'existing-image-host', hostId: TEST_HOST_ID });
   const { images, deployments } = repositories();
   const row = await images.insert({ ...app, image: ociImage() });
   expect(
@@ -75,14 +74,19 @@ test('an image cannot supersede a binary deployment on an incapable host', async
       initialDataFrom: null,
       onlyOne: false,
     }),
-  ).toEqual({ outcome: 'no-image-host' });
-  expect((await deployments.findById(app))?.state).toBe('running');
+  ).toMatchObject({ outcome: 'created' });
+  expect((await deployments.findById(app))?.state).toBe('superseded');
+  const [placed] = await sql.unsafe(
+    'SELECT host_id FROM nibrun.deployments WHERE artifact_id = $1',
+    [row!.id],
+  );
+  expect(placed.host_id).toBe(TEST_HOST_ID);
 });
 
-test('a capable host receives the image command and digest in desired state', async () => {
+test('a registered host receives the image command and digest in desired state', async () => {
   const { images, deployments, agent } = repositories();
-  const hostId = await agent.registerHost({ originId: 'image-host', supportsOciImages: true });
-  const app = await createDeployedApp({ sql, name: 'capable-image-host', hostId });
+  const hostId = await agent.registerHost({ originId: 'image-host' });
+  const app = await createDeployedApp({ sql, name: 'registered-image-host', hostId });
   const row = await images.insert({ ...app, image: ociImage() });
   const created = await deployments.insert({
     ...app,
@@ -104,11 +108,10 @@ test('a capable host receives the image command and digest in desired state', as
   expect(exported?.config?.args).toEqual([]);
 });
 
-test('new image deployments select a ready capable host', async () => {
+test('new image deployments select a ready host', async () => {
   const { images, deployments, agent } = repositories();
   const hostId = await agent.registerHost({
     originId: 'ready-image-host',
-    supportsOciImages: true,
   });
   await sql.unsafe(
     "UPDATE nibrun.hosts SET reported_state = 'ready', last_seen_at = now() WHERE id = $1",
@@ -130,10 +133,10 @@ test('new image deployments select a ready capable host', async () => {
   expect(placed.host_id).toBe(hostId);
 });
 
-test('a legacy registration clears image capability and prevents image rollback', async () => {
+test('host registration renewals preserve image deployments, exports and rollbacks', async () => {
   const { images, deployments, agent } = repositories();
-  const originId = 'downgraded-image-host';
-  const hostId = await agent.registerHost({ originId, supportsOciImages: true });
+  const originId = 'renewed-image-host';
+  const hostId = await agent.registerHost({ originId });
   const app = await createDeployedApp({ sql, name: originId, hostId });
   const row = await images.insert({ ...app, image: ociImage() });
   const image = await deployments.insert({
@@ -143,23 +146,26 @@ test('a legacy registration clears image capability and prevents image rollback'
     onlyOne: false,
   });
   if (image.outcome !== 'created') {
-    throw new Error('The capable host did not accept its image deployment.');
+    throw new Error('The image deployment was not created.');
   }
-  const binaryApp = await createDeployedApp({ sql, name: 'downgrade-binary-app', hostId });
+  const binaryApp = await createDeployedApp({ sql, name: 'renewal-binary-app', hostId });
   await new ExportsRepository(withTypes<Queries>(sql)).request({
     ...app,
     expiresAt: new Date(Date.now() + DATABASE_TIMEOUT_MS),
   });
-  await agent.registerHost({ originId });
-  expect(await deployments.insertRollback({ ...app, rollbackOf: image.row.id })).toBeNull();
+  expect(await agent.registerHost({ originId })).toBe(hostId);
   const desired = await agent.desiredState({ hostId });
-  expect(desired.instances.map((instance) => instance.appId)).toEqual([binaryApp.appId]);
-  expect(desired.exports).toEqual([]);
+  expect(desired.instances.find((instance) => instance.appId === app.appId)?.artifact).toEqual(
+    ociImage(),
+  );
+  expect(desired.instances.map((instance) => instance.appId)).toContain(binaryApp.appId);
+  expect(desired.exports[0]?.artifact).toEqual(ociImage());
   expect(desired.volumes.map((volume) => volume.appId)).toContain(app.appId);
-  await new DeploymentsService({ deploymentsRepo: deployments }).failUnsupportedImages({ hostId });
-  const failed = await deployments.findById({ ...app, deploymentId: image.row.id });
-  expect(failed?.state).toBe('failed');
-  expect(failed?.message).toBe('The assigned host no longer supports OCI images.');
+  expect((await deployments.findById({ ...app, deploymentId: image.row.id }))?.state).toBe(
+    'pending',
+  );
+  const rollback = await deployments.insertRollback({ ...app, rollbackOf: image.row.id });
+  expect(rollback?.artifact_id).toBe(row!.id);
   expect((await deployments.findById(binaryApp))?.state).toBe('running');
 });
 
