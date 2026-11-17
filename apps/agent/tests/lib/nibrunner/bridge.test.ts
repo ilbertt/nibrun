@@ -37,7 +37,7 @@ import { NibrunnerFilesystem } from '#services/nibrunner-filesystem.service.ts';
 import { NibrunnerGuestConnections } from '#services/nibrunner-guest-connections.service.ts';
 import { NibrunnerLogs } from '#services/nibrunner-logs.service.ts';
 import { ReportSignal } from '#services/report-signal.service.ts';
-import { artifactStore } from '#tests/support/artifacts.ts';
+import { ARTIFACT_BYTES, ARTIFACT_DIGEST, artifactStore } from '#tests/support/artifacts.ts';
 import {
   APP_ID,
   DEPLOYMENT_ID,
@@ -129,6 +129,8 @@ function fixture(initialDesired: HostDesiredState) {
       desiredStateFile: `${directory}/desired.json`,
       reportedStateFile: `${directory}/reported.json`,
       artifactStoreDir: `${directory}/artifact-store`,
+      artifactCacheDir: `${directory}/artifacts`,
+      procDir: `${directory}/proc`,
       artifactBucket: 'binaries',
       importBucket: 'imports',
       exportBucket: 'exports',
@@ -213,6 +215,80 @@ function fixture(initialDesired: HostDesiredState) {
     };
   });
 }
+
+function obsoleteCacheEntry(config: NibrunnerBridgeConfig) {
+  return Effect.gen(function* () {
+    const fs = yield* FileSystem.FileSystem;
+    for (const directory of [config.procDir, config.artifactStoreDir, config.artifactCacheDir]) {
+      yield* fs.makeDirectory(directory, { recursive: true });
+    }
+    const file = `${config.artifactStoreDir}/${'b'.repeat(ARTIFACT_DIGEST.length)}`;
+    yield* fs.writeFileString(file, 'obsolete');
+    yield* fs.utimes(file, new Date(0), new Date(0));
+    return file;
+  });
+}
+
+test.each(['accepted', 'stale', 'unaccepted'] as const)(
+  'cache reclamation requires a fresh accepted runtime report: %s',
+  async function fencesCacheReclamation(state) {
+    await run(
+      Effect.gen(function* () {
+        const fs = yield* FileSystem.FileSystem;
+        const setup = yield* fixture(desiredState({ retainedArtifactDigests: [] }));
+        const file = yield* obsoleteCacheEntry(setup.config);
+        const native: NibrunnerReport = JSON.parse(
+          yield* fs.readFileString(setup.config.reportedStateFile),
+        );
+        if (state === 'stale') {
+          native.reportedAt = '1970-01-01T00:00:00Z';
+        }
+        if (state === 'unaccepted') {
+          native.acceptedDigest = null;
+        }
+        yield* fs.writeFileString(setup.config.reportedStateFile, JSON.stringify(native));
+        const bridge = yield* setup.create.pipe(Effect.provide(artifactStore()));
+        yield* bridge.pollOnce;
+        yield* bridge.cacheOnce;
+        expect(yield* fs.exists(file)).toBe(state !== 'accepted');
+      }),
+    );
+  },
+);
+
+test('cache reclamation waits for staged objects to be published before collecting unrelated bytes', async function serializesStagingAndCollection() {
+  await run(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const setup = yield* fixture(
+        desiredState({ retainedArtifactDigests: [], instances: [desiredInstance()] }),
+      );
+      const file = yield* obsoleteCacheEntry(setup.config);
+      const opened = yield* Deferred.make<void>();
+      const release = yield* Deferred.make<void>();
+      const store = ArtifactStore.make({
+        open: () =>
+          Deferred.succeed(opened, undefined).pipe(
+            Effect.andThen(Deferred.await(release)),
+            Effect.as(new Blob([ARTIFACT_BYTES]).stream()),
+          ),
+      });
+      const bridge = yield* setup.create.pipe(Effect.provideService(ArtifactStore, store));
+      yield* bridge.pollOnce;
+      yield* Deferred.await(opened);
+      const cleanup = yield* Effect.fork(bridge.cacheOnce);
+      yield* Effect.sleep('10 millis');
+      expect((yield* Fiber.poll(cleanup))._tag).toBe('None');
+      expect(yield* fs.exists(file)).toBe(true);
+      yield* Deferred.succeed(release, undefined);
+      yield* Fiber.join(cleanup);
+      expect(yield* fs.exists(file)).toBe(false);
+      expect(
+        new Uint8Array(yield* fs.readFile(`${setup.config.artifactStoreDir}/${ARTIFACT_DIGEST}`)),
+      ).toEqual(ARTIFACT_BYTES);
+    }),
+  );
+});
 
 test('the bridge registers, polls and forwards ready reports across a process restart', async () => {
   await run(

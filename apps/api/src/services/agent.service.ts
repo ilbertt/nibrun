@@ -23,6 +23,7 @@ import type { VolumeStorageMigrationsService } from '#services/volume-storage-mi
 const MS_PER_SECOND = 1000;
 const SECONDS_PER_HOUR = 60 * 60;
 const SESSION_LIFETIME_MS = SECONDS_PER_HOUR * MS_PER_SECOND;
+const RETAINED_DEPLOYMENTS_PER_APP = 2;
 
 /** What a report is borrowed for, and nothing else an upload's own service can do. */
 export type UploadSweepServiceContract = Pick<ArtifactsService, 'sweepAbandoned'>;
@@ -120,7 +121,10 @@ export class AgentService extends Service {
   }
 
   desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
-    return this.agentRepo.desiredState({ hostId });
+    return this.agentRepo.desiredState({
+      hostId,
+      retainedDeploymentsPerApp: RETAINED_DEPLOYMENTS_PER_APP,
+    });
   }
 
   /**

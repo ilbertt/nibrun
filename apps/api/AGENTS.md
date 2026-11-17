@@ -11,6 +11,12 @@ It references `hosts.id`, a UUIDv7 assigned before the agent receives a session.
 `hosts.origin_id` uniquely retains the agent's persisted registration identity. Every session
 request must carry it. Legacy agents may present a saved canonical id; both resolve to the same host.
 Moving an app creates a new deployment; its volume survives the execution it belonged to.
+
+Desired host state includes the artifact digests for the current deployment and its immediate
+predecessor for each app assigned to that host. Select them in the same repeatable-read snapshot as
+the desired executions. This controls host-local cache retention and does not delete uploaded S3
+objects or deployment history. Configuration-only redeployments may retain the same digest twice;
+do not reach farther back merely to keep two distinct binaries.
 `deployments.initiated_by` is required and defaults to `owner`; platform operations use `system.*` initiators.
 GitHub and MCP provenance still represent owner deployments. Bind initiators in repository
 queries through `DeploymentInitiator` rather than embedding SQL string literals.
