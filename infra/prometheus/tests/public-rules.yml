@@ -1,0 +1,33 @@
+rule_files:
+  - ../public-rules.yml
+evaluation_interval: 30s
+tests:
+  - interval: 30s
+    input_series:
+      - series: 'up{job="nibrunner",instance="private-host"}'
+        values: '1 1 1 0 0'
+      - series: 'nibrunner_app_state{job="nibrunner",instance="private-host",app="private-a",state="running"}'
+        values: '1x4'
+      - series: 'nibrunner_app_state{job="nibrunner",instance="private-host",app="private-b",state="running"}'
+        values: '1x4'
+      - series: 'nibrunner_app_state{job="nibrunner",instance="private-host",app="private-c",state="sleeping"}'
+        values: '1x4'
+    promql_expr_test:
+      - expr: nibrun_public:apps
+        eval_time: 1m
+        exp_samples:
+          - labels: 'nibrun_public:apps{state="running"}'
+            value: 2
+          - labels: 'nibrun_public:apps{state="sleeping"}'
+            value: 1
+      - expr: nibrun_public:last_successful_scrape_timestamp_seconds
+        eval_time: 1m
+        exp_samples:
+          - labels: nibrun_public:last_successful_scrape_timestamp_seconds
+            value: 60
+      - expr: nibrun_public:apps
+        eval_time: 2m
+        exp_samples: []
+      - expr: nibrun_public:last_successful_scrape_timestamp_seconds
+        eval_time: 2m
+        exp_samples: []

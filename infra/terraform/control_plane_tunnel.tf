@@ -1,5 +1,5 @@
 locals {
-  control_plane_hostnames       = toset(concat([var.api_hostname, var.umami_hostname], values(local.control_plane_access_hostnames)))
+  control_plane_hostnames       = toset(concat([var.api_hostname, var.umami_hostname, var.metrics_hostname], values(local.control_plane_access_hostnames)))
   control_plane_tunnel_hostname = "${cloudflare_zero_trust_tunnel_cloudflared.control_plane.id}.cfargotunnel.com"
   control_plane_access = {
     for application in cloudflare_zero_trust_access_application.control_plane : application.domain => {

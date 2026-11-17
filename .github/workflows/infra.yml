@@ -36,6 +36,15 @@ jobs:
       - name: Check Terraform
         run: bun run --filter @repo/internal-scripts terraform-check
 
+  metrics-check:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/prepare
+      - name: Validate metrics collection and public aggregates
+        run: bun run --filter @repo/internal-scripts check-metrics
+
   terraform-plan:
     # A pull request from a fork is handed neither repository variables nor an OIDC token, so the
     # role arn arrives empty and there is nothing to assume. `terraform-fork-guard` is what keeps
@@ -72,6 +81,8 @@ jobs:
           TF_VAR_dozzle_hostname: ${{ vars.DOZZLE_HOSTNAME }}
           TF_VAR_victorialogs_hostname: ${{ vars.VICTORIALOGS_HOSTNAME }}
           TF_VAR_umami_hostname: ${{ vars.UMAMI_HOSTNAME }}
+          TF_VAR_grafana_hostname: ${{ vars.GRAFANA_HOSTNAME }}
+          TF_VAR_metrics_hostname: ${{ vars.METRICS_HOSTNAME }}
           # Still APP_DOMAIN on purpose: the repository variable is read outside this repo
           # too, so it is not ours alone to rename.
           TF_VAR_app_host_domain: ${{ vars.APP_DOMAIN }}
@@ -110,7 +121,7 @@ jobs:
   infra-passed:
     if: always() && github.event.pull_request.draft == false
     name: infra:required
-    needs: [terraform-check, terraform-plan, terraform-fork-guard]
+    needs: [terraform-check, terraform-plan, terraform-fork-guard, metrics-check]
     runs-on: ubuntu-latest
     steps:
       - name: Check all jobs passed

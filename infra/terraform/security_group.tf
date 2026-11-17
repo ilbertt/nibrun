@@ -54,6 +54,14 @@ resource "aws_security_group" "instance" {
     security_groups = [aws_security_group.port_relay.id]
   }
 
+  ingress {
+    description     = "Metrics writes from nibrunner"
+    from_port       = var.metrics_ingest_port
+    to_port         = var.metrics_ingest_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.nibrunner_host.id]
+  }
+
   # No inbound SSH: shell access is via SSM Session Manager.
 
   egress {
