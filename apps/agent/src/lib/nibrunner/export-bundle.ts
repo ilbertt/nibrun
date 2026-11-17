@@ -30,7 +30,7 @@ export const writeNibrunnerExportBundle = Effect.fn('writeNibrunnerExportBundle'
 }: {
   preparedDirectory: string;
   artifact: DesiredExport['artifact'];
-  config?: DesiredExport['config'];
+  config: DesiredExport['config'];
   artifactBucket: string;
   stagingDir: string;
 }) {

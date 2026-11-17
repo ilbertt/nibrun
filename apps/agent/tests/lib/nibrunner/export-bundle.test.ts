@@ -30,6 +30,7 @@ const fixture = Effect.gen(function* () {
     input: {
       preparedDirectory,
       artifact: artifact(),
+      config: undefined,
       artifactBucket: 'binaries',
       stagingDir: `${directory}/work`,
     },
