@@ -56,14 +56,12 @@ export const openSession = Effect.fn('openSession')(function* (inputs: {
   hostIdFile: string;
   versions: HostVersions;
   capacity: HostCapacity;
-  supportsOciImages?: boolean;
 }) {
   const hostId = yield* readOrCreateRegistrationId(inputs.hostIdFile);
   return yield* inputs.control.openSession({
     hostId,
     versions: inputs.versions,
     capacity: inputs.capacity,
-    supportsOciImages: inputs.supportsOciImages,
   });
 });
 
@@ -72,13 +70,11 @@ export function makeSessionHolder<E, R>({
   hostIdFile,
   versions,
   capacity,
-  supportsOciImages,
 }: {
   control: ControlPlaneClient;
   hostIdFile: string;
   versions: HostVersions;
   capacity: Effect.Effect<HostCapacity, E, R>;
-  supportsOciImages?: boolean;
 }) {
   return Effect.gen(function* () {
     const cached = yield* SynchronizedRef.make(Option.none<AgentSession>());
@@ -94,7 +90,6 @@ export function makeSessionHolder<E, R>({
           hostIdFile,
           versions,
           capacity: yield* capacity,
-          supportsOciImages,
         });
         yield* Effect.logInfo('session opened').pipe(
           Effect.annotateLogs({ hostId: session.hostId, expiresAt: session.expiresAt }),

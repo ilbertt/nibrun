@@ -40,7 +40,6 @@ export const AgentSessionRequestSchema = Type.Object({
   hostId: HostIdSchema,
   versions: HostVersionsSchema,
   capacity: HostCapacitySchema,
-  supportsOciImages: Type.Optional(Type.Boolean()),
 });
 
 export type AgentSessionRequest = typeof AgentSessionRequestSchema.static;

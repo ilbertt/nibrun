@@ -19,8 +19,8 @@ ZeroFS services. `AGENT_NIBRUNNER_STATE_DIR` defaults to `/var/lib/nibrunner`; i
 persists registration separately from the engine's state. The bridge cannot advertise `ready`
 while host routing, live queries and storage handoff remain under commissioning.
 
-The bridge advertises `supportsOciImages` when opening its control-plane session. Registry OCI
-artifacts carry an explicit program and working directory; nibrunner pulls their pinned digest.
+Registry OCI artifacts carry an explicit program and working directory; nibrunner pulls their
+pinned digest.
 Image exports retain the complete writable overlay under `data/` and an `image.json` with the
 image and runtime configuration. Binary exports keep their existing data-directory layout.
 Legacy VM and export paths refuse OCI artifacts before attempting an object-store download.
