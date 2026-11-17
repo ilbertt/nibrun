@@ -19,6 +19,12 @@ ZeroFS services. `AGENT_NIBRUNNER_STATE_DIR` defaults to `/var/lib/nibrunner`; i
 persists registration separately from the engine's state. The bridge cannot advertise `ready`
 while host routing, live queries and storage handoff remain under commissioning.
 
+Registry OCI artifacts carry an explicit program and working directory; nibrunner pulls their
+pinned digest.
+Image exports retain the complete writable overlay under `data/` and an `image.json` with the
+image and runtime configuration. Binary exports keep their existing data-directory layout.
+Legacy VM and export paths refuse OCI artifacts before attempting an object-store download.
+
 Besides converging, it answers directory reads through `lib/agent/filesystem.ts` and cron
 listings through `lib/agent/cron-query.ts`, each on routes of its own.
 Directory reads wake idle apps through `AppWaker` and hold `GuestActivity` through the wake

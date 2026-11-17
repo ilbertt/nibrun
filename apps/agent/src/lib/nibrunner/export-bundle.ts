@@ -1,5 +1,5 @@
 import { FileSystem, Path } from '@effect/platform';
-import type { DesiredArtifact } from '@repo/protocol';
+import type { DesiredExport } from '@repo/protocol';
 import { Data, Effect, Option } from 'effect';
 import {
   BUNDLE_NAME,
@@ -24,11 +24,13 @@ export class InvalidNibrunnerExport extends Data.TaggedError('InvalidNibrunnerEx
 export const writeNibrunnerExportBundle = Effect.fn('writeNibrunnerExportBundle')(function* ({
   preparedDirectory,
   artifact,
+  config,
   artifactBucket,
   stagingDir,
 }: {
   preparedDirectory: string;
-  artifact: DesiredArtifact;
+  artifact: DesiredExport['artifact'];
+  config: DesiredExport['config'];
   artifactBucket: string;
   stagingDir: string;
 }) {
@@ -45,7 +47,8 @@ export const writeNibrunnerExportBundle = Effect.fn('writeNibrunnerExportBundle'
   }
 
   let dataPath = preparedDirectory;
-  for (const part of ['', DATA_DIRECTORY, ...NIBRUNNER_DATA_DIRECTORY.split('/').filter(Boolean)]) {
+  const parts = 'kind' in artifact ? [] : NIBRUNNER_DATA_DIRECTORY.split('/').filter(Boolean);
+  for (const part of ['', DATA_DIRECTORY, ...parts]) {
     dataPath = path.join(dataPath, part);
     yield* requireType({ file: dataPath, type: 'Directory' });
   }
@@ -57,11 +60,14 @@ export const writeNibrunnerExportBundle = Effect.fn('writeNibrunnerExportBundle'
       metadataFiles.push(filename);
     }
   }
-  const binaryName = yield* bundleBinaryName({ artifact, metadataFiles });
   yield* fs.makeDirectory(stagingDir, { recursive: true, mode: STAGING_MODE });
-  const binaryPath = path.join(stagingDir, binaryName);
-  yield* downloadAndVerify({ artifact, destination: binaryPath, bucket: artifactBucket });
-  yield* fs.chmod(binaryPath, BINARY_MODE);
+  const runtimeName = yield* writeRuntimeArtifact({
+    artifact,
+    config,
+    artifactBucket,
+    stagingDir,
+    metadataFiles,
+  });
   const bundlePath = path.join(stagingDir, BUNDLE_NAME);
   yield* stdoutOf({
     command: [
@@ -73,11 +79,42 @@ export const writeNibrunnerExportBundle = Effect.fn('writeNibrunnerExportBundle'
       path.basename(dataPath),
       '-C',
       stagingDir,
-      binaryName,
+      runtimeName,
       ...(metadataFiles.length > 0 ? ['-C', preparedDirectory, ...metadataFiles] : []),
     ],
     env: { COPYFILE_DISABLE: '1' },
     timeout: ARCHIVE_TIMEOUT,
   });
   return { path: bundlePath, sizeBytes: Number((yield* fs.stat(bundlePath)).size) };
+});
+
+const writeRuntimeArtifact = Effect.fn('writeRuntimeArtifact')(function* ({
+  artifact,
+  config,
+  artifactBucket,
+  stagingDir,
+  metadataFiles,
+}: {
+  artifact: DesiredExport['artifact'];
+  config: DesiredExport['config'];
+  artifactBucket: string;
+  stagingDir: string;
+  metadataFiles: readonly string[];
+}) {
+  const fs = yield* FileSystem.FileSystem;
+  const path = yield* Path.Path;
+  if ('kind' in artifact) {
+    const filename = 'image.json';
+    yield* fs.writeFileString(
+      path.join(stagingDir, filename),
+      `${JSON.stringify({ image: artifact, config }, null, 2)}\n`,
+      { mode: 0o600 },
+    );
+    return filename;
+  }
+  const filename = yield* bundleBinaryName({ artifact, metadataFiles });
+  const destination = path.join(stagingDir, filename);
+  yield* downloadAndVerify({ artifact, destination, bucket: artifactBucket });
+  yield* fs.chmod(destination, BINARY_MODE);
+  return filename;
 });

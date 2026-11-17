@@ -6,6 +6,12 @@ import {
 } from '#lib/aws/credentials.ts';
 import { describe } from '#lib/failure.ts';
 
+export class UnsupportedArtifact extends Data.TaggedError('UnsupportedArtifact') {
+  override get message() {
+    return 'OCI images require a nibrunner host.';
+  }
+}
+
 export class ArtifactTransferError extends Data.TaggedError('ArtifactTransferError')<{
   readonly cause: unknown;
 }> {

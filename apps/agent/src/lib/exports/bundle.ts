@@ -1,7 +1,13 @@
 import { FileSystem, Path } from '@effect/platform';
-import { type DesiredArtifact, FilenameSchema, type TenantEnvironment } from '@repo/protocol';
+import {
+  type DesiredArtifact,
+  type DesiredRuntimeArtifact,
+  FilenameSchema,
+  type TenantEnvironment,
+} from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { Data, Duration, Effect, Either } from 'effect';
+import { UnsupportedArtifact } from '#lib/artifacts/store.ts';
 import { BINARY_MODE, downloadAndVerify } from '#lib/vm/artifacts.ts';
 import { MKFS_ROOT_ENTRIES } from '#lib/volumes/ext4.ts';
 import { AgentConfig } from '#services/agent-config.service.ts';
@@ -146,11 +152,14 @@ export const writeBundle = Effect.fn('writeBundle')(function* ({
   crontab,
   stagingDir,
 }: {
-  artifact: DesiredArtifact;
+  artifact: DesiredRuntimeArtifact;
   environment: TenantEnvironment | undefined;
   crontab: string | undefined;
   stagingDir: string;
 }) {
+  if ('kind' in artifact) {
+    return yield* new UnsupportedArtifact();
+  }
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
   const config = yield* AgentConfig;
