@@ -16,6 +16,7 @@ import {
   SLUG,
 } from '#tests/support/app.ts';
 import { gzippedTarball } from '#tests/support/archives.ts';
+import { registryImage } from '#tests/support/image.ts';
 import type { UploadProgress } from '#upload.ts';
 
 const PUT_URL = 'https://store.example/artifact-1?signature=x';
@@ -779,4 +780,14 @@ test('a remote archive response cannot silently become a pending upload', async 
     }),
   ).rejects.toThrow('fetched archive');
   expect(sent.some((entry) => entry.what === 'deployment')).toBe(false);
+});
+
+test('a registry image is registered without any binary upload or completion request', async () => {
+  const sent: Sent[] = [];
+  const binary = registryImage();
+  const api = apiHolding({ apps: [], sent, created: { id: ARTIFACT_ID, digest: DIGEST } });
+  await deploy({ api, binary, args: ['httpd', '-f'], name: NAME });
+  expect(sent.find((item) => item.what === 'artifact')?.body).toEqual({ image: binary });
+  expect(sent.some((item) => item.what === 'complete')).toBe(false);
+  expect(sent.some((item) => item.what === 'deployment')).toBe(true);
 });

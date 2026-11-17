@@ -97,6 +97,10 @@ the layout under `src/commands/` is the command tree.
 - The factory is where a missing variable or unreadable credential is noticed,
   and parsh resolves it outside its own error handling — hence the `try` around
   `cli.main()`. Remove it and those print a stack trace instead of one line.
+- `nib run "registry/repository@sha256:digest args" --image --program /absolute/path`
+  uses a public Linux amd64 OCI image. `--working-directory` defaults to `/app`.
+  Image startup paths belong to the artifact; arguments, port and environment use the existing
+  app configuration flow. GitHub deployment credentials remain limited to compiled binaries.
 - A tenant binary and its arguments arrive as one quoted positional, split by
   `src/lib/command-line.ts`. parsh cannot tell a trailing `--verbose` meant for
   the tenant from one meant for us, so quoting is what says which — never add a

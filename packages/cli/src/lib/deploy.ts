@@ -4,6 +4,7 @@ import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError } from '@repo/api-client/unwrap';
 import {
   appQuotaExceeded,
+  type DeployableArtifact,
   type DeployableBinary,
   type Deployed,
   deploy as startDeployment,
@@ -21,7 +22,7 @@ import { describeProgress } from '#lib/upload-progress.ts';
 export type DeployInput = RunOptions & {
   api: PublicApiClient;
   ui: Ui;
-  binary: DeployableBinary;
+  binary: DeployableArtifact;
   args: TenantArguments;
   detach?: boolean | undefined;
 };

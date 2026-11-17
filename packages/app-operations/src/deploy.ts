@@ -8,6 +8,7 @@ import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
 import { appUrl } from '@repo/app-ui';
 import { appFor } from '#apps.ts';
+import type { RegistryImage } from '#image.ts';
 import { type DeployableArchive, importArchive } from '#imports.ts';
 import { type ConfigEdit, configPatch, type Deployed, type DeployStep } from '#release.ts';
 import { updateApp } from '#update.ts';
@@ -46,6 +47,7 @@ export type FetchableBinary = {
 };
 
 export type DeployableBinary = UploadableBinary | FetchableBinary;
+export type DeployableArtifact = DeployableBinary | RegistryImage;
 
 function isFetchable(binary: DeployableBinary): binary is FetchableBinary {
   return 'url' in binary;
@@ -57,7 +59,10 @@ function isFetchable(binary: DeployableBinary): binary is FetchableBinary {
  * A url is read for a name here only to have one to call the app — what the binary is called once
  * it is stored is the api's to decide, from the url it is the one fetching.
  */
-function binaryName(binary: DeployableBinary): string | undefined {
+function binaryName(binary: DeployableArtifact): string | undefined {
+  if ('kind' in binary) {
+    return binary.repository.split('/').at(-1);
+  }
   return isFetchable(binary) ? lastSegment(binary.url) : binary.name;
 }
 
@@ -77,7 +82,7 @@ function lastSegment(url: string): string | undefined {
 
 export type DeployInput = ConfigEdit & {
   api: PublicApiClient;
-  binary: DeployableBinary;
+  binary: DeployableArtifact;
   // Required where the rest of the edit is optional: what the caller typed is what the binary is
   // asked to run with, and carrying over the last release's arguments because none were given
   // this time would run something nobody asked for.
@@ -231,11 +236,18 @@ async function artifactFor({
 }: {
   api: PublicApiClient;
   appId: string;
-  binary: DeployableBinary;
+  binary: DeployableArtifact;
   canReuse: boolean;
   whileUploading: UploadWait;
   upload: UploadTransport;
 }): Promise<{ artifact: StoredArtifact; reused: boolean }> {
+  if ('kind' in binary) {
+    const artifact = unwrap(await api.api.apps({ appId }).artifacts.post({ image: binary }));
+    if (!isStored(artifact)) {
+      throw new ApiError('The API did not return a registered image artifact.');
+    }
+    return { artifact, reused: false };
+  }
   if (isFetchable(binary)) {
     return { artifact: await fetchBinary({ api, appId, binary }), reused: false };
   }
