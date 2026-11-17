@@ -14,12 +14,14 @@ export const AppsAppIdArtifactsArtifactIdController = new Elysia()
   .use(ArtifactsServicePlugin)
   .get(
     '/apps/:appId/artifacts/:artifactId',
-    async function getArtifact({ artifactsService, params, user, status }) {
-      const artifact = await artifactsService.get({
+    async function getArtifact({ artifactsService, imageArtifactsService, params, user, status }) {
+      const owned = {
         appId: Value.Parse(AppIdSchema, params.appId),
         artifactId: Value.Parse(ArtifactIdSchema, params.artifactId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
-      });
+      };
+      const artifact =
+        (await imageArtifactsService.find(owned)) ?? (await artifactsService.get(owned));
       return status(StatusMap.OK, artifact);
     },
     {

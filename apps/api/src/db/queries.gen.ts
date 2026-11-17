@@ -27,11 +27,14 @@ export interface ISelectDesiredDeploymentsResult {
     /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
     digest: NonNullable<IArtifactsColumns["digest"]>;
     /** Counted off the uploaded bytes, so absent until they are there. A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    size_bytes: NonNullable<IArtifactsColumns["size_bytes"]>;
+    size_bytes: IArtifactsColumns["size_bytes"];
     /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
-    object_key: NonNullable<IArtifactsColumns["object_key"]>;
+    object_key: IArtifactsColumns["object_key"];
     /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: IArtifactsColumns["original_file_name"];
+    image_repository: IArtifactsColumns["image_repository"];
+    image_program: IArtifactsColumns["image_program"];
+    image_working_directory: IArtifactsColumns["image_working_directory"];
     http_port: IAppConfigsColumns["http_port"];
     has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
     args: IAppConfigsColumns["args"];
@@ -111,13 +114,18 @@ export interface ISelectDesiredExportsResult {
     /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
     digest: NonNullable<IArtifactsColumns["digest"]>;
     /** Counted off the uploaded bytes, so absent until they are there. A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    size_bytes: NonNullable<IArtifactsColumns["size_bytes"]>;
+    size_bytes: IArtifactsColumns["size_bytes"];
     /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
-    artifact_object_key: NonNullable<IArtifactsColumns["object_key"]>;
+    artifact_object_key: IArtifactsColumns["object_key"];
     /** The name the binary was uploaded under; a content-addressed key carries none. */
     original_file_name: IArtifactsColumns["original_file_name"];
     /** The config version whose environment belongs in the bundle, pinned when the export was asked for. */
     config_id: IExportsColumns["config_id"];
+    image_repository: IArtifactsColumns["image_repository"];
+    image_program: IArtifactsColumns["image_program"];
+    image_working_directory: IArtifactsColumns["image_working_directory"];
+    http_port: IAppConfigsColumns["http_port"] | null;
+    args: IAppConfigsColumns["args"] | null;
 }
 
 /** Result of query `SelectDesiredExportEnvironment`. */
@@ -630,7 +638,7 @@ export interface IInsertPendingArtifactResult {
     id: IArtifactsColumns["id"];
     app_id: IArtifactsColumns["app_id"];
     /** The name the binary was uploaded under; a content-addressed key carries none. */
-    original_file_name: IArtifactsColumns["original_file_name"];
+    original_file_name: NonNullable<IArtifactsColumns["original_file_name"]>;
     original_file_url: IArtifactsColumns["original_file_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
@@ -647,7 +655,7 @@ export interface ICompleteArtifactResult {
     /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
     object_key: NonNullable<IArtifactsColumns["object_key"]>;
     /** The name the binary was uploaded under; a content-addressed key carries none. */
-    original_file_name: IArtifactsColumns["original_file_name"];
+    original_file_name: NonNullable<IArtifactsColumns["original_file_name"]>;
     original_file_url: IArtifactsColumns["original_file_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
@@ -662,7 +670,7 @@ export interface ISelectPendingArtifactResult {
     id: IArtifactsColumns["id"];
     app_id: IArtifactsColumns["app_id"];
     /** The name the binary was uploaded under; a content-addressed key carries none. */
-    original_file_name: IArtifactsColumns["original_file_name"];
+    original_file_name: NonNullable<IArtifactsColumns["original_file_name"]>;
     original_file_url: IArtifactsColumns["original_file_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
@@ -689,7 +697,7 @@ export interface ISelectArtifactsByAppResult {
     /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
     object_key: NonNullable<IArtifactsColumns["object_key"]>;
     /** The name the binary was uploaded under; a content-addressed key carries none. */
-    original_file_name: IArtifactsColumns["original_file_name"];
+    original_file_name: NonNullable<IArtifactsColumns["original_file_name"]>;
     original_file_url: IArtifactsColumns["original_file_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
@@ -706,7 +714,7 @@ export interface ISelectArtifactByIdResult {
     /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
     object_key: NonNullable<IArtifactsColumns["object_key"]>;
     /** The name the binary was uploaded under; a content-addressed key carries none. */
-    original_file_name: IArtifactsColumns["original_file_name"];
+    original_file_name: NonNullable<IArtifactsColumns["original_file_name"]>;
     original_file_url: IArtifactsColumns["original_file_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
@@ -1092,6 +1100,45 @@ export interface ISelectHealthPingResult {
     ok: number | null;
 }
 
+/** Result of query `InsertImageArtifact`. */
+export interface IInsertImageArtifactResult {
+    id: IArtifactsColumns["id"];
+    app_id: IArtifactsColumns["app_id"];
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
+    digest: NonNullable<IArtifactsColumns["digest"]>;
+    image_repository: NonNullable<IArtifactsColumns["image_repository"]>;
+    image_program: NonNullable<IArtifactsColumns["image_program"]>;
+    image_working_directory: NonNullable<IArtifactsColumns["image_working_directory"]>;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+}
+
+/** Result of query `SelectImageArtifact`. */
+export interface ISelectImageArtifactResult {
+    id: IArtifactsColumns["id"];
+    app_id: IArtifactsColumns["app_id"];
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
+    digest: NonNullable<IArtifactsColumns["digest"]>;
+    image_repository: NonNullable<IArtifactsColumns["image_repository"]>;
+    image_program: NonNullable<IArtifactsColumns["image_program"]>;
+    image_working_directory: NonNullable<IArtifactsColumns["image_working_directory"]>;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+}
+
+/** Result of query `SelectImageArtifactsByApp`. */
+export interface ISelectImageArtifactsByAppResult {
+    id: IArtifactsColumns["id"];
+    app_id: IArtifactsColumns["app_id"];
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
+    digest: NonNullable<IArtifactsColumns["digest"]>;
+    image_repository: NonNullable<IArtifactsColumns["image_repository"]>;
+    image_program: NonNullable<IArtifactsColumns["image_program"]>;
+    image_working_directory: NonNullable<IArtifactsColumns["image_working_directory"]>;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+}
+
 /** Result of query `InsertPendingImport`. */
 export interface IInsertPendingImportResult {
     id: IImportsColumns["id"];
@@ -1402,6 +1449,9 @@ export interface Queries {
     InsertGitHubDeploymentGrant: IInsertGitHubDeploymentGrantResult;
     SelectValidGitHubDeploymentGrant: ISelectValidGitHubDeploymentGrantResult;
     SelectHealthPing: ISelectHealthPingResult;
+    InsertImageArtifact: IInsertImageArtifactResult;
+    SelectImageArtifact: ISelectImageArtifactResult;
+    SelectImageArtifactsByApp: ISelectImageArtifactsByAppResult;
     InsertPendingImport: IInsertPendingImportResult;
     CompleteImport: ICompleteImportResult;
     DeleteImport: IDeleteImportResult;
@@ -1680,13 +1730,16 @@ export interface IArtifactsColumns {
     /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
     object_key: import("@repo/protocol").ObjectKey | null;
     /** The name the binary was uploaded under; a content-addressed key carries none. */
-    original_file_name: import("@repo/protocol").Filename;
+    original_file_name: import("@repo/protocol").Filename | null;
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: Date;
     original_file_url: string | null;
     /** The digest the url's own download was held to, which for an archive is the archive's. */
     source_digest: import("@repo/protocol").Sha256Digest | null;
+    image_repository: string | null;
+    image_program: string | null;
+    image_working_directory: string | null;
 }
 
 /** Schema of `artifacts`. */
@@ -1799,6 +1852,9 @@ export interface IDesiredDeploymentsColumns {
     idle_timeout_ms: number | null;
     /** The release's own state, beside the app's. A host reads it to tell a release it should run from one it is only answering for. */
     deployment_state: import("#lib/api/deployment.ts").DeploymentState | null;
+    image_repository: string | null;
+    image_program: string | null;
+    image_working_directory: string | null;
 }
 
 /** Schema of `desired_deployments`. */
@@ -1858,6 +1914,9 @@ export interface IDesiredExportsColumns {
     original_file_name: import("@repo/protocol").Filename | null;
     /** The config version whose environment belongs in the bundle, pinned when the export was asked for. */
     config_id: string | null;
+    image_repository: string | null;
+    image_program: string | null;
+    image_working_directory: string | null;
 }
 
 /** Schema of `desired_exports`. */
@@ -2478,7 +2537,10 @@ export const schema = {
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
             original_file_url: { _columnName: "original_file_url", _foreignKeys: {} },
-            source_digest: { _columnName: "source_digest", _foreignKeys: {} }
+            source_digest: { _columnName: "source_digest", _foreignKeys: {} },
+            image_repository: { _columnName: "image_repository", _foreignKeys: {} },
+            image_program: { _columnName: "image_program", _foreignKeys: {} },
+            image_working_directory: { _columnName: "image_working_directory", _foreignKeys: {} }
         },
         _indexes: {
             artifacts_app_id_idx: { _indexName: "artifacts_app_id_idx" },
@@ -2488,7 +2550,8 @@ export const schema = {
         },
         _constraints: {
             artifacts_app_id_fkey: { _constraintName: "artifacts_app_id_fkey" },
-            artifacts_pkey: { _constraintName: "artifacts_pkey" }
+            artifacts_pkey: { _constraintName: "artifacts_pkey" },
+            artifacts_source_check: { _constraintName: "artifacts_source_check" }
         }
     },
     cached_binaries: {
@@ -2592,7 +2655,10 @@ export const schema = {
             has_extra_public_port: { _columnName: "has_extra_public_port", _foreignKeys: {} },
             activation: { _columnName: "activation", _foreignKeys: {} },
             idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} },
-            deployment_state: { _columnName: "deployment_state", _foreignKeys: {} }
+            deployment_state: { _columnName: "deployment_state", _foreignKeys: {} },
+            image_repository: { _columnName: "image_repository", _foreignKeys: {} },
+            image_program: { _columnName: "image_program", _foreignKeys: {} },
+            image_working_directory: { _columnName: "image_working_directory", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}
@@ -2631,7 +2697,10 @@ export const schema = {
             size_bytes: { _columnName: "size_bytes", _foreignKeys: {} },
             artifact_object_key: { _columnName: "artifact_object_key", _foreignKeys: {} },
             original_file_name: { _columnName: "original_file_name", _foreignKeys: {} },
-            config_id: { _columnName: "config_id", _foreignKeys: {} }
+            config_id: { _columnName: "config_id", _foreignKeys: {} },
+            image_repository: { _columnName: "image_repository", _foreignKeys: {} },
+            image_program: { _columnName: "image_program", _foreignKeys: {} },
+            image_working_directory: { _columnName: "image_working_directory", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}

@@ -1,11 +1,11 @@
+import type { BinaryArtifact } from '@repo/api-client/models';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui/components/tooltip';
 import { GlobeIcon, UploadIcon } from 'lucide-react';
-import type { ArtifactSummary } from '#queries/artifacts.ts';
 
 export function BinaryOrigin({
   originalFileUrl,
 }: {
-  originalFileUrl: ArtifactSummary['originalFileUrl'];
+  originalFileUrl: BinaryArtifact['originalFileUrl'];
 }) {
   return (
     <Tooltip>

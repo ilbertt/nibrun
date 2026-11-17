@@ -15,7 +15,7 @@ import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import { StatusMap } from 'elysia';
 import { exportJWK, generateKeyPair, type JWTPayload, SignJWT } from 'jose';
-import { ArtifactSchema } from '#lib/api/artifact.ts';
+import { BinaryArtifactSchema } from '#lib/api/artifact.ts';
 import { SqliteConnectionSchema } from '#lib/api/sqlite-connection.ts';
 import { BadRequestError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import { DIRECTORY_READ_TIMEOUT_MS } from '#lib/filesystem/timeouts.ts';
@@ -77,7 +77,7 @@ const MCP_CLIENT_ID = 'test-mcp-client';
 const NATIVE_BINARY = { download_url: NATIVE_DOWNLOAD_URL, file_id: 'file-mcp-binary' };
 const UPLOAD_URL = 'https://uploads.example.test/binary?signature=upload-token';
 const BINARY_SHA256 = 'a94d242b9587cc191df91f21b3ac236714b02ce453730e17b0ddf17cb138eb1e';
-const ARTIFACT = Value.Parse(ArtifactSchema, {
+const ARTIFACT = Value.Parse(BinaryArtifactSchema, {
   id: 'mcp-artifact',
   appId: 'mcp-app',
   digest: BINARY_SHA256,

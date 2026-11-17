@@ -3,6 +3,7 @@ import {
   ByteSizeSchema,
   FilenameSchema,
   ObjectKeySchema,
+  OciImageSchema,
   Sha256DigestSchema,
   TimestampSchema,
 } from '@repo/protocol';
@@ -14,7 +15,7 @@ import { ArtifactIdSchema } from '#lib/api/identifiers.ts';
 //
 // No state: the row is written once the bytes are stored, so an artifact that exists is one
 // that can be deployed.
-export const ArtifactSchema = Type.Object({
+export const BinaryArtifactSchema = Type.Object({
   id: ArtifactIdSchema,
   appId: AppIdSchema,
   digest: Sha256DigestSchema,
@@ -29,4 +30,13 @@ export const ArtifactSchema = Type.Object({
   createdAt: TimestampSchema,
 });
 
+export type BinaryArtifact = typeof BinaryArtifactSchema.static;
+
+export const ImageArtifactSchema = Type.Object({
+  ...Type.Pick(BinaryArtifactSchema, ['id', 'appId', 'createdAt']).properties,
+  ...OciImageSchema.properties,
+});
+export type ImageArtifact = typeof ImageArtifactSchema.static;
+
+export const ArtifactSchema = Type.Union([BinaryArtifactSchema, ImageArtifactSchema]);
 export type Artifact = typeof ArtifactSchema.static;

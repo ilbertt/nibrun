@@ -138,10 +138,8 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
       await Promise.all([
         sql.SelectDesiredDeployments`
           /* @notNull digest */
-          /* @notNull size_bytes */
-          /* @notNull object_key */
           SELECT id, app_id, state,
-                 digest, size_bytes, object_key, original_file_name,
+                 digest, size_bytes, object_key, original_file_name, image_repository, image_program, image_working_directory,
                  http_port, has_extra_public_port, args, vcpu_count, memory_mib,
                  health_check_path, health_check_interval_ms, health_check_timeout_ms,
                  health_check_grace_period_ms, health_check_healthy_threshold,
@@ -186,14 +184,14 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
           ORDER BY deployment_id, name
         `,
         sql.SelectDesiredExports`
-          /* @notNull artifact_object_key */
           /* @notNull digest */
-          /* @notNull size_bytes */
-          SELECT id, app_id, object_key, state,
-                 digest, size_bytes, artifact_object_key, original_file_name, config_id
-          FROM nibrun.desired_exports
-          WHERE app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
-          ORDER BY id
+          SELECT e.id, e.app_id, e.object_key, e.state,
+                 e.digest, e.size_bytes, e.artifact_object_key, e.original_file_name, e.config_id,
+                 e.image_repository, e.image_program, e.image_working_directory, c.http_port, c.args
+          FROM nibrun.desired_exports e
+          LEFT JOIN nibrun.app_configs c ON c.id = e.config_id
+          WHERE e.app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
+          ORDER BY e.id
         `,
         sql.SelectDesiredExportEnvironment`
           SELECT export_id, name, value FROM nibrun.desired_export_environment
