@@ -105,7 +105,7 @@ export const DEPLOY_PRESETS = {
   opencloud: {
     isRecommended: false,
     projectUrl: 'https://github.com/opencloud-eu/opencloud',
-    version: 'v9.1.0',
+    version: 'v9.2.0',
     markdownContent: opencloudPage,
     category: DeployCategory.FilesAndSharing,
     title: 'OpenCloud',
@@ -113,8 +113,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'opencloud',
       binary:
-        'https://github.com/opencloud-eu/opencloud/releases/download/v9.1.0/opencloud-9.1.0-linux-amd64',
-      sha256: '183d95c3a77ccb520dabaa106e08d1037afcaa8af6403c22eb6ac9a565de777e',
+        'https://github.com/opencloud-eu/opencloud/releases/download/v9.2.0/opencloud-9.2.0-linux-amd64',
+      sha256: '6dd961024170b77838b9c61f0b03767fe9bf27d4ba8265d6537cb2e6a228b9be',
       port: 9200,
       arg: ['server'],
       env: [
@@ -321,7 +321,7 @@ export const DEPLOY_PRESETS = {
   picoshare: {
     isRecommended: false,
     projectUrl: 'https://github.com/mtlynch/picoshare',
-    version: 'v1.5.4',
+    version: 'v1.5.5',
     markdownContent: picosharePage,
     category: DeployCategory.FilesAndSharing,
     title: 'PicoShare',
@@ -329,8 +329,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'picoshare',
       binary:
-        'https://github.com/mtlynch/picoshare/releases/download/v1.5.4/picoshare-v1.5.4-linux-amd64.tar.gz',
-      sha256: '5cd141ac24373b61ed4feaa64850c0de56f88455bc7695b43624ae2fae014431',
+        'https://github.com/mtlynch/picoshare/releases/download/v1.5.5/picoshare-v1.5.5-linux-amd64.tar.gz',
+      sha256: '72ab7116e861c2daecae6dbeb9912cdfe33182fdace86b5b7780671971f07bb4',
       port: 4001,
       arg: ['-db', '/app/data/store.db'],
       env: [
