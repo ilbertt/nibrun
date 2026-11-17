@@ -33,6 +33,7 @@ function createMcpController() {
   const {
     appsService,
     artifactsService,
+    imageArtifactsService,
     deploymentsService,
     logsService,
     filesystemService,
@@ -42,6 +43,7 @@ function createMcpController() {
   const handler = createMcpServerHandler({
     appsService,
     artifactsService,
+    imageArtifactsService,
     deploymentsService,
     logsService,
     filesystemService,

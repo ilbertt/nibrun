@@ -15,7 +15,7 @@ import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import { StatusMap } from 'elysia';
 import { exportJWK, generateKeyPair, type JWTPayload, SignJWT } from 'jose';
-import { BinaryArtifactSchema } from '#lib/api/artifact.ts';
+import { BinaryArtifactSchema, ImageArtifactSchema } from '#lib/api/artifact.ts';
 import { SqliteConnectionSchema } from '#lib/api/sqlite-connection.ts';
 import { BadRequestError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import { DIRECTORY_READ_TIMEOUT_MS } from '#lib/filesystem/timeouts.ts';
@@ -31,6 +31,7 @@ import {
 } from '#routes/api/apps/model.ts';
 import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
 import { DEFAULT_CONFIG } from '#tests/services/support/fixtures.ts';
+import { ociImage } from '#tests/support/oci-image.ts';
 
 const {
   auth,
@@ -49,6 +50,7 @@ const { registerTool } = await import('#lib/mcp/tools/shared/register-tool.ts');
 const { MCP_TOOL_META } = await import('#lib/mcp/tools/shared/tool-meta.ts');
 const appsService = AppsServicePlugin.decorator.appsService;
 const artifactsService = ArtifactsServicePlugin.decorator.artifactsService;
+const imageArtifactsService = ArtifactsServicePlugin.decorator.imageArtifactsService;
 const deploymentsService = DeploymentsServicePlugin.decorator.deploymentsService;
 const logsService = LogsServicePlugin.decorator.logsService;
 const filesystemService = FilesystemServicePlugin.decorator.filesystemService;
@@ -114,6 +116,7 @@ beforeAll(async function createAccounts() {
 });
 
 beforeEach(function publishSigningKey() {
+  spyOn(imageArtifactsService, 'find').mockResolvedValue(null);
   spyOn(auth.api, 'getJwks').mockResolvedValue({ keys: [jwk] });
   spyOn(globalThis, 'fetch').mockImplementation(
     Object.assign(
@@ -1056,11 +1059,17 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       },
       inputSchema: {
         additionalProperties: false,
-        oneOf: [{ required: ['url'] }, { required: ['binary'] }, { required: ['artifactId'] }],
+        oneOf: [
+          { required: ['url'] },
+          { required: ['binary'] },
+          { required: ['artifactId'] },
+          { required: ['image'] },
+        ],
         allOf: [
           ...DeploymentTargetSchema.allOf,
           { not: { required: ['name', 'artifactId'] } },
           { not: { required: ['sha256', 'artifactId'] } },
+          { not: { required: ['sha256', 'image'] } },
         ],
       },
       _meta: {
@@ -1088,6 +1097,16 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       .find((properties) => 'url' in properties)!;
     expect(tool.inputSchema.properties.url).toEqual(JSON.parse(JSON.stringify(fetched.url)));
     expect(tool.inputSchema.properties.sha256).toEqual(JSON.parse(JSON.stringify(fetched.sha256)));
+    expect(tool.inputSchema.properties.image.additionalProperties).toBe(false);
+    expect(tool.inputSchema.properties.image.properties).toEqual(
+      JSON.parse(
+        JSON.stringify(
+          CreateArtifactBodySchema.anyOf
+            .map((schema) => schema.properties)
+            .find((properties) => 'image' in properties)!.image.properties,
+        ),
+      ),
+    );
     expect(tool.inputSchema.properties.binary.required).toEqual(['download_url', 'file_id']);
     expect(Object.keys(tool.inputSchema.properties.binary.properties)).toEqual([
       'download_url',
@@ -2059,3 +2078,83 @@ test.each(['/mcp/missing', '/.well-known/missing'])(
     expect(response.status).toBe(StatusMap['Not Found']);
   },
 );
+
+test('MCP registers and deploys an explicit image without fetching a binary', async () => {
+  const app = ownedApp();
+  const image = ociImage();
+  const artifact = Value.Parse(ImageArtifactSchema, {
+    ...image,
+    id: ARTIFACT.id,
+    appId: app.id,
+    createdAt: ARTIFACT.createdAt,
+  });
+  spyOn(appsService, 'get').mockResolvedValue(app);
+  const create = spyOn(imageArtifactsService, 'create').mockResolvedValue(artifact);
+  const fetch = spyOn(artifactsService, 'createFromUrl');
+  const complete = spyOn(artifactsService, 'completeUpload');
+  const deploy = spyOn(deploymentsService, 'createWithMcpClient').mockResolvedValue(DEPLOYMENT);
+  const token = await accessToken();
+  const response = await rpc({
+    method: 'tools/call',
+    params: { name: MCP_TOOL_NAMES.deployApp, arguments: { appId: app.id, image } },
+    token,
+  });
+  const body = await rpcBody(response);
+  expect(body.result.isError).not.toBe(true);
+  expect(create).toHaveBeenCalledWith({
+    appId: app.id,
+    ownerId,
+    image,
+    isAnonymous: false,
+    deploymentGrant: null,
+  });
+  expect(deploy).toHaveBeenCalledWith(expect.objectContaining({ artifactId: artifact.id }));
+  expect(fetch).not.toHaveBeenCalled();
+  expect(complete).not.toHaveBeenCalled();
+});
+
+test('MCP can redeploy an existing image artifact without completing a binary upload', async () => {
+  const app = ownedApp();
+  const artifact = Value.Parse(ImageArtifactSchema, {
+    ...ociImage(),
+    id: ARTIFACT.id,
+    appId: app.id,
+    createdAt: ARTIFACT.createdAt,
+  });
+  spyOn(appsService, 'get').mockResolvedValue(app);
+  spyOn(imageArtifactsService, 'find').mockResolvedValue(artifact);
+  const complete = spyOn(artifactsService, 'completeUpload');
+  spyOn(deploymentsService, 'createWithMcpClient').mockResolvedValue(DEPLOYMENT);
+  const token = await accessToken();
+  const response = await rpc({
+    method: 'tools/call',
+    params: {
+      name: MCP_TOOL_NAMES.deployApp,
+      arguments: { appId: app.id, artifactId: artifact.id },
+    },
+    token,
+  });
+  expect((await rpcBody(response)).result.isError).not.toBe(true);
+  expect(complete).not.toHaveBeenCalled();
+});
+
+test('MCP image sources refuse nested environment values before creating an app', async () => {
+  const create = spyOn(appsService, 'create');
+  const register = spyOn(imageArtifactsService, 'create');
+  const response = await rpc({
+    method: 'tools/call',
+    params: {
+      name: MCP_TOOL_NAMES.deployApp,
+      arguments: {
+        name: 'Image',
+        image: { ...ociImage(), environment: { API_KEY: 'blocked-image-environment-value' } },
+      },
+    },
+    token: await accessToken(),
+  });
+  const body = await rpcBody(response);
+  expect(body.error ?? body.result?.isError).toBeTruthy();
+  expect(create).not.toHaveBeenCalled();
+  expect(register).not.toHaveBeenCalled();
+  expect(JSON.stringify(body)).not.toContain('blocked-image-environment-value');
+});
