@@ -57,7 +57,7 @@ async function desiredVolumes() {
     sql: withTypes<Queries>(sql),
     secretsKey: TEST_SECRETS_KEY,
   });
-  return (await repository.desiredState({ hostId: HOST_ID })).volumes;
+  return (await repository.desiredState({ hostId: HOST_ID, retainedDeploymentsPerApp: 2 })).volumes;
 }
 
 function storage(auth: S3VolumeAuth) {

@@ -25,6 +25,8 @@ export class NibrunnerBridgeConfig extends Effect.Service<NibrunnerBridgeConfig>
         desiredStateFile: path.join(stateDir, 'desired.json'),
         reportedStateFile: path.join(stateDir, 'reported.json'),
         artifactStoreDir: path.join(stateDir, 'artifact-store'),
+        artifactCacheDir: path.join(stateDir, 'artifacts'),
+        procDir: '/proc',
       };
     }),
   },

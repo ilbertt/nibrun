@@ -4,6 +4,7 @@ import { CONTROL_PLANE_BACKOFF } from '#lib/agent/backoff.ts';
 import { supervised } from '#lib/agent/loop.ts';
 import type { ControlPlaneClient } from '#lib/control/client.ts';
 import { makeSessionHolder } from '#lib/control/session.ts';
+import { sweepNibrunnerArtifactCache } from '#lib/nibrunner/artifact-cache.ts';
 import { nibrunnerCronListings, pollNibrunnerCron } from '#lib/nibrunner/cron-query.ts';
 import { pollNibrunnerFilesystem } from '#lib/nibrunner/filesystem-query.ts';
 import { nibrunnerQueryDeployments } from '#lib/nibrunner/query-deployments.ts';
@@ -33,6 +34,7 @@ import { SqliteSessions } from '#services/sqlite-sessions.service.ts';
 const REPORT_MAX_AGE_MS = 30_000;
 const LOG_IDLE_POLL = '500 millis';
 const EXPORT_IDLE_POLL = '500 millis';
+const CACHE_IDLE_POLL = '1 minute';
 
 export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
   control,
@@ -56,6 +58,7 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
   });
   const latest = yield* Ref.make(Option.none<HostDesiredState>());
   const preparing = yield* Ref.make(Option.none<Fiber.RuntimeFiber<unknown, unknown>>());
+  const artifactLease = yield* Effect.makeSemaphore(1);
 
   const pollOnce = Effect.gen(function* () {
     const session = yield* sessions.current;
@@ -84,10 +87,12 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
       Effect.catchTag('MissingNibrunnerFile', () => Effect.succeedNone),
     );
     if (Option.isSome(held)) {
-      yield* writeNibrunnerDocument({
-        path: config.desiredStateFile,
-        desired: nibrunnerWithdrawals({ held: held.value, wanted }),
-      });
+      yield* artifactLease.withPermits(1)(
+        writeNibrunnerDocument({
+          path: config.desiredStateFile,
+          desired: nibrunnerWithdrawals({ held: held.value, wanted }),
+        }),
+      );
     }
     const prepare = Effect.gen(function* () {
       yield* stageNibrunnerArtifacts({
@@ -98,6 +103,7 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
       });
       yield* writeNibrunnerDocument({ path: config.desiredStateFile, desired: wanted });
     }).pipe(
+      artifactLease.withPermits(1),
       Effect.provideService(ArtifactStore, store),
       Effect.sandbox,
       Effect.tapError((cause) => Effect.logWarning('nibrunner preparation failed', cause)),
@@ -149,6 +155,26 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
         ),
     );
   });
+
+  const cacheOnce = artifactLease.withPermits(1)(
+    Effect.gen(function* () {
+      const wanted = Option.getOrUndefined(yield* Ref.get(latest));
+      if (wanted?.retainedArtifactDigests === undefined) {
+        return;
+      }
+      const state = yield* currentState;
+      if (state.desired.revision !== nibrunnerDocument(wanted).revision) {
+        return;
+      }
+      yield* sweepNibrunnerArtifactCache({
+        desired: wanted,
+        reported: state.report,
+        artifactStoreDir: config.artifactStoreDir,
+        artifactCacheDir: config.artifactCacheDir,
+        procDir: config.procDir,
+      });
+    }),
+  );
   const sqliteGuest = yield* makeNibrunnerSqliteGuest({ deployments: sqliteDeployments });
   const sqlite = Context.get(
     yield* Layer.build(
@@ -258,6 +284,7 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
     logOnce,
     exportsOnce,
     sqliteOnce,
+    cacheOnce,
     run: Effect.all(
       [
         supervised({
@@ -268,6 +295,11 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
           schedule: CONTROL_PLANE_BACKOFF,
         }),
         reportLoop,
+        supervised({
+          once: cacheOnce.pipe(Effect.andThen(Effect.sleep(CACHE_IDLE_POLL))),
+          onFailure: (cause) => Effect.logWarning('nibrunner artifact cache cleanup failed', cause),
+          schedule: CONTROL_PLANE_BACKOFF,
+        }),
         supervised({
           once: filesystemOnce,
           onFailure: (cause) => Effect.logWarning('nibrunner filesystem query failed', cause),

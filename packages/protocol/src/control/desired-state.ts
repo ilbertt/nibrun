@@ -156,6 +156,8 @@ export const HostDesiredStateSchema = Type.Object({
   instances: Type.Array(DesiredInstanceSchema),
   checkpoints: Type.Array(DesiredCheckpointSchema),
   exports: Type.Array(DesiredExportSchema),
+  // Omitted by older APIs: hosts must not reclaim deployment caches without an authoritative set.
+  retainedArtifactDigests: Type.Optional(Type.Array(Sha256DigestSchema)),
 });
 
 export type HostDesiredState = typeof HostDesiredStateSchema.static;

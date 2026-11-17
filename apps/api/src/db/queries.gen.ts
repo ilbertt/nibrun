@@ -17,6 +17,12 @@ export interface ISelectHostForIdentityResult {
 export interface IObserveHostReportResult {
 }
 
+/** Result of query `SelectRetainedDeploymentArtifacts`. */
+export interface ISelectRetainedDeploymentArtifactsResult {
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
+    digest: NonNullable<IArtifactsColumns["digest"]>;
+}
+
 /** Result of query `SelectDesiredDeployments`. */
 export interface ISelectDesiredDeploymentsResult {
     /** The latest execution, including while its app is stopped or failed. */
@@ -1314,6 +1320,7 @@ export interface Queries {
     RegisterHost: IRegisterHostResult;
     SelectHostForIdentity: ISelectHostForIdentityResult;
     ObserveHostReport: IObserveHostReportResult;
+    SelectRetainedDeploymentArtifacts: ISelectRetainedDeploymentArtifactsResult;
     SelectDesiredDeployments: ISelectDesiredDeploymentsResult;
     SelectDesiredVolumes: ISelectDesiredVolumesResult;
     SelectDesiredHostnames: ISelectDesiredHostnamesResult;
