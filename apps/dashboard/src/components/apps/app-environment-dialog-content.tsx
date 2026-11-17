@@ -120,6 +120,6 @@ function describeSave({
     withheld ??
     (saveOnly
       ? `Save the environment variables ${name} needs before its first deployment.`
-      : `Saving releases ${name} again on the binary it already runs. Its hostnames and everything on its volume stay as they are.`)
+      : `Saving releases ${name} again using its current source. Its hostnames and everything on its volume stay as they are.`)
   );
 }

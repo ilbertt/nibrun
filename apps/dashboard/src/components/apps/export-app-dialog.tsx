@@ -15,11 +15,13 @@ import type { AppActionAvailability } from '#lib/app-actions.ts';
 import { formatBytes } from '#lib/format-bytes.ts';
 import { useAppExport } from '#lib/hooks/use-app-export.ts';
 import { useAppId } from '#lib/hooks/use-app-id.ts';
+import { useDeployedArtifact } from '#lib/hooks/use-deployed-artifact.ts';
 
 export function ExportAppDialog({ availability }: { availability: AppActionAvailability }) {
   const appId = useAppId();
   const [open, setOpen] = useState(false);
   const run = useAppExport(appId);
+  const deployed = useDeployedArtifact(appId);
 
   if (availability.kind === 'hidden') {
     return null;
@@ -37,13 +39,20 @@ export function ExportAppDialog({ availability }: { availability: AppActionAvail
         <DialogHeader>
           <DialogTitle>Export this app</DialogTitle>
           <DialogDescription>
-            One <span className="font-mono">.tar.gz</span> holding the binary this app runs,
-            everything on its volume, a <span className="font-mono">.env</span> of the variables it
-            was deployed with, and its <span className="font-mono">crontab</span> if it has
-            registered cron jobs.
+            One <span className="font-mono">.tar.gz</span> holding this app’s binary or pinned image
+            reference, everything on its volume, a <span className="font-mono">.env</span> of the
+            variables it was deployed with, and its <span className="font-mono">crontab</span> if it
+            has registered cron jobs.
           </DialogDescription>
         </DialogHeader>
 
+        {deployed.status === 'ready' && 'kind' in deployed.artifact && (
+          <p className="text-muted-foreground text-sm">
+            Image exports include the full writable filesystem under <code>data/</code> and startup
+            settings in <code>image.json</code>. The app’s <code>/app/data</code> directory is at{' '}
+            <code>data/app/data</code> in the archive.
+          </p>
+        )}
         <p className="text-muted-foreground text-sm">
           Preparing one reads the whole filesystem, so it can take minutes. Asking again while one
           is being prepared is answered with that same bundle rather than starting a second.

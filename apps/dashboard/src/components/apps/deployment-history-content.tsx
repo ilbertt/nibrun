@@ -40,7 +40,7 @@ export function DeploymentHistoryContent() {
           </EmptyMedia>
           <EmptyTitle>This app has never been deployed</EmptyTitle>
           <EmptyDescription>
-            <code className="font-mono">nib run</code> is what releases a binary into it.
+            <code className="font-mono">nib run</code> deploys a binary or container image into it.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>
