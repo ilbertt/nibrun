@@ -23,10 +23,7 @@ export const JwtAccessPolicySchema = Type.Object(
       maxItems: 32,
       uniqueItems: true,
     }),
-    publicKeys: Type.Union([
-      Type.Array(Type.String({ minLength: 1, maxLength: 16384 }), { minItems: 1, maxItems: 8 }),
-      Type.Object({ url: httpsUrl({ maxLength: 2048 }) }, strict),
-    ]),
+    publicKeys: Type.Object({ url: httpsUrl({ maxLength: 2048 }) }, strict),
   },
   strict,
 );
