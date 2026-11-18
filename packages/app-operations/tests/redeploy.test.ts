@@ -100,7 +100,14 @@ test('config is written before the deployment that snapshots it', async () => {
   expect(sent.filter((each) => each.what === 'app patch')).toEqual([
     {
       what: 'app patch',
-      body: { args: ['serve'], httpPort: PORT, environment: { TOKEN: 'shh' } },
+      body: {
+        config: {
+          access: { kind: 'public' },
+          args: ['serve'],
+          httpPort: PORT,
+          environment: { TOKEN: 'shh' },
+        },
+      },
     },
   ]);
   expect(sent.at(-1)?.what).toBe('deployment');
@@ -114,7 +121,7 @@ test('what the caller left out is left alone', async () => {
   await redeploy({ api: apiHolding({ sent }), appId: APP_ID, environment: TOKEN_SET });
 
   expect(sent.find((each) => each.what === 'app patch')?.body).toEqual({
-    environment: TOKEN_SET,
+    config: { access: { kind: 'public' }, environment: TOKEN_SET },
   });
 });
 
@@ -129,7 +136,7 @@ test('a new name goes in the same patch as the config, parsed', async () => {
   });
 
   expect(sent.find((each) => each.what === 'app patch')?.body).toEqual({
-    args: ['serve'],
+    config: { access: { kind: 'public' }, args: ['serve'] },
     name: 'Loud Badger',
   });
 });

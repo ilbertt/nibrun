@@ -219,7 +219,7 @@ function ownedApp() {
     ownerId,
     name: 'MCP example',
     slug: 'mcp-example',
-    config: { ...DEFAULT_CONFIG, environment: { API_KEY: REDACTED } },
+    config: { ...DEFAULT_CONFIG, access: { kind: 'public' }, environment: { API_KEY: REDACTED } },
     hostnames: [
       {
         hostname: 'mcp-example.apps.test',
@@ -1172,7 +1172,11 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
           name,
           arguments: {
             name: 'Needs configuration',
-            config: { httpPort: 8080, environment: { API_KEY: 'blocked-environment-value' } },
+            config: {
+              access: { kind: 'public' },
+              httpPort: 8080,
+              environment: { API_KEY: 'blocked-environment-value' },
+            },
             ...source,
           },
         },
@@ -1193,7 +1197,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     'prepares an upload and deploys into the same app: new=%s',
     async (isNew) => {
       const app = ownedApp();
-      const config = { httpPort: 8080, args: ['serve'] };
+      const config = { access: { kind: 'public' as const }, httpPort: 8080, args: ['serve'] };
       const target = isNew ? { name: app.name, config } : { appId: app.id };
       const createApp = spyOn(appsService, 'create').mockResolvedValue(app);
       const getApp = spyOn(appsService, 'get').mockResolvedValue(app);
@@ -1382,7 +1386,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     { source: { url: BINARY_URL }, config: undefined },
     {
       source: { binary: NATIVE_BINARY },
-      config: { httpPort: 8080, args: ['serve'] },
+      config: { access: { kind: 'public' }, httpPort: 8080, args: ['serve'] },
     },
   ])('creates an app and redeploys it using the returned ID: %j', async ({ source, config }) => {
     const app = ownedApp();
@@ -1754,7 +1758,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     { appId: ARTIFACT.appId, artifactId: ARTIFACT.id, binary: NATIVE_BINARY },
     { appId: ARTIFACT.appId, artifactId: ARTIFACT.id, sha256: BINARY_SHA256 },
     { name: '', url: BINARY_URL },
-    { name: 'New app', config: { httpPort: 0 }, url: BINARY_URL },
+    { name: 'New app', config: { access: { kind: 'public' }, httpPort: 0 }, url: BINARY_URL },
     { name: 'New app', config: { unknown: true }, url: BINARY_URL },
     { name: 'New app', ownerId: 'caller-selected-owner', url: BINARY_URL },
     { name: 'New app', url: BINARY_URL, binary: NATIVE_BINARY },

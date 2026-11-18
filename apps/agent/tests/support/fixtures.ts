@@ -73,7 +73,7 @@ export const JWT_ACCESS = {
   audiences: ['reports'],
   token: { header: 'Authorization', format: 'bearer' },
   publicKeys: { url: 'https://id.example/keys' },
-} satisfies DesiredInstance['access'];
+} satisfies DesiredInstance['config']['access'];
 
 export const APP_HOSTNAME: AppHostname = {
   hostname: Value.Parse(HostnameSchema, 'app-1.apps.example.com'),
@@ -104,9 +104,9 @@ export function desiredInstance(overrides: Partial<DesiredInstance> = {}): Desir
     deploymentId: DEPLOYMENT_ID,
     volumeId: VOLUME_ID,
     desiredState: 'running',
-    access: { kind: 'public' },
     artifact: artifact(),
     config: {
+      access: { kind: 'public' },
       httpPort: HTTP_PORT_FIXTURE,
       hasExtraPublicPort: false,
       args: [],

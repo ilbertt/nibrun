@@ -10,6 +10,7 @@ import { sealSecret } from '#lib/tenant-secrets.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
 import { DeploymentHostsRepository } from '#repositories/deployment-hosts.repository.ts';
+import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { createDeployedApp } from '#tests/support/deployed-app.ts';
 import { registerHost, TEST_HOST_ID } from '#tests/support/hosts.ts';
@@ -76,9 +77,8 @@ test('hosts receive only their own executions, volumes, hostnames and decrypted 
     expect(desired.instances[0]).toMatchObject({
       appId: app.appId,
       deploymentId: app.deploymentId,
-      access: { kind: 'public' },
       hostnames: [{ hostname: `${name}.apps.test`, kind: 'platform' }],
-      config: { environment: { TOKEN: `${name}-secret` } },
+      config: { access: { kind: 'public' }, environment: { TOKEN: `${name}-secret` } },
     });
     expect(desired.volumes[0]?.appId).toBe(app.appId);
     expect(desired.exports).toHaveLength(1);
@@ -278,39 +278,52 @@ test('artifact retention follows the two latest executions of apps assigned to t
   expect(sharing.retainedArtifactDigests).toContain(previous);
 });
 
-test('access changes reach the existing deployment, and switching to public clears its key source', async () => {
+test('access edits are staged until deployed and rollback restores the pinned policy', async () => {
   const app = await createHostedApp({ name: 'protected-app', hostId: SOURCE_HOST });
   const apps = new AppsRepository(withTypes<Queries>(sql));
-  const access: AppAccessPolicy = {
+  const deployments = new DeploymentsRepository(withTypes<Queries>(sql));
+  const jwt: AppAccessPolicy = {
     kind: 'jwt',
     issuer: 'my-issuer',
     audiences: ['first', 'second'],
     token: { header: 'X-Assertion', format: 'raw' },
     publicKeys: { url: 'https://issuer.example/jwks' },
   };
-  const written = await apps.update({ ...app, patch: { name: undefined, access } });
-  expect(written && appAccess(written)).toEqual(access);
-  const desired = await repository().desiredState({
-    hostId: SOURCE_HOST,
-    retainedDeploymentsPerApp: 2,
-  });
-  const instance = desired.instances.find((instance) => instance.appId === app.appId);
-  expect(instance?.deploymentId).toBe(app.deploymentId);
-  expect(instance?.access).toEqual(access);
-  expect(
-    await apps.update({
-      ...app,
-      ownerId: destination.ownerId,
-      patch: { name: undefined, access: { kind: 'public' } },
-    }),
-  ).toBeNull();
-  const cleared = await apps.update({
-    ...app,
-    patch: { name: undefined, access: { kind: 'public' } },
-  });
-  expect(cleared).toMatchObject({
-    access_kind: 'public',
-    access_jwks_url: null,
-    access_audiences: null,
-  });
+
+  async function deployedAccess() {
+    const desired = await repository().desiredState({
+      hostId: SOURCE_HOST,
+      retainedDeploymentsPerApp: 2,
+    });
+    const instance = desired.instances.find((instance) => instance.appId === app.appId);
+    expect(instance).not.toHaveProperty('access');
+    return instance?.config.access;
+  }
+
+  async function deploy() {
+    const result = await deployments.insert({ ...app, initialDataFrom: null, onlyOne: false });
+    if (result.outcome !== 'created') {
+      throw new Error(result.outcome);
+    }
+    return result.row;
+  }
+
+  const publicAccess = { kind: 'public' } as const;
+  const written = await apps.update({ ...app, patch: { name: undefined, access: jwt } });
+  expect(written && appAccess(written)).toEqual(jwt);
+  expect(await deployedAccess()).toEqual(publicAccess);
+  const protectedDeployment = await deploy();
+  expect(appAccess(protectedDeployment)).toEqual(jwt);
+  expect(await deployedAccess()).toEqual(jwt);
+
+  await apps.update({ ...app, patch: { name: undefined, access: publicAccess } });
+  expect(await deployedAccess()).toEqual(jwt);
+  expect(appAccess(await deploy())).toEqual(publicAccess);
+  expect(await deployedAccess()).toEqual(publicAccess);
+  const historical = await deployments.findById({ ...app, deploymentId: protectedDeployment.id });
+  expect(historical && appAccess(historical)).toEqual(jwt);
+
+  const rollback = await deployments.insertRollback({ ...app, rollbackOf: protectedDeployment.id });
+  expect(rollback && appAccess(rollback)).toEqual(jwt);
+  expect(await deployedAccess()).toEqual(jwt);
 });

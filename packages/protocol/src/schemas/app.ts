@@ -1,5 +1,6 @@
 import { stringEnum } from '@repo/typebox-extensions';
 import { Type } from '@sinclair/typebox';
+import { AppAccessPolicySchema } from '#control/access.ts';
 import { RUNTIME_VALUE_NAMES, RUNTIME_VALUE_PREFIX } from '#lib/runtime-values.ts';
 import { secretString } from '#lib/secret.ts';
 import { HostnameSchema, HttpPortSchema } from '#lib/wire.ts';
@@ -75,6 +76,7 @@ export const TenantArgumentsSchema = Type.Array(Type.String({ maxLength: MAX_ARG
 export type TenantArguments = typeof TenantArgumentsSchema.static;
 
 export const AppConfigSchema = Type.Object({
+  access: AppAccessPolicySchema,
   httpPort: HttpPortSchema,
   // Whether the app is reached on a public TCP and UDP port besides HTTP. A yes or no rather than
   // a number, because the port has to be the same on every hop for a binary that announces the one

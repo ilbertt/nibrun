@@ -17,7 +17,6 @@ export function nibrunnerWithdrawals({
       return [
         {
           ...instance,
-          access: next.access,
           desiredState: next.desiredState === 'stopped' ? 'stopped' : instance.desiredState,
         },
       ];

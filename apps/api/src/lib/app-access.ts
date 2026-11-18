@@ -1,10 +1,10 @@
 import { type AppAccessPolicy, AppAccessPolicySchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import type { Queries } from '#db/queries.gen.ts';
+import type { Tables } from '#db/queries.gen.ts';
 
-type AccessColumns = Pick<
-  Queries['SelectAppById'],
-  Extract<keyof Queries['SelectAppById'], `access_${string}`>
+export type AccessColumns = Pick<
+  Tables['app_configs']['columns'],
+  Extract<keyof Tables['app_configs']['columns'], `access_${string}`>
 >;
 
 export function appAccess(row: AccessColumns): AppAccessPolicy {

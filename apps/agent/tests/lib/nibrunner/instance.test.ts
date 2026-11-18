@@ -101,6 +101,6 @@ test('public ports and their references are refused without exposing tenant valu
 
 test('JWT access follows the app across all its HTTP hostnames', () => {
   const instance = desiredInstance();
-  instance.access = JWT_ACCESS;
-  expect(nibrunnerInstance(instance).access).toEqual(instance.access);
+  instance.config.access = JWT_ACCESS;
+  expect(nibrunnerInstance(instance).access).toEqual(instance.config.access);
 });

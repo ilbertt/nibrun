@@ -40,10 +40,3 @@ export type AppEdit = ConfigEdit & {
   /** What to call the app from now on. Its hostnames stay: the slug never follows a rename. */
   name?: string | undefined;
 };
-
-export function appPatch({ name, ...edit }: AppEdit) {
-  return {
-    ...configPatch(edit),
-    ...(name !== undefined && { name }),
-  };
-}

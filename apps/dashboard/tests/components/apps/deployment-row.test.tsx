@@ -13,6 +13,7 @@ function deployment(initiatedBy: DeploymentSummary['initiatedBy']): DeploymentSu
     createdAt: '2026-11-10T09:00:00.000Z',
     restartCount: 0,
     config: {
+      access: { kind: 'public' },
       args: [],
       volumeSizeBytes: 8_589_934_592,
       environment: {},

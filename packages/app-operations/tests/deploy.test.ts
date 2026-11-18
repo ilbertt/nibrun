@@ -54,7 +54,7 @@ function apiHolding({
   artifacts?: Pick<Artifact, 'id' | 'digest' | 'sizeBytes' | 'originalFileName'>[];
 }): PublicApiClient {
   function app(id: string) {
-    return { id, name: NAME, hostnames };
+    return { id, name: NAME, hostnames, config: { access: { kind: 'public' } } };
   }
 
   function addressed({ appId }: { appId: string }) {
@@ -166,7 +166,12 @@ test('an unchanged local binary reuses this app artifact and still releases the 
   });
 
   expect(sent).toEqual([
-    { what: 'app patch', body: { args: ['serve'], environment: { MODE: 'updated' } } },
+    {
+      what: 'app patch',
+      body: {
+        config: { access: { kind: 'public' }, args: ['serve'], environment: { MODE: 'updated' } },
+      },
+    },
     { what: 'list artifacts', body: APP_ID },
     { what: 'deployment', body: { artifactId: ARTIFACT_ID } },
   ]);
@@ -357,7 +362,7 @@ test('a new app omits environment deletion markers', async () => {
   });
   expect(sent[0]).toMatchObject({
     what: 'create',
-    body: { config: { environment: { TOKEN: 'value' } } },
+    body: { config: { access: { kind: 'public' }, environment: { TOKEN: 'value' } } },
   });
 });
 
@@ -375,7 +380,10 @@ test('config is written before the deployment that snapshots it', async () => {
     port: PORT,
   });
 
-  expect(sent[0]).toEqual({ what: 'app patch', body: { args: ['serve'], httpPort: PORT } });
+  expect(sent[0]).toEqual({
+    what: 'app patch',
+    body: { config: { access: { kind: 'public' }, args: ['serve'], httpPort: PORT } },
+  });
   expect(sent.at(-1)?.what).toBe('deployment');
 });
 

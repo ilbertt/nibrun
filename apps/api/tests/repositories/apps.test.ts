@@ -133,9 +133,8 @@ test('a new JWT-protected app stores its full access policy on creation', async 
       name: Value.Parse(AppNameSchema, slug),
       slug,
       hostname: Value.Parse(HostnameSchema, `${slug}.apps.example.com`),
-      config: { ...configWithDefaults(), environment: {} },
+      config: { ...configWithDefaults(), access, environment: {} },
       anonymousAppsAtMost: null,
-      access,
     }),
   );
   expect(appAccess(app)).toEqual(access);
