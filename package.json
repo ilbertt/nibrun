@@ -31,6 +31,7 @@
       "@vitejs/plugin-react": "^6.1.2",
       "better-auth": "1.7.25",
       "lucide-react": "^1.66.0",
+      "picomatch": "npm:@ryotsu/picomatch@4.0.7-a",
       "react": "^19.3.1",
       "react-dom": "^19.3.1",
       "sonner": "^2.0.8",
@@ -60,6 +61,8 @@
   },
   "overrides": {
     "dompurify": "3.4.17",
-    "fflate": "0.8.3"
+    "fflate": "0.8.3",
+    "minimatch": "11.0.1",
+    "picomatch": "catalog:"
   }
 }

@@ -35,6 +35,7 @@
     "@repo/typescript-config": "workspace:*",
     "git-cliff": "^2.14.2",
     "json-schema-to-typescript": "16.0.0",
+    "picomatch": "catalog:",
     "typescript": "catalog:"
   },
   "dependencies": {

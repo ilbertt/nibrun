@@ -87,6 +87,16 @@ Document temporary security overrides and vendored dependency patches in the own
 The current DOMPurify and fflate overrides replace vulnerable upstream pins. Monaco also
 needs the sanitizer import patch documented in `packages/sqlite-explorer/AGENTS.md`.
 
+The root minimatch override moves ts-morph/shadcn's transitive glob matcher to 11.0.1 for
+GHSA-g3hv-75wg-m249; remove it when their dependency ranges accept the fixed release.
+The picomatch catalog/override pins all transitive versions to `@ryotsu/picomatch@4.0.7-a`,
+whose source fix for GHSA-fc5q-39xc-vjpf was reviewed against upstream 4.0.7. The package is a
+third-party security fork, with no runtime dependencies or install scripts, pinned through the
+lockfile's integrity hash. It collapses safe single-branch wildcard repetitions and treats
+unsupported complex forms literally; capture groups can differ. Keep its safety guard enabled.
+Recheck the fork and compatibility tests on upgrades, and return to upstream picomatch when it
+publishes a fixed release. Do not suppress the advisory in `check:security`.
+
 Check `package.json` scripts (root and per-app) for other available commands.
 
 ## Run scripts
