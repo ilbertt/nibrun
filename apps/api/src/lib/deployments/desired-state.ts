@@ -108,6 +108,7 @@ export function toDesiredInstance({
     deploymentId: row.id,
     volumeId: volumeIdOf(row.app_id),
     desiredState,
+    access: { kind: 'public' },
     // Left out for an app whose microVM is kept up either way, so a host is never handed a
     // timeout it would be wrong to act on.
     ...(desiredState === 'on-request' ? { idleTimeoutMs: row.idle_timeout_ms } : {}),

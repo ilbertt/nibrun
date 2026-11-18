@@ -47,6 +47,7 @@ function desiredState(): HostDesiredState {
         deploymentId: Value.Parse(DeploymentIdSchema, 'dep_1'),
         volumeId: Value.Parse(VolumeIdSchema, 'vol_1'),
         desiredState: 'running',
+        access: { kind: 'public' },
         artifact: {
           digest: Value.Parse(Sha256DigestSchema, hexDigest()),
           sizeBytes: 2048,

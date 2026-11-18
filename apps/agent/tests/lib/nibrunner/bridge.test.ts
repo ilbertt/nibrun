@@ -47,6 +47,7 @@ import {
   desiredVolume,
   EXPORT_ID,
   HOST_ID,
+  JWT_ACCESS,
   POLL_SETTINGS_FIXTURE,
 } from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
@@ -630,7 +631,7 @@ test('stops and removals bypass a blocked download without omitting an unrelated
       const bridge = yield* setup.create.pipe(Effect.provide(store));
       setup.world.desired = desiredState({
         instances: [
-          desiredInstance({ deploymentId: NEXT_DEPLOYMENT_ID }),
+          desiredInstance({ deploymentId: NEXT_DEPLOYMENT_ID, access: JWT_ACCESS }),
           desiredInstance({ appId: SECOND_APP_ID, desiredState: 'stopped' }),
         ],
       });
@@ -640,6 +641,9 @@ test('stops and removals bypass a blocked download without omitting an unrelated
         path: setup.config.desiredStateFile,
         hostId: HOST_ID,
       });
+      expect(held.instances.find((instance) => instance.appId === first.appId)?.access).toEqual(
+        JWT_ACCESS,
+      );
       expect(held.revision.startsWith('preparing-')).toBe(true);
       expect(
         held.instances.map((instance) => [

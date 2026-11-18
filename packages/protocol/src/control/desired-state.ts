@@ -1,5 +1,6 @@
 import { stringEnum } from '@repo/typebox-extensions';
 import { Type } from '@sinclair/typebox';
+import { AppAccessPolicySchema } from '#control/access.ts';
 import { S3VolumeStorageSchema } from '#control/volume-storage.ts';
 import { ByteSizeSchema, FilenameSchema, ObjectKeySchema, Sha256DigestSchema } from '#lib/wire.ts';
 import {
@@ -61,6 +62,7 @@ export const DesiredInstanceSchema = Type.Object({
   // one it cannot act on — and so an api that predates this leaves a host on its own default
   // rather than stopping it converging.
   idleTimeoutMs: Type.Optional(IdleTimeoutMsSchema),
+  access: AppAccessPolicySchema,
   artifact: DesiredArtifactSchema,
   config: AppConfigSchema,
   // Carried down so the host can render its own routing config from the same state it boots
