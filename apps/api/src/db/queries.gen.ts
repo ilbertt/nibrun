@@ -1666,6 +1666,12 @@ export interface IAppsColumns {
     volume_storage_migration_started_at: Date | null;
     /** The host that owns this started attempt; recovery must not accept another host's cleanup. */
     volume_storage_migration_host_id: import("@repo/protocol").HostId | null;
+    access_kind: string;
+    access_header: string | null;
+    access_format: string | null;
+    access_issuer: string | null;
+    access_audiences: string[] | null;
+    access_jwks_url: string | null;
 }
 
 /** Schema of `apps`. */
@@ -2110,6 +2116,12 @@ export interface ILiveAppsColumns {
     volume_storage_migration_message: string | null;
     /** Recorded before any host-side migration work. Once set, timeout recovery must wait for host cleanup confirmation. */
     volume_storage_migration_started_at: Date | null;
+    access_kind: string | null;
+    access_header: string | null;
+    access_format: string | null;
+    access_issuer: string | null;
+    access_audiences: string[] | null;
+    access_jwks_url: string | null;
 }
 
 /** Schema of `live_apps`. */
@@ -2452,7 +2464,13 @@ export const schema = {
             volume_storage_migration_state: { _columnName: "volume_storage_migration_state", _foreignKeys: {} },
             volume_storage_migration_message: { _columnName: "volume_storage_migration_message", _foreignKeys: {} },
             volume_storage_migration_started_at: { _columnName: "volume_storage_migration_started_at", _foreignKeys: {} },
-            volume_storage_migration_host_id: { _columnName: "volume_storage_migration_host_id", _foreignKeys: {} }
+            volume_storage_migration_host_id: { _columnName: "volume_storage_migration_host_id", _foreignKeys: {} },
+            access_kind: { _columnName: "access_kind", _foreignKeys: {} },
+            access_header: { _columnName: "access_header", _foreignKeys: {} },
+            access_format: { _columnName: "access_format", _foreignKeys: {} },
+            access_issuer: { _columnName: "access_issuer", _foreignKeys: {} },
+            access_audiences: { _columnName: "access_audiences", _foreignKeys: {} },
+            access_jwks_url: { _columnName: "access_jwks_url", _foreignKeys: {} }
         },
         _indexes: {
             apps_deleted_idx: { _indexName: "apps_deleted_idx" },
@@ -2462,6 +2480,8 @@ export const schema = {
             apps_unstarted_volume_storage_migrations_idx: { _indexName: "apps_unstarted_volume_storage_migrations_idx" }
         },
         _constraints: {
+            apps_access_format_check: { _constraintName: "apps_access_format_check" },
+            apps_access_policy_check: { _constraintName: "apps_access_policy_check" },
             apps_activation_check: { _constraintName: "apps_activation_check" },
             apps_idle_timeout_ms_check: { _constraintName: "apps_idle_timeout_ms_check" },
             apps_owner_id_fkey: { _constraintName: "apps_owner_id_fkey" },
@@ -2851,7 +2871,13 @@ export const schema = {
             name: { _columnName: "name", _foreignKeys: {} },
             volume_storage_migration_state: { _columnName: "volume_storage_migration_state", _foreignKeys: {} },
             volume_storage_migration_message: { _columnName: "volume_storage_migration_message", _foreignKeys: {} },
-            volume_storage_migration_started_at: { _columnName: "volume_storage_migration_started_at", _foreignKeys: {} }
+            volume_storage_migration_started_at: { _columnName: "volume_storage_migration_started_at", _foreignKeys: {} },
+            access_kind: { _columnName: "access_kind", _foreignKeys: {} },
+            access_header: { _columnName: "access_header", _foreignKeys: {} },
+            access_format: { _columnName: "access_format", _foreignKeys: {} },
+            access_issuer: { _columnName: "access_issuer", _foreignKeys: {} },
+            access_audiences: { _columnName: "access_audiences", _foreignKeys: {} },
+            access_jwks_url: { _columnName: "access_jwks_url", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}
