@@ -60,6 +60,8 @@
   },
   "overrides": {
     "dompurify": "3.4.17",
-    "fflate": "0.8.3"
+    "fflate": "0.8.3",
+    "minimatch": "11.0.1",
+    "picomatch": "npm:@ryotsu/picomatch@4.0.7-a"
   }
 }
