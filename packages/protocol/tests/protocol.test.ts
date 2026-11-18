@@ -77,6 +77,7 @@ function desiredState(): HostDesiredState {
         deploymentId: Value.Parse(DeploymentIdSchema, 'dep_1'),
         volumeId: Value.Parse(VolumeIdSchema, 'vol_1'),
         desiredState: 'running',
+        access: { kind: 'public' },
         artifact: {
           digest: hexDigest() as never,
           sizeBytes: 2048,
@@ -101,6 +102,14 @@ function desiredState(): HostDesiredState {
     exports: [],
   };
 }
+
+test('desired state rejects an instance without an explicit access policy', () => {
+  const state = desiredState();
+  const instances = state.instances.map(({ access: _access, ...instance }) => instance);
+  expect(isValidMessage({ schema: HostDesiredStateSchema, value: { ...state, instances } })).toBe(
+    false,
+  );
+});
 
 function desiredExport() {
   return {

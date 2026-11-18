@@ -3,7 +3,12 @@ import { MIN_IDLE_TIMEOUT_MS } from '@repo/protocol';
 import { interpolableRuntimeValue, RUNTIME_VALUES } from '@repo/protocol/runtime-values';
 import { UnsupportedNibrunnerFeature } from '#lib/nibrunner/failure.ts';
 import { nibrunnerInstance } from '#lib/nibrunner/instance.ts';
-import { APP_HOSTNAME, desiredInstance, tenantEnvironment } from '#tests/support/fixtures.ts';
+import {
+  APP_HOSTNAME,
+  desiredInstance,
+  JWT_ACCESS,
+  tenantEnvironment,
+} from '#tests/support/fixtures.ts';
 
 const DATA_REFERENCE = interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name);
 const HOSTNAME_REFERENCE = interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name);
@@ -92,4 +97,10 @@ test('public ports and their references are refused without exposing tenant valu
   } catch (error) {
     expect(String(error)).not.toContain('sensitive');
   }
+});
+
+test('JWT access follows the app across all its HTTP hostnames', () => {
+  const instance = desiredInstance();
+  instance.access = JWT_ACCESS;
+  expect(nibrunnerInstance(instance).access).toEqual(instance.access);
 });

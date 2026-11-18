@@ -1,5 +1,6 @@
 /** biome-ignore-all lint/performance/noBarrelFile: index is the only allowed file where we can export other files */
 
+export { type AppAccessPolicy, AppAccessPolicySchema } from '#control/access.ts';
 export {
   type CronQuery,
   type CronQueryRequest,
