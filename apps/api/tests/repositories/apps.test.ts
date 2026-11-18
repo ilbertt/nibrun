@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { withTypes } from '@ilbertt/bun-sqlgen';
+import type { AppAccessPolicy } from '@repo/protocol';
 import {
   type AppId,
   AppIdSchema,
@@ -21,6 +22,7 @@ import type { Queries, Tables } from '#db/queries.gen.ts';
 import { AppNameSchema, OWNED_APP_STATES } from '#lib/api/app.ts';
 import { DnsLabelSchema } from '#lib/api/dns-label.ts';
 import { type ArtifactId, type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { appAccess } from '#lib/app-access.ts';
 import { configWithDefaults, type SealedEnvironmentPatch } from '#lib/app-config.ts';
 import { openSecret, sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
 import {
@@ -116,6 +118,29 @@ async function createApp(slug: string): Promise<AppId> {
   return created.app.id;
 }
 
+test('a new JWT-protected app stores its full access policy on creation', async () => {
+  const slug = Value.Parse(DnsLabelSchema, 'private-heron');
+  const access = {
+    kind: 'jwt',
+    token: { header: 'Authorization', format: 'bearer' },
+    issuer: 'https://issuer.example',
+    audiences: ['private-heron'],
+    publicKeys: { url: 'https://issuer.example/keys' },
+  } satisfies AppAccessPolicy;
+  const { app } = requireCreated(
+    await repo.create({
+      ownerId: OWNER_ID,
+      name: Value.Parse(AppNameSchema, slug),
+      slug,
+      hostname: Value.Parse(HostnameSchema, `${slug}.apps.example.com`),
+      config: { ...configWithDefaults(), environment: {} },
+      anonymousAppsAtMost: null,
+      access,
+    }),
+  );
+  expect(appAccess(app)).toEqual(access);
+});
+
 test('owner configuration changes preserve an existing platform-enabled extra port', async () => {
   const slug = Value.Parse(DnsLabelSchema, 'enabled-extra-port');
   const created = requireCreated(
@@ -191,6 +216,7 @@ describe('an app nobody has said anything about waits to be asked for', () => {
     const appId = await createApp('fresh-heron');
 
     expect(await repo.findById({ appId, ownerId: OWNER_ID })).toMatchObject({
+      access_kind: 'public',
       activation: 'on-request',
       idle_timeout_ms: DEFAULT_IDLE_TIMEOUT_MS,
     });

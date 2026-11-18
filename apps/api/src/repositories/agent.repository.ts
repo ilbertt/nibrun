@@ -180,8 +180,13 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
                  health_check_unhealthy_threshold,
                  restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
                  restart_backoff_factor, restart_reset_after_ms, config_id,
-                 activation, idle_timeout_ms, deployment_state
+                 activation, idle_timeout_ms, deployment_state,
+                 access_kind, access_header, access_format, access_issuer, access_audiences,
+                 access_jwks_url
           FROM nibrun.desired_deployments
+          JOIN (SELECT id AS app_id, access_kind, access_header, access_format, access_issuer,
+                       access_audiences, access_jwks_url
+                FROM nibrun.apps) app_access USING (app_id)
           WHERE id IN (SELECT deployment_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
           ORDER BY app_id, id
         `,

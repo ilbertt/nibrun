@@ -60,6 +60,12 @@ export interface ISelectDesiredDeploymentsResult {
     idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
     /** The release's own state, beside the app's. A host reads it to tell a release it should run from one it is only answering for. */
     deployment_state: IDeploymentsColumns["state"];
+    access_kind: IAppsColumns["access_kind"];
+    access_header: IAppsColumns["access_header"];
+    access_format: IAppsColumns["access_format"];
+    access_issuer: IAppsColumns["access_issuer"];
+    access_audiences: IAppsColumns["access_audiences"];
+    access_jwks_url: IAppsColumns["access_jwks_url"];
 }
 
 /** Result of query `SelectDesiredVolumes`. */
@@ -235,7 +241,7 @@ export interface ISelectAppsAllowedResult {
 
 /** Result of query `InsertApp`. */
 export interface IInsertAppResult {
-    id: IAppsColumns["id"];
+    id: string | null;
 }
 
 /** Result of query `InsertAppConfig`. */
@@ -266,6 +272,12 @@ export interface ISelectCreatedAppResult {
     state: IAppsColumns["state"];
     activation: IAppsColumns["activation"];
     idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
+    access_kind: IAppsColumns["access_kind"];
+    access_header: IAppsColumns["access_header"];
+    access_format: IAppsColumns["access_format"];
+    access_issuer: IAppsColumns["access_issuer"];
+    access_audiences: IAppsColumns["access_audiences"];
+    access_jwks_url: IAppsColumns["access_jwks_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -321,6 +333,12 @@ export interface ISelectAppsByOwnerResult {
     state: IAppsColumns["state"];
     activation: IAppsColumns["activation"];
     idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
+    access_kind: IAppsColumns["access_kind"];
+    access_header: IAppsColumns["access_header"];
+    access_format: IAppsColumns["access_format"];
+    access_issuer: IAppsColumns["access_issuer"];
+    access_audiences: IAppsColumns["access_audiences"];
+    access_jwks_url: IAppsColumns["access_jwks_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -376,6 +394,12 @@ export interface ISelectAppByIdResult {
     state: IAppsColumns["state"];
     activation: IAppsColumns["activation"];
     idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
+    access_kind: IAppsColumns["access_kind"];
+    access_header: IAppsColumns["access_header"];
+    access_format: IAppsColumns["access_format"];
+    access_issuer: IAppsColumns["access_issuer"];
+    access_audiences: IAppsColumns["access_audiences"];
+    access_jwks_url: IAppsColumns["access_jwks_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -576,6 +600,12 @@ export interface ISelectAppAsChangedResult {
     state: IAppsColumns["state"];
     activation: IAppsColumns["activation"];
     idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
+    access_kind: IAppsColumns["access_kind"];
+    access_header: IAppsColumns["access_header"];
+    access_format: IAppsColumns["access_format"];
+    access_issuer: IAppsColumns["access_issuer"];
+    access_audiences: IAppsColumns["access_audiences"];
+    access_jwks_url: IAppsColumns["access_jwks_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -619,6 +649,10 @@ export interface ISelectAppAsChangedResult {
     compute_measured_at: IAppUsageColumns["compute_measured_at"];
     /** When this app is due to be deleted. */
     expires_at: Date | null;
+}
+
+/** Result of query `SetAppAccess`. */
+export interface ISetAppAccessResult {
 }
 
 /** Result of query `SelectAppForOnlyArtifact`. */
@@ -1367,6 +1401,7 @@ export interface Queries {
     SelectAppsLeft: ISelectAppsLeftResult;
     SelectAnonymousAppsHeld: ISelectAnonymousAppsHeldResult;
     SelectAppAsChanged: ISelectAppAsChangedResult;
+    SetAppAccess: ISetAppAccessResult;
     SelectAppForOnlyArtifact: ISelectAppForOnlyArtifactResult;
     SelectArtifactHeldByApp: ISelectArtifactHeldByAppResult;
     InsertPendingArtifact: IInsertPendingArtifactResult;
