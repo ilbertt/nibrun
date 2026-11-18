@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "@better-auth/core": "catalog:",
-    "@better-auth/oauth-provider": "1.7.7",
+    "@better-auth/oauth-provider": "1.7.25",
     "@repo/analytics": "workspace:*",
     "@repo/api-client": "workspace:*",
     "@repo/api-constants": "workspace:*",

@@ -145,6 +145,13 @@ Migrations are ordered `src/db/migrations/NNNN_*.sql`, applied on startup by
 `src/db/migrate.ts`. Add one by dropping in the next-numbered file. The runner's
 ledger lives in the `api_migrations` schema — never put app tables there.
 
+Upgrade Better Auth and its plugins together with exact versions. Generate its schema with the
+matching `auth` CLI and `scripts/auth-schema.ts`, compare it with the complete migration history,
+and follow upstream cleanup instructions for obsolete constraints the generator does not remove.
+Run the real GitHub callback against migrated Postgres, covering new accounts, returning accounts
+and anonymous account linking. Memory-adapter auth tests do not establish schema compatibility.
+The legacy `auth.account.issuer` column remains nullable to preserve existing account values.
+
 **Migrations carry schema and nothing else — never `INSERT`, `UPDATE` or
 `DELETE` on app tables.** Rows to repair are found by the state they are in and
 fixed by code that runs continuously, so the repair is retried, tested and
