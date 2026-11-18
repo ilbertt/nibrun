@@ -1,3 +1,4 @@
+import { httpsUrl } from '@repo/typebox-extensions';
 import { Type } from '@sinclair/typebox';
 import { SECRET_ANNOTATION, secretString } from '#lib/secret.ts';
 import { ObjectKeySchema } from '#lib/wire.ts';
@@ -30,7 +31,7 @@ export const S3VolumeAuthSchema = Type.Union(
 export type S3VolumeAuth = typeof S3VolumeAuthSchema.static;
 
 export const S3VolumeStorageSchema = Type.Object({
-  endpoint: Type.String({ pattern: '^https://[^\\s]+$' }),
+  endpoint: httpsUrl(),
   bucket: Type.String({ pattern: '^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$' }),
   prefix: ObjectKeySchema,
   region: Type.Optional(Type.String({ minLength: 1 })),

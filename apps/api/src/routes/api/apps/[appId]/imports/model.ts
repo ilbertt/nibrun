@@ -2,7 +2,7 @@ import { ByteSizeSchema, FilenameSchema, Sha256DigestSchema } from '@repo/protoc
 import { t } from 'elysia';
 import { ImportIdSchema } from '#lib/api/identifiers.ts';
 import { ImportSchema } from '#lib/api/import.ts';
-import { MAX_REMOTE_URL_LENGTH, REMOTE_URL_PATTERN } from '#lib/remote-url.ts';
+import { remoteUrlSchema } from '#lib/remote-url.ts';
 
 // The bytes the owner holds. The name is theirs, not the store's: keys here are assigned one per
 // row, so they carry none, and this is the only name anybody would recognise the archive by.
@@ -20,11 +20,7 @@ const StagedUploadSchema = t.Object({
 });
 
 const FetchedArchiveSchema = t.Object({
-  url: t.String({
-    description: 'Public https url the api fetches the archive from.',
-    pattern: REMOTE_URL_PATTERN,
-    maxLength: MAX_REMOTE_URL_LENGTH,
-  }),
+  url: remoteUrlSchema('Public HTTPS URL the API fetches the archive from.'),
   sha256: t.Optional(Sha256DigestSchema),
 });
 
