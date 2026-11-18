@@ -1,3 +1,4 @@
+import { isPublicRoutableHost } from '@better-auth/core/utils/host';
 import { Elysia } from 'elysia';
 import { sql } from '#db/client.ts';
 import { createAuth } from '#lib/auth/better-auth.ts';
@@ -52,6 +53,7 @@ import { GitHubDeploymentTokensService } from '#services/github-deployment-token
 import { HealthService } from '#services/health.service.ts';
 import { HostnamesService } from '#services/hostnames.service.ts';
 import { ImportsService } from '#services/imports.service.ts';
+import { JwksService } from '#services/jwks.service.ts';
 import { LogsService } from '#services/logs.service.ts';
 import { McpAuthorizationService } from '#services/mcp-authorization.service.ts';
 import { PaidRequestsService } from '#services/paid-requests.service.ts';
@@ -337,3 +339,16 @@ export const GitHubDeploymentGrantsServicePlugin = new Elysia({
 export const GitHubDeploymentTokensServicePlugin = new Elysia({
   name: 'service.githubDeploymentTokens',
 }).decorate('githubDeploymentTokensService', githubDeploymentTokensService);
+
+export const JwksServicePlugin = new Elysia({ name: 'service.jwks' }).decorate(
+  'jwksService',
+  new JwksService({
+    sources: new RemoteSourceRepository({
+      logger: createLogger('JWKS'),
+      mayDial: isPublicRoutableHost,
+      timeouts: { totalMs: 8000 },
+    }),
+    slots: new RemoteFetchSlots(),
+    key: secretsKey,
+  }),
+);
