@@ -641,7 +641,7 @@ export const DEPLOY_PRESETS = {
   flipt: {
     isRecommended: false,
     projectUrl: 'https://github.com/flipt-io/flipt',
-    version: 'v2.14.1',
+    version: 'v1.62.1',
     markdownContent: fliptPage,
     title: 'Flipt',
     subtitle: 'Feature flags with a UI, evaluated over HTTP or gRPC.',
@@ -649,8 +649,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'flipt',
       binary:
-        'https://github.com/flipt-io/flipt/releases/download/v2.14.1/flipt_linux_x86_64.tar.gz',
-      sha256: '777437f40420332460b36639ae2b50a8874d3d3dd165edaff381e4d8a61b1626',
+        'https://github.com/flipt-io/flipt/releases/download/v1.62.1/flipt_linux_x86_64.tar.gz',
+      sha256: '9db863eacf2b7f15bec3b71d724bbf193e130f79477767d10b84b9ea75d0cf65',
       port: 8080,
       arg: ['server'],
       env: [
