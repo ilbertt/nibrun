@@ -2,6 +2,12 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.11.19-2]
+
+### 🚀 Features
+
+- *(cli)* Configure deployment access with JWT flags (#1274)
+
 ## [2026.11.19-1]
 
 ### 🚀 Features
