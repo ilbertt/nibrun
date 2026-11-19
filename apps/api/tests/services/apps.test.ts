@@ -21,6 +21,7 @@ import {
 import { Value } from '@sinclair/typebox/value';
 import { SQL } from 'bun';
 import { schema } from '#db/queries.gen.ts';
+import { accessColumns } from '#lib/app-access.ts';
 
 const HOST_ID = Value.Parse(HostIdSchema, 'reporting-host');
 
@@ -110,6 +111,7 @@ function appRow(slug: DnsLabel): AppRow {
     slug,
     state: 'active',
     activation: 'always',
+    ...accessColumns({ kind: 'public' }),
     idle_timeout_ms: MIN_IDLE_TIMEOUT_MS,
     config_id: 'config-1',
     volume_storage_migration_state: null,

@@ -1,5 +1,6 @@
 import type { TypedSQL } from '@ilbertt/bun-sqlgen';
 import type {
+  AppAccessPolicy,
   AppHostnameKind,
   AppId,
   ComputeUsage,
@@ -13,6 +14,7 @@ import type { Queries } from '#db/queries.gen.ts';
 import { APP_STATES, type AppHostnameState, type AppName, type AppState } from '#lib/api/app.ts';
 import type { DnsLabel } from '#lib/api/dns-label.ts';
 import type { OwnerId } from '#lib/api/identifiers.ts';
+import { accessColumns } from '#lib/app-access.ts';
 import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
 import { ConflictError } from '#lib/errors.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
@@ -32,6 +34,7 @@ export type NewApp = {
   slug: DnsLabel;
   hostname: Hostname;
   config: StoredAppConfig;
+  access?: AppAccessPolicy;
   // How many apps without an account behind them may be live at once, platform-wide, where this
   // is one; null where the owner has an identity and the number is not theirs to count against.
   anonymousAppsAtMost: number | null;
@@ -72,7 +75,10 @@ export type StateChange = OwnedApp & { state: AppState; from: readonly AppState[
  * The name is on the app row and the rest is a config version, so the two are written apart
  * and read back together.
  */
-export type SealedAppPatch = SealedConfigPatch & { name: AppName | undefined };
+export type SealedAppPatch = SealedConfigPatch & {
+  name: AppName | undefined;
+  access?: AppAccessPolicy;
+};
 
 /** Everything but `deleted`, which is a host's word for a filesystem that is gone. */
 export const LIVE_APP_STATES: readonly AppState[] = APP_STATES.filter(
@@ -167,6 +173,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     slug,
     hostname,
     config,
+    access = { kind: 'public' },
     anonymousAppsAtMost,
   }: NewApp): Promise<AppCreation> {
     return this.sql.begin(async (tx): Promise<AppCreation> => {
@@ -180,9 +187,17 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         return { outcome: 'at-capacity' };
       }
 
+      const columns = accessColumns(access);
       const [inserted] = await tx.InsertApp`
-        INSERT INTO nibrun.apps (owner_id, name, slug)
-        VALUES (${ownerId}, ${name}, ${slug})
+        INSERT INTO nibrun.apps (
+          owner_id, name, slug, access_kind, access_header, access_format,
+          access_issuer, access_audiences, access_jwks_url
+        ) VALUES (
+          ${ownerId}, ${name}, ${slug}, ${columns.access_kind}, ${columns.access_header},
+          ${columns.access_format}, ${columns.access_issuer},
+          ${columns.access_audiences && tx.array(columns.access_audiences, TEXT_ARRAY)},
+          ${columns.access_jwks_url}
+        )
         RETURNING id
       `;
       if (!inserted) {
@@ -235,6 +250,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       const [app] = await tx.SelectCreatedApp`
         /* @notNull environment_names */
         SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
+               a.access_kind, a.access_header, a.access_format, a.access_issuer, a.access_audiences,
+               a.access_jwks_url,
                a.created_at, a.updated_at, a.volume_storage_migration_state,
                a.volume_storage_migration_message, a.volume_storage_migration_started_at,
                c.id AS config_id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
@@ -267,6 +284,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     return this.sql.SelectAppsByOwner`
       /* @notNull environment_names */
       SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
+             a.access_kind, a.access_header, a.access_format, a.access_issuer, a.access_audiences,
+             a.access_jwks_url,
              a.created_at, a.updated_at, a.volume_storage_migration_state,
              a.volume_storage_migration_message, a.volume_storage_migration_started_at,
              c.id AS config_id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
@@ -441,6 +460,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     const [app] = await this.sql.SelectAppById`
       /* @notNull environment_names */
       SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
+             a.access_kind, a.access_header, a.access_format, a.access_issuer, a.access_audiences,
+             a.access_jwks_url,
              a.created_at, a.updated_at, a.volume_storage_migration_state,
              a.volume_storage_migration_message, a.volume_storage_migration_started_at,
              c.id AS config_id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
@@ -475,7 +496,11 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    * index is the rule. Written whether or not the name moved, because reconfiguring an app changes
    * the app and the new version lands in another table, so nothing else would move `updated_at`.
    */
-  update({ appId, ownerId, patch: { name, ...config } }: OwnedApp & { patch: SealedAppPatch }) {
+  update({
+    appId,
+    ownerId,
+    patch: { name, access, ...config },
+  }: OwnedApp & { patch: SealedAppPatch }) {
     return this.sql.begin(async (tx) => {
       const locked = await lockAppForMutation({ tx, appId, ownerId });
       if (!locked) {
@@ -485,6 +510,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       if (Object.keys(config).length > 0) {
         await appendConfigVersion({ tx, appId, patch: config, storage: undefined });
       }
+
+      await writeAppAccess({ tx, appId, ownerId, access });
 
       await tx.TouchApp`
         UPDATE nibrun.live_apps a
@@ -901,6 +928,8 @@ async function appAsChanged({
   const [app] = await tx.SelectAppAsChanged`
     /* @notNull environment_names */
     SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
+           a.access_kind, a.access_header, a.access_format, a.access_issuer, a.access_audiences,
+           a.access_jwks_url,
            a.created_at, a.updated_at, a.volume_storage_migration_state,
            a.volume_storage_migration_message, a.volume_storage_migration_started_at,
            c.id AS config_id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
@@ -995,5 +1024,27 @@ async function insertEnvironment({
         TEXT_ARRAY,
       )}
     ) AS pair(name, value)
+  `;
+}
+
+async function writeAppAccess({
+  tx,
+  appId,
+  ownerId,
+  access,
+}: OwnedApp & {
+  tx: TypedSQL<Queries>;
+  access: AppAccessPolicy | undefined;
+}) {
+  if (!access) {
+    return;
+  }
+  const columns = accessColumns(access);
+  await tx.SetAppAccess`
+    UPDATE nibrun.apps SET access_kind = ${columns.access_kind}, access_header = ${columns.access_header},
+      access_format = ${columns.access_format}, access_issuer = ${columns.access_issuer},
+      access_jwks_url = ${columns.access_jwks_url},
+      access_audiences = ${columns.access_audiences && tx.array(columns.access_audiences, TEXT_ARRAY)}
+    WHERE id = ${appId} AND owner_id = ${ownerId}
   `;
 }

@@ -1,11 +1,14 @@
 import { afterAll, beforeAll, expect, test } from 'bun:test';
 import { withTypes } from '@ilbertt/bun-sqlgen';
+import type { AppAccessPolicy } from '@repo/protocol';
 import { type HostId, Sha256DigestSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
+import { appAccess } from '#lib/app-access.ts';
 import { sealSecret } from '#lib/tenant-secrets.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
+import { AppsRepository } from '#repositories/apps.repository.ts';
 import { DeploymentHostsRepository } from '#repositories/deployment-hosts.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { createDeployedApp } from '#tests/support/deployed-app.ts';
@@ -73,6 +76,7 @@ test('hosts receive only their own executions, volumes, hostnames and decrypted 
     expect(desired.instances[0]).toMatchObject({
       appId: app.appId,
       deploymentId: app.deploymentId,
+      access: { kind: 'public' },
       hostnames: [{ hostname: `${name}.apps.test`, kind: 'platform' }],
       config: { environment: { TOKEN: `${name}-secret` } },
     });
@@ -272,4 +276,41 @@ test('artifact retention follows the two latest executions of apps assigned to t
     retainedDeploymentsPerApp: 2,
   });
   expect(sharing.retainedArtifactDigests).toContain(previous);
+});
+
+test('access changes reach the existing deployment, and switching to public clears its key source', async () => {
+  const app = await createHostedApp({ name: 'protected-app', hostId: SOURCE_HOST });
+  const apps = new AppsRepository(withTypes<Queries>(sql));
+  const access: AppAccessPolicy = {
+    kind: 'jwt',
+    issuer: 'my-issuer',
+    audiences: ['first', 'second'],
+    token: { header: 'X-Assertion', format: 'raw' },
+    publicKeys: { url: 'https://issuer.example/jwks' },
+  };
+  const written = await apps.update({ ...app, patch: { name: undefined, access } });
+  expect(written && appAccess(written)).toEqual(access);
+  const desired = await repository().desiredState({
+    hostId: SOURCE_HOST,
+    retainedDeploymentsPerApp: 2,
+  });
+  const instance = desired.instances.find((instance) => instance.appId === app.appId);
+  expect(instance?.deploymentId).toBe(app.deploymentId);
+  expect(instance?.access).toEqual(access);
+  expect(
+    await apps.update({
+      ...app,
+      ownerId: destination.ownerId,
+      patch: { name: undefined, access: { kind: 'public' } },
+    }),
+  ).toBeNull();
+  const cleared = await apps.update({
+    ...app,
+    patch: { name: undefined, access: { kind: 'public' } },
+  });
+  expect(cleared).toMatchObject({
+    access_kind: 'public',
+    access_jwks_url: null,
+    access_audiences: null,
+  });
 });

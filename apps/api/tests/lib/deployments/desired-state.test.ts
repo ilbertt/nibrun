@@ -212,6 +212,7 @@ function deploymentRow() {
     restart_reset_after_ms: 1000,
     config_id: 'config-1',
     activation: 'always',
+    access_kind: 'public',
     idle_timeout_ms: IDLE_TIMEOUT_MS,
     deployment_state: 'running',
   } as unknown as Parameters<typeof toDesiredInstance>[0]['row'];
