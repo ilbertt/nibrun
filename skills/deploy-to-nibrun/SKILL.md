@@ -173,10 +173,17 @@ deployment, set `config.access` when creating the app through MCP. With the CLI,
 `nib run` or `nib apps update`. If your CLI lacks these flags, use MCP or the dashboard's
 **HTTP access** picker. Redeploying without access flags preserves the current policy.
 
+**Custom JWT** works directly on `<slug>.nibrun.app` with your issuer's public HTTPS JWKS URL
+and the app's audience. By default, clients send the JWT in `Authorization: Bearer <token>`.
+
 #### Cloudflare Access
 
-Protect the app's proxied custom hostname with a self-hosted Cloudflare Access application and
-an Allow policy. In the nibrun deploy dialog, choose **HTTP access → Cloudflare Access** and
+For Cloudflare sign-in, attach a custom hostname from your Cloudflare account, enable its DNS
+proxy, and protect it with a self-hosted Access application and an Allow policy. nibrun owns
+the `nibrun.app` zone, so your account can't put an Access login on `<slug>.nibrun.app`.
+The default hostname still requires a valid assertion for the app.
+
+In the nibrun deploy dialog, choose **HTTP access → Cloudflare Access** and
 enter the team domain and application audience (AUD). For MCP deployments, substitute those
 values in `config.access`.
 
