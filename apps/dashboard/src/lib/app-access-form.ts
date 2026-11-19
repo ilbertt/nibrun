@@ -1,6 +1,9 @@
 import type { App } from '@repo/api-client/models';
-import { DEFAULT_APP_ACCESS } from '@repo/api-constants';
-import { CLOUDFLARE_ACCESS_HEADER, isCloudflareAccessHeader } from '@repo/app-ui';
+import {
+  CLOUDFLARE_ACCESS_HEADER,
+  DEFAULT_APP_ACCESS,
+  isCloudflareAccessHeader,
+} from '@repo/api-constants';
 
 export type AppAccess = App['config']['access'];
 export type AccessMode = 'public' | 'cloudflare' | 'jwt';

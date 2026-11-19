@@ -1,5 +1,5 @@
 import { isPublicRoutableHost } from '@better-auth/core/utils/host';
-import { isCloudflareAccessHeader } from '@repo/app-ui';
+import { isCloudflareAccessHeader } from '@repo/api-constants';
 import type { AppAccessPolicy } from '@repo/protocol';
 import { BadRequestError } from '#lib/errors.ts';
 import { hostnameOf } from '#lib/public-address.ts';
