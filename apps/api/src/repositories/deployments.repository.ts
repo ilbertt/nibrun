@@ -1,4 +1,6 @@
 import type { TypedSQL } from '@ilbertt/bun-sqlgen';
+import { isCloudflareAccessHeader } from '@repo/api-constants';
+import { CLOUDFLARE_ACCESS_DOMAIN_HINT } from '@repo/app-ui';
 import type {
   AppId,
   DeploymentId,
@@ -16,6 +18,8 @@ import type {
   OAuthClientId,
   OwnerId,
 } from '#lib/api/identifiers.ts';
+import { CUSTOM_KIND } from '#lib/app-hostname.ts';
+import { ConflictError } from '#lib/errors.ts';
 import { HOST_REPORT_MAX_AGE_MS } from '#lib/host-readiness.ts';
 import { lockAppForMutation } from '#repositories/apps.repository.ts';
 import { Repository } from '#repositories/repository.ts';
@@ -299,17 +303,24 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     rollbackOf,
   }: RollbackDeploymentInput): Promise<DeploymentRow | null> {
     return this.sql.begin(async (tx) => {
+      if (!(await lockAppForMutation({ tx, appId, ownerId }))) {
+        return null;
+      }
       const [replayable] = await tx.SelectDeploymentToReplay`
-        SELECT d.id
+        SELECT c.access_header, EXISTS (
+          SELECT 1 FROM nibrun.app_hostnames h WHERE h.app_id = a.id AND h.kind = ${CUSTOM_KIND}
+        ) AS has_custom_domain
         FROM nibrun.deployments d
         JOIN nibrun.live_apps a ON a.id = d.app_id
+        JOIN nibrun.app_configs c ON c.id = d.config_id
         WHERE d.id = ${rollbackOf} AND d.app_id = ${appId} AND a.owner_id = ${ownerId}
-        FOR UPDATE OF a
       `;
       if (!replayable) {
         return null;
       }
-      await lockAppForMutation({ tx, appId, ownerId });
+      if (isCloudflareAccessHeader(replayable.access_header) && !replayable.has_custom_domain) {
+        throw new ConflictError(CLOUDFLARE_ACCESS_DOMAIN_HINT);
+      }
       await supersedeLiveDeployment({ tx, appId, ownerId });
 
       const [inserted] = await tx.InsertReplayedDeployment`

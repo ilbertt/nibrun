@@ -151,7 +151,7 @@ test('a new JWT-protected app stores its full access policy on creation', async 
 });
 
 test('Cloudflare Access needs a registered domain to enable or change the policy', async () => {
-  const appId = await createApp('access-domain');
+  const appId = await createHostedUsageApp('access-domain');
   const other = await createApp('other-domain');
   const domains = new AppHostnamesRepository(withTypes<Queries>(sql));
   const own = {
@@ -176,13 +176,58 @@ test('Cloudflare Access needs a registered domain to enable or change the policy
   await expect(update(CLOUDFLARE_ACCESS)).rejects.toThrow('Associate a custom domain');
   await domains.addCustom(own);
   expect(await update(CLOUDFLARE_ACCESS)).toMatchObject({ access_kind: 'jwt' });
-  await domains.removeCustom(own);
-  expect(await update(CLOUDFLARE_ACCESS)).toMatchObject({ access_kind: 'jwt' });
-  await expect(update({ ...CLOUDFLARE_ACCESS, audiences: ['other'] })).rejects.toThrow(
-    'Associate a custom domain',
-  );
+  const removeLast = 'Deploy Public or Custom JWT';
+  await expect(domains.removeCustom(own)).rejects.toThrow(removeLast);
+  const deployments = new DeploymentsRepository(withTypes<Queries>(sql));
+  const owner = { appId, ownerId: OWNER_ID };
+  const [seed] = await deployments.listByApp(owner);
+  if (!seed) {
+    throw new Error('Expected the initial deployment');
+  }
+  const release = { ...owner, artifactId: seed.artifact_id, initialDataFrom: null, onlyOne: false };
+  const protectedRelease = await deployments.insert(release);
+  if (protectedRelease.outcome !== 'created') {
+    throw new Error('Expected the protected deployment');
+  }
+
+  const alias = { ...own, hostname: Value.Parse(HostnameSchema, 'second.example.com') };
+  await domains.addCustom(alias);
+  const removals = await Promise.allSettled([
+    domains.removeCustom(own),
+    domains.removeCustom(alias),
+  ]);
+  expect(removals.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+  const remaining = removals[0].status === 'fulfilled' ? alias : own;
+  expect((await domains.listByApp(owner)).filter((h) => h.kind === 'custom')).toHaveLength(1);
+
   expect(await update({ kind: 'public' })).toMatchObject({ access_kind: 'public' });
+  await expect(domains.removeCustom(remaining)).rejects.toThrow(removeLast);
+  expect((await deployments.insert(release)).outcome).toBe('created');
+  expect(await domains.removeCustom(remaining)).toEqual({ cloudflare_id: null });
   await expect(update(CLOUDFLARE_ACCESS)).rejects.toThrow('Associate a custom domain');
+  await expect(
+    deployments.insertRollback({ ...owner, rollbackOf: protectedRelease.row.id }),
+  ).rejects.toThrow('Associate a custom domain');
+});
+
+test('switching to another JWT header allows domain removal without making the app public', async () => {
+  const appId = await createApp('jwt-header');
+  const owner = { appId, ownerId: OWNER_ID };
+  const domains = new AppHostnamesRepository(withTypes<Queries>(sql));
+  const domain = { ...owner, hostname: Value.Parse(HostnameSchema, 'jwt.example.com') };
+  await domains.addCustom(domain);
+  const custom = {
+    ...CLOUDFLARE_ACCESS,
+    token: { header: 'Authorization', format: 'bearer' },
+  } satisfies AppAccessPolicy;
+  for (const access of [CLOUDFLARE_ACCESS, custom]) {
+    await repo.update({ ...owner, patch: { name: undefined, access } });
+  }
+  expect(await domains.removeCustom(domain)).toEqual({ cloudflare_id: null });
+  expect(await repo.findById(owner)).toMatchObject({
+    access_kind: 'jwt',
+    access_header: 'Authorization',
+  });
 });
 
 test('owner configuration changes preserve an existing platform-enabled extra port', async () => {
