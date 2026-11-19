@@ -17,11 +17,12 @@ import type { DnsLabel } from '#lib/api/dns-label.ts';
 import type { OwnerId } from '#lib/api/identifiers.ts';
 import { accessColumns } from '#lib/app-access.ts';
 import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
+import { CUSTOM_KIND } from '#lib/app-hostname.ts';
 import { BadRequestError, ConflictError } from '#lib/errors.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
 import { requiresCustomDomain } from '#lib/validate-app-access.ts';
 import type { StoredVolumeStorage } from '#lib/volume-storage.ts';
-import { type AppHostnameRow, CUSTOM_KIND } from '#repositories/app-hostnames.repository.ts';
+import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';
 import { Repository, TEXT_ARRAY } from '#repositories/repository.ts';
 
 export type AppRow = Queries['SelectAppById'];

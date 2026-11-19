@@ -206,6 +206,12 @@ export interface IDeleteCustomAppHostnameResult {
     cloudflare_id: IAppHostnamesColumns["cloudflare_id"];
 }
 
+/** Result of query `SelectAccessAfterLastDomainRemoval`. */
+export interface ISelectAccessAfterLastDomainRemovalResult {
+    saved_header: IAppConfigsColumns["access_header"];
+    deployed_header: IAppConfigsColumns["access_header"];
+}
+
 /** Result of query `SelectPendingCustomHostnames`. */
 export interface ISelectPendingCustomHostnamesResult {
     id: IAppHostnamesColumns["id"];
@@ -807,7 +813,8 @@ export interface ISelectReadyDeploymentHostResult {
 
 /** Result of query `SelectDeploymentToReplay`. */
 export interface ISelectDeploymentToReplayResult {
-    id: IDeploymentsColumns["id"];
+    access_header: IAppConfigsColumns["access_header"];
+    has_custom_domain: boolean | null;
 }
 
 /** Result of query `InsertReplayedDeployment`. */
@@ -1388,6 +1395,7 @@ export interface Queries {
     UpdateCustomAppHostnameEdge: IUpdateCustomAppHostnameEdgeResult;
     UpdateCustomAppHostnameState: IUpdateCustomAppHostnameStateResult;
     DeleteCustomAppHostname: IDeleteCustomAppHostnameResult;
+    SelectAccessAfterLastDomainRemoval: ISelectAccessAfterLastDomainRemovalResult;
     SelectPendingCustomHostnames: ISelectPendingCustomHostnamesResult;
     SelectDisposableAppHostnames: ISelectDisposableAppHostnamesResult;
     DeleteDisposableAppHostname: IDeleteDisposableAppHostnameResult;

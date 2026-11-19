@@ -1,10 +1,18 @@
-import { type AppHostname, type Hostname, HostnameSchema, type Timestamp } from '@repo/protocol';
+import {
+  type AppHostname,
+  type AppHostnameKind,
+  type Hostname,
+  HostnameSchema,
+  type Timestamp,
+} from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { getDomain } from 'tldts';
 import type { Queries } from '#db/queries.gen.ts';
 import type { AppHostnameState } from '#lib/api/app.ts';
 import type { DnsLabel } from '#lib/api/dns-label.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
+
+export const CUSTOM_KIND: AppHostnameKind = 'custom';
 
 /**
  * The app domain is a different registrable domain from the one the dashboard is served on, so

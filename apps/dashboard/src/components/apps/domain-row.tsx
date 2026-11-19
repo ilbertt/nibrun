@@ -11,7 +11,13 @@ import type { AppSummary } from '#queries/apps.ts';
 
 type Hostname = AppSummary['hostnames'][number];
 
-export function DomainRow({ hostname }: { hostname: Hostname }) {
+export function DomainRow({
+  hostname,
+  removalBlocked,
+}: {
+  hostname: Hostname;
+  removalBlocked: boolean;
+}) {
   const removal = useRemoveDomain(useAppId());
   // The platform hostname has no remove: it is how the app is addressed once every brought
   // domain has gone, and nothing would put it back.
@@ -29,7 +35,8 @@ export function DomainRow({ hostname }: { hostname: Hostname }) {
               variant="ghost"
               size="icon"
               aria-label={`Remove ${hostname.hostname}`}
-              disabled={removal.isPending}
+              aria-describedby={removalBlocked ? 'last-domain-access' : undefined}
+              disabled={removal.isPending || removalBlocked}
               onClick={() => removal.mutate(hostname.hostname)}
             >
               {removal.isPending ? <Spinner /> : <Trash2Icon />}
@@ -37,6 +44,11 @@ export function DomainRow({ hostname }: { hostname: Hostname }) {
           )}
         </div>
       </div>
+      {removal.error && (
+        <p role="alert" className="text-destructive">
+          {removal.error.message}
+        </p>
+      )}
       {isPlatform || hostname.state === 'active' ? null : <DomainRecords hostname={hostname} />}
     </li>
   );

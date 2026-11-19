@@ -210,9 +210,13 @@ export class HostnamesService extends Service {
    * failed for a reason they cannot act on.
    */
   async remove({ appId, ownerId, hostname }: OwnedApp & { hostname: Hostname }): Promise<void> {
-    const cloudflareId = await this.hostnamesRepo.removeCustom({ appId, ownerId, hostname });
-    if (cloudflareId === null) {
+    const removed = await this.hostnamesRepo.removeCustom({ appId, ownerId, hostname });
+    if (!removed) {
       throw new NotFoundError('Custom hostname not found.');
+    }
+    const cloudflareId = removed.cloudflare_id;
+    if (!cloudflareId) {
+      return;
     }
     try {
       await this.customHostnamesRepo.remove({ cloudflareId });

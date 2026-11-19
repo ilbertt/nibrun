@@ -90,9 +90,9 @@ class StubHostnamesRepository implements AppHostnamesRepositoryContract {
     return Promise.resolve(true);
   }
 
-  removeCustom(): Promise<string | null> {
+  removeCustom() {
     this.trace.push('remove');
-    return Promise.resolve(this.removed);
+    return Promise.resolve(this.removed === null ? null : { cloudflare_id: this.removed });
   }
 
   listPendingCustom({ after }: { after: string | null }): Promise<PendingRow[]> {

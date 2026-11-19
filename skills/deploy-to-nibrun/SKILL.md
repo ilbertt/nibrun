@@ -186,6 +186,7 @@ The default hostname still requires a valid assertion for the app.
 In the nibrun deploy dialog, choose **HTTP access → Cloudflare Access** and
 enter the team domain and application audience (AUD). New apps start with only a platform hostname.
 Register the custom domain before using the Cloudflare assertion header through the dashboard or CLI.
+To remove the last custom domain, deploy Public or Custom JWT access first.
 
 With the CLI, use `https://TEAM.cloudflareaccess.com` as the issuer, the Access application's
 AUD as the audience, and `/cdn-cgi/access/certs` on that issuer as the JWKS URL. Add
