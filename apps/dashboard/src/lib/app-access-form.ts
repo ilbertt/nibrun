@@ -1,11 +1,6 @@
 import type { App } from '@repo/api-client/models';
 import { DEFAULT_APP_ACCESS } from '@repo/api-constants';
-import {
-  CLOUDFLARE_ACCESS_CERTS_PATH,
-  CLOUDFLARE_ACCESS_HEADER,
-  cloudflareTeamIssuer,
-  isCloudflareAccessPreset,
-} from '@repo/app-ui';
+import { CLOUDFLARE_ACCESS_HEADER, isCloudflareAccessHeader } from '@repo/app-ui';
 
 export type AppAccess = App['config']['access'];
 export type AccessMode = 'public' | 'cloudflare' | 'jwt';
@@ -20,6 +15,15 @@ export type AccessFields = {
   format: Extract<AppAccess, { kind: 'jwt' }>['token']['format'];
 };
 
+const TEAM =
+  /^(?:https:\/\/)?([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.cloudflareaccess\.com)?\/?$/i;
+const CERTS = '/cdn-cgi/access/certs';
+
+function cloudflareTeamIssuer(team: string): string | undefined {
+  const label = TEAM.exec(team.trim())?.[1];
+  return label && `https://${label.toLowerCase()}.cloudflareaccess.com`;
+}
+
 const MODE_LABELS = {
   public: 'Public',
   cloudflare: 'Cloudflare Access',
@@ -31,7 +35,13 @@ export function accessModeLabel(mode: AccessMode): string {
 
 export function accessFields(access: AppAccess): AccessFields {
   const jwt = access.kind === 'jwt' ? access : undefined;
-  const isCloudflare = jwt !== undefined && isCloudflareAccessPreset(jwt);
+  const isCloudflare =
+    jwt !== undefined &&
+    isCloudflareAccessHeader(jwt.token.header) &&
+    cloudflareTeamIssuer(jwt.issuer) === jwt.issuer &&
+    jwt.publicKeys.url === jwt.issuer + CERTS &&
+    jwt.token.format === 'raw' &&
+    jwt.audiences.length === 1;
   return {
     mode: isCloudflare ? 'cloudflare' : access.kind,
     team: isCloudflare ? new URL(jwt.issuer).hostname : '',
@@ -64,7 +74,7 @@ export function parseAccess(fields: AccessFields): ParsedAccess {
         kind: 'jwt',
         issuer,
         audiences: [audience],
-        publicKeys: { url: issuer + CLOUDFLARE_ACCESS_CERTS_PATH },
+        publicKeys: { url: issuer + CERTS },
         token: { header: CLOUDFLARE_ACCESS_HEADER, format: 'raw' },
       },
     };

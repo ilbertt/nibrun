@@ -2,9 +2,7 @@
 
 export { appUrl, hostnameUrl, servingHostname } from '#address.ts';
 export {
-  CLOUDFLARE_ACCESS_CERTS_PATH,
   CLOUDFLARE_ACCESS_DOMAIN_HINT,
   CLOUDFLARE_ACCESS_HEADER,
-  cloudflareTeamIssuer,
-  isCloudflareAccessPreset,
+  isCloudflareAccessHeader,
 } from '#cloudflare-access.ts';

@@ -1,5 +1,5 @@
 import { DEFAULT_APP_ACCESS } from '@repo/api-constants';
-import { CLOUDFLARE_ACCESS_DOMAIN_HINT } from '@repo/app-ui';
+import { CLOUDFLARE_ACCESS_DOMAIN_HINT, isCloudflareAccessHeader } from '@repo/app-ui';
 import {
   Accordion,
   AccordionContent,
@@ -40,7 +40,18 @@ export function DeployAccessField({
   return (
     <api.Field
       name="access"
-      validators={{ onChange: ({ value }) => value && parseAccess(value).error }}
+      validators={{
+        onChange: ({ value }) => {
+          if (
+            value?.mode === 'jwt' &&
+            !hasCustomDomain &&
+            isCloudflareAccessHeader(value.header.trim())
+          ) {
+            return CLOUDFLARE_ACCESS_DOMAIN_HINT;
+          }
+          return value && parseAccess(value).error;
+        },
+      }}
     >
       {(field) => {
         const fields = field.state.value ?? accessFields(saved ?? DEFAULT_APP_ACCESS);
