@@ -1,6 +1,6 @@
 {
   "name": "@repo/cli",
-  "version": "2026.10.27-1",
+  "version": "2026.11.19-1",
   "private": true,
   "type": "module",
   "imports": {

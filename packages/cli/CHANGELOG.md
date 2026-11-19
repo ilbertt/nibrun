@@ -2,6 +2,29 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.11.19-1]
+
+### 🚀 Features
+
+- *(api)* [**breaking**] Snapshot access policies in deployment configs (#1261)
+- *(db)* Store app access policies in typed columns (#1258)
+- *(agent)* Enforce JWT access on desired instances (#1257)
+- Require paid requests for new extra public ports (#1237)
+- *(infra)* Prepare nibrunner export publishing (#1179)
+- *(agent)* Connect to deployment-fenced guest services (#1172)
+- *(api)* Register hosts and pin deployment ownership (#1046)
+- Add paid resource requests (#1045)
+
+### 🐛 Bug Fixes
+
+- *(agent)* Bound local deployment artifact retention (#1252)
+- *(agent)* Share filesystem socket with host deployment (#1105)
+- *(deps)* Update vulnerable Bun-managed dependencies (#1101)
+
+### 🚜 Refactor
+
+- Share HTTPS URL schemas (#1264)
+
 ## [2026.10.27-1]
 
 ### 🚀 Features
