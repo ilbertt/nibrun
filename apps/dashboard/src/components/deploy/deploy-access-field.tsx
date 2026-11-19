@@ -80,7 +80,7 @@ export function DeployAccessField({
                   )}
                   {fields.mode === 'cloudflare' && (
                     <p className="text-muted-foreground text-sm">
-                      For MCP clients, enable{' '}
+                      If your app exposes an MCP server, enable{' '}
                       <a
                         className="underline underline-offset-4"
                         href="https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/managed-oauth/"
