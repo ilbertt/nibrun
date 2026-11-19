@@ -7,7 +7,8 @@ import { UsageError } from '#lib/errors.ts';
 export const ACCESS_OPTIONS = {
   access: {
     schema: z.enum(['public', 'jwt']).optional(),
-    description: 'Set HTTP access for this deployment. Use public to remove JWT protection.',
+    description:
+      'Set HTTP access for this deployment. Cloudflare Access requires a custom domain. Use public to remove JWT protection.',
   },
   'jwt-issuer': {
     schema: z.string().trim().min(1).optional(),

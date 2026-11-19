@@ -25,6 +25,7 @@ import { type ArtifactId, type OwnerId, OwnerIdSchema } from '#lib/api/identifie
 import { appAccess } from '#lib/app-access.ts';
 import { configWithDefaults, type SealedEnvironmentPatch } from '#lib/app-config.ts';
 import { openSecret, sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
+import { AppHostnamesRepository } from '#repositories/app-hostnames.repository.ts';
 import {
   type AppCreation,
   AppsRepository,
@@ -33,6 +34,7 @@ import {
 } from '#repositories/apps.repository.ts';
 import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
+import { CLOUDFLARE_ACCESS } from '#tests/support/cloudflare-access.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { registerHost } from '#tests/support/hosts.ts';
 import { refusedBy } from '#tests/support/postgres.ts';
@@ -146,6 +148,41 @@ test('a new JWT-protected app stores its full access policy on creation', async 
     }),
   );
   expect(appAccess(app)).toEqual(access);
+});
+
+test('Cloudflare Access needs a registered domain to enable or change the policy', async () => {
+  const appId = await createApp('access-domain');
+  const other = await createApp('other-domain');
+  const domains = new AppHostnamesRepository(withTypes<Queries>(sql));
+  const own = {
+    appId,
+    ownerId: OWNER_ID,
+    hostname: Value.Parse(HostnameSchema, 'access.example.com'),
+  };
+  await domains.addCustom({
+    ...own,
+    appId: other,
+    hostname: Value.Parse(HostnameSchema, 'other.example.com'),
+  });
+
+  function update(access: AppAccessPolicy) {
+    return repo.update({
+      appId,
+      ownerId: OWNER_ID,
+      patch: { name: undefined, access, args: ['serve'] },
+    });
+  }
+
+  await expect(update(CLOUDFLARE_ACCESS)).rejects.toThrow('Associate a custom domain');
+  await domains.addCustom(own);
+  expect(await update(CLOUDFLARE_ACCESS)).toMatchObject({ access_kind: 'jwt' });
+  await domains.removeCustom(own);
+  expect(await update(CLOUDFLARE_ACCESS)).toMatchObject({ access_kind: 'jwt' });
+  await expect(update({ ...CLOUDFLARE_ACCESS, audiences: ['other'] })).rejects.toThrow(
+    'Associate a custom domain',
+  );
+  expect(await update({ kind: 'public' })).toMatchObject({ access_kind: 'public' });
+  await expect(update(CLOUDFLARE_ACCESS)).rejects.toThrow('Associate a custom domain');
 });
 
 test('owner configuration changes preserve an existing platform-enabled extra port', async () => {

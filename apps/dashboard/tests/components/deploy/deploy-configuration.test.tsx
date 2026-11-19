@@ -34,6 +34,7 @@ const UNTOUCHED: DeployFormValues = {
 
 // Cast because what this file is about is which fields the form offers, not what an app row holds.
 const RUNNING = {
+  hostnames: [],
   config: {
     args: [],
     environment: {},
@@ -69,6 +70,42 @@ test('new deploys show public access and updates show the saved policy', () => {
   expect(creating).toContain('HTTP access');
   expect(creating).toContain('>Public</span>');
   expect(updating).toContain('>Custom JWT</span>');
+});
+
+test('only Cloudflare Access requires a registered custom hostname', async () => {
+  const platform = {
+    hostname: 'reports.nibrun.app',
+    kind: 'platform',
+    state: 'active',
+    dcvTarget: null,
+    edgeErrors: [],
+    createdAt: '2026-11-19T00:00:00Z',
+  } satisfies AppSummary['hostnames'][number];
+  const custom = {
+    ...platform,
+    kind: 'custom',
+    state: 'pending',
+    hostname: 'reports.example.com',
+  } as const;
+  for (const replacing of [
+    undefined,
+    { ...RUNNING, hostnames: [platform] },
+    { ...RUNNING, hostnames: [platform, custom] },
+  ]) {
+    const disabled: string[] = [];
+    const html = renderToStaticMarkup(<Configuration replacing={replacing} />);
+    await new HTMLRewriter()
+      .on('input[type=radio][disabled]', {
+        element(input) {
+          disabled.push(input.getAttribute('value') ?? '');
+        },
+      })
+      .transform(new Response(html))
+      .text();
+    const hasDomain = replacing?.hostnames.includes(custom);
+    expect(disabled).toEqual(hasDomain ? [] : ['cloudflare']);
+    expect(html.includes('Associate a custom domain')).toBe(!hasDomain);
+  }
 });
 
 describe('what a deploy is beyond the binary itself', () => {

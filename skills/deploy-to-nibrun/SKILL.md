@@ -184,20 +184,12 @@ the `nibrun.app` zone, so your account can't put an Access login on `<slug>.nibr
 The default hostname still requires a valid assertion for the app.
 
 In the nibrun deploy dialog, choose **HTTP access → Cloudflare Access** and
-enter the team domain and application audience (AUD). For MCP deployments, substitute those
-values in `config.access`.
+enter the team domain and application audience (AUD). New apps start with only a platform hostname.
+After registering the custom domain, use the dashboard or `nib apps update` to enable the preset.
 
-```json
-{
-  "kind": "jwt",
-  "issuer": "https://TEAM.cloudflareaccess.com",
-  "audiences": ["APPLICATION_AUD"],
-  "publicKeys": { "url": "https://TEAM.cloudflareaccess.com/cdn-cgi/access/certs" },
-  "token": { "header": "Cf-Access-Jwt-Assertion", "format": "raw" }
-}
-```
-
-With the CLI, add `--jwt-header Cf-Access-Jwt-Assertion --jwt-format raw` to the JWT flags above.
+With the CLI, use `https://TEAM.cloudflareaccess.com` as the issuer, the Access application's
+AUD as the audience, and `/cdn-cgi/access/certs` on that issuer as the JWKS URL. Add
+`--jwt-header Cf-Access-Jwt-Assertion --jwt-format raw`.
 If your app exposes an MCP server and Cloudflare handles sign-in, enable
 [Managed OAuth in the Access application](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/managed-oauth/).
 
