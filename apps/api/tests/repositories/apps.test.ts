@@ -118,6 +118,14 @@ async function createApp(slug: string): Promise<AppId> {
   return created.app.id;
 }
 
+test('config versions require an explicit access kind', async () => {
+  const columns = await sql.unsafe(
+    `SELECT is_nullable, column_default FROM information_schema.columns
+     WHERE table_schema = 'nibrun' AND table_name = 'app_configs' AND column_name = 'access_kind'`,
+  );
+  expect([...columns]).toEqual([{ is_nullable: 'NO', column_default: null }]);
+});
+
 test('a new JWT-protected app stores its full access policy on creation', async () => {
   const slug = Value.Parse(DnsLabelSchema, 'private-heron');
   const access = {
