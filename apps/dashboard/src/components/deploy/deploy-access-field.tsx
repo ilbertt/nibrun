@@ -1,4 +1,5 @@
-import { DEFAULT_APP_ACCESS } from '@repo/api-constants';
+import { DEFAULT_APP_ACCESS, isCloudflareAccessHeader } from '@repo/api-constants';
+import { CLOUDFLARE_ACCESS_DOMAIN_HINT } from '@repo/app-ui';
 import {
   Accordion,
   AccordionContent,
@@ -30,14 +31,27 @@ const MODES = [
 export function DeployAccessField({
   api,
   saved,
+  hasCustomDomain,
 }: {
   api: DeployFormApi;
   saved: AppAccess | undefined;
+  hasCustomDomain: boolean;
 }) {
   return (
     <api.Field
       name="access"
-      validators={{ onChange: ({ value }) => value && parseAccess(value).error }}
+      validators={{
+        onChange: ({ value }) => {
+          if (
+            value?.mode === 'jwt' &&
+            !hasCustomDomain &&
+            isCloudflareAccessHeader(value.header.trim())
+          ) {
+            return CLOUDFLARE_ACCESS_DOMAIN_HINT;
+          }
+          return value && parseAccess(value).error;
+        },
+      }}
     >
       {(field) => {
         const fields = field.state.value ?? accessFields(saved ?? DEFAULT_APP_ACCESS);
@@ -59,9 +73,18 @@ export function DeployAccessField({
               </AccordionTrigger>
               <AccordionContent keepMounted>
                 <div className="grid gap-4">
-                  <AccessPicker mode={fields.mode} change={(mode) => change({ mode })} />
+                  <AccessPicker
+                    hasCustomDomain={hasCustomDomain}
+                    mode={fields.mode}
+                    change={(mode) => change({ mode })}
+                  />
+                  {!hasCustomDomain && (
+                    <p id="cloudflare-domain-hint" className="text-muted-foreground text-sm">
+                      {CLOUDFLARE_ACCESS_DOMAIN_HINT}
+                    </p>
+                  )}
                   {fields.mode === 'cloudflare' && (
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <fieldset disabled={!hasCustomDomain} className="grid gap-4 sm:grid-cols-2">
                       <TextField
                         label="Team domain"
                         id="cf-team"
@@ -76,7 +99,7 @@ export function DeployAccessField({
                         placeholder="Application AUD tag"
                         change={(cloudflareAudience) => change({ cloudflareAudience })}
                       />
-                    </div>
+                    </fieldset>
                   )}
                   {fields.mode === 'cloudflare' && (
                     <p className="text-muted-foreground text-sm">
@@ -105,20 +128,32 @@ export function DeployAccessField({
   );
 }
 
-function AccessPicker({ mode, change }: { mode: AccessMode; change: (mode: AccessMode) => void }) {
+function AccessPicker({
+  mode,
+  change,
+  hasCustomDomain,
+}: {
+  mode: AccessMode;
+  hasCustomDomain: boolean;
+  change: (mode: AccessMode) => void;
+}) {
   return (
     <fieldset className="grid grid-cols-3 gap-2">
       <legend className="sr-only">Access method</legend>
       {MODES.map(({ value, icon: Icon }) => (
         <label
           key={value}
-          className="relative flex min-h-16 cursor-pointer flex-col items-start justify-center gap-1.5 rounded-lg border border-border px-3 font-medium text-sm hover:bg-muted/50 has-checked:border-foreground has-checked:bg-muted/50 has-focus-visible:ring-2 has-focus-visible:ring-ring"
+          className="relative flex min-h-16 cursor-pointer flex-col items-start justify-center gap-1.5 rounded-lg border border-border px-3 font-medium text-sm hover:bg-muted/50 has-disabled:cursor-not-allowed has-checked:border-foreground has-checked:bg-muted/50 has-disabled:opacity-50 has-focus-visible:ring-2 has-focus-visible:ring-ring"
         >
           <input
             className="sr-only"
             type="radio"
             name="access-mode"
             value={value}
+            disabled={value === 'cloudflare' && !hasCustomDomain}
+            aria-describedby={
+              value === 'cloudflare' && !hasCustomDomain ? 'cloudflare-domain-hint' : undefined
+            }
             checked={value === mode}
             onChange={() => change(value)}
           />

@@ -4,7 +4,7 @@ import { Value } from '@sinclair/typebox/value';
 import { AppPatchSchema } from '#lib/api/app.ts';
 import { accessColumns, appAccess } from '#lib/app-access.ts';
 import { BadRequestError } from '#lib/errors.ts';
-import { validatedAppAccess } from '#lib/validate-app-access.ts';
+import { requiresCustomDomain, validatedAppAccess } from '#lib/validate-app-access.ts';
 import { CreateAppRequestSchema } from '#routes/api/apps/model.ts';
 
 const jwt = {
@@ -59,4 +59,15 @@ test('a private key set endpoint is refused', () => {
   expect(() =>
     validatedAppAccess({ ...jwt, publicKeys: { url: 'https://127.0.0.1/keys' } }),
   ).toThrow(BadRequestError);
+});
+
+test('the domain requirement follows the assertion header regardless of issuer, audiences or token format', () => {
+  expect(
+    requiresCustomDomain({
+      ...jwt,
+      audiences: ['a', 'b'],
+      token: { header: 'cF-access-JWT-assertion', format: 'bearer' },
+    }),
+  ).toBe(true);
+  expect(requiresCustomDomain(jwt)).toBe(false);
 });

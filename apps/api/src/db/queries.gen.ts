@@ -525,6 +525,7 @@ export interface IDeleteAppUsageByAppResult {
 
 /** Result of query `SelectCurrentAppConfig`. */
 export interface ISelectCurrentAppConfigResult {
+    has_custom_domain: boolean | null;
     access_kind: IAppConfigsColumns["access_kind"];
     access_header: IAppConfigsColumns["access_header"];
     access_format: IAppConfigsColumns["access_format"];

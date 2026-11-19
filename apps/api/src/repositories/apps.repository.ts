@@ -1,4 +1,6 @@
+import { isDeepStrictEqual } from 'node:util';
 import type { TypedSQL } from '@ilbertt/bun-sqlgen';
+import { CLOUDFLARE_ACCESS_DOMAIN_HINT } from '@repo/app-ui';
 import type {
   AppHostnameKind,
   AppId,
@@ -15,10 +17,11 @@ import type { DnsLabel } from '#lib/api/dns-label.ts';
 import type { OwnerId } from '#lib/api/identifiers.ts';
 import { accessColumns } from '#lib/app-access.ts';
 import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
-import { ConflictError } from '#lib/errors.ts';
+import { BadRequestError, ConflictError } from '#lib/errors.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
+import { requiresCustomDomain } from '#lib/validate-app-access.ts';
 import type { StoredVolumeStorage } from '#lib/volume-storage.ts';
-import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';
+import { type AppHostnameRow, CUSTOM_KIND } from '#repositories/app-hostnames.repository.ts';
 import { Repository, TEXT_ARRAY } from '#repositories/repository.ts';
 
 export type AppRow = Queries['SelectAppById'];
@@ -727,9 +730,15 @@ export async function appendConfigVersion({
   patch: SealedConfigPatch;
   storage: StoredVolumeStorage | undefined;
 }): Promise<string> {
+  const needsDomain = requiresCustomDomain(patch.access);
   const [current] = await tx.SelectCurrentAppConfig`
     /* @notNull environment_names */
-    SELECT c.access_kind, c.access_header, c.access_format, c.access_issuer, c.access_audiences, c.access_jwks_url,
+    SELECT EXISTS (
+             SELECT 1 FROM nibrun.app_hostnames h
+             WHERE ${needsDomain} AND h.app_id = c.app_id AND h.kind = ${CUSTOM_KIND}
+             LIMIT 1 FOR KEY SHARE
+           ) AS has_custom_domain,
+           c.access_kind, c.access_header, c.access_format, c.access_issuer, c.access_audiences, c.access_jwks_url,
            c.id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
            c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
            c.health_check_grace_period_ms, c.health_check_healthy_threshold,
@@ -750,7 +759,15 @@ export async function appendConfigVersion({
     throw new Error('An app exists with no config.');
   }
 
-  const config = { ...toAppConfig(current), ...patch };
+  const previous = toAppConfig(current);
+  if (
+    needsDomain &&
+    !current.has_custom_domain &&
+    !isDeepStrictEqual(previous.access, patch.access)
+  ) {
+    throw new BadRequestError(CLOUDFLARE_ACCESS_DOMAIN_HINT);
+  }
+  const config = { ...previous, ...patch };
   const columns = accessColumns(config.access);
   const audiences = columns.access_audiences && tx.array(columns.access_audiences, TEXT_ARRAY);
   const volumeStorage = storage ?? current;

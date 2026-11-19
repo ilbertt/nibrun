@@ -60,7 +60,13 @@ export function DeployConfiguration({
         )}
       </api.Field>
 
-      <DeployAccessField api={api} saved={replacing?.config.access} />
+      <DeployAccessField
+        api={api}
+        saved={replacing?.config.access}
+        hasCustomDomain={
+          replacing?.hostnames.some((hostname) => hostname.kind === 'custom') ?? false
+        }
+      />
 
       <Accordion>
         <AccordionItem>

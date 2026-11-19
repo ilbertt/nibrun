@@ -1,5 +1,9 @@
 import type { App } from '@repo/api-client/models';
-import { DEFAULT_APP_ACCESS } from '@repo/api-constants';
+import {
+  CLOUDFLARE_ACCESS_HEADER,
+  DEFAULT_APP_ACCESS,
+  isCloudflareAccessHeader,
+} from '@repo/api-constants';
 
 export type AppAccess = App['config']['access'];
 export type AccessMode = 'public' | 'cloudflare' | 'jwt';
@@ -16,6 +20,13 @@ export type AccessFields = {
 
 const TEAM =
   /^(?:https:\/\/)?([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)(?:\.cloudflareaccess\.com)?\/?$/i;
+const CERTS = '/cdn-cgi/access/certs';
+
+function cloudflareTeamIssuer(team: string): string | undefined {
+  const label = TEAM.exec(team.trim())?.[1];
+  return label && `https://${label.toLowerCase()}.cloudflareaccess.com`;
+}
+
 const MODE_LABELS = {
   public: 'Public',
   cloudflare: 'Cloudflare Access',
@@ -25,21 +36,13 @@ export function accessModeLabel(mode: AccessMode): string {
   return MODE_LABELS[mode];
 }
 
-const ASSERTION = 'Cf-Access-Jwt-Assertion';
-const CERTS = '/cdn-cgi/access/certs';
-
-function teamIssuer(team: string): string | undefined {
-  const label = TEAM.exec(team.trim())?.[1];
-  return label && `https://${label.toLowerCase()}.cloudflareaccess.com`;
-}
-
 export function accessFields(access: AppAccess): AccessFields {
   const jwt = access.kind === 'jwt' ? access : undefined;
   const isCloudflare =
     jwt !== undefined &&
-    teamIssuer(jwt.issuer) === jwt.issuer &&
+    isCloudflareAccessHeader(jwt.token.header) &&
+    cloudflareTeamIssuer(jwt.issuer) === jwt.issuer &&
     jwt.publicKeys.url === jwt.issuer + CERTS &&
-    jwt.token.header.toLowerCase() === ASSERTION.toLowerCase() &&
     jwt.token.format === 'raw' &&
     jwt.audiences.length === 1;
   return {
@@ -61,7 +64,7 @@ export function parseAccess(fields: AccessFields): ParsedAccess {
     return { policy: DEFAULT_APP_ACCESS };
   }
   if (fields.mode === 'cloudflare') {
-    const issuer = teamIssuer(fields.team);
+    const issuer = cloudflareTeamIssuer(fields.team);
     const audience = fields.cloudflareAudience.trim();
     if (!issuer) {
       return { error: 'Enter your Cloudflare team name or team domain.' };
@@ -75,7 +78,7 @@ export function parseAccess(fields: AccessFields): ParsedAccess {
         issuer,
         audiences: [audience],
         publicKeys: { url: issuer + CERTS },
-        token: { header: ASSERTION, format: 'raw' },
+        token: { header: CLOUDFLARE_ACCESS_HEADER, format: 'raw' },
       },
     };
   }

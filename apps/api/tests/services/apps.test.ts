@@ -72,6 +72,7 @@ import {
   DEPLOYMENT_ID,
   OWNER_ID,
 } from '#tests/services/support/fixtures.ts';
+import { CLOUDFLARE_ACCESS } from '#tests/support/cloudflare-access.ts';
 import { uniqueViolation } from '#tests/support/postgres.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
@@ -630,6 +631,14 @@ describe('an app is created with the environment it was given, and never reports
     expect(app.config.environment).toEqual({ TOKEN: REDACTED });
     expect(JSON.stringify(app.config)).not.toContain(SECRET);
   });
+});
+
+test('a new app cannot enable Cloudflare Access before registering a domain', async () => {
+  const appsRepo = new StubAppsRepository({ failures: 0 });
+  await expect(createApp({ appsRepo, config: { access: CLOUDFLARE_ACCESS } })).rejects.toThrow(
+    'Associate a custom domain',
+  );
+  expect(appsRepo.offeredConfigs).toHaveLength(0);
 });
 
 test('app creation and edits accept the policy through config, and the owner reads it there', async () => {

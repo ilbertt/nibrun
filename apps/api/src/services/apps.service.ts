@@ -1,3 +1,4 @@
+import { CLOUDFLARE_ACCESS_DOMAIN_HINT } from '@repo/app-ui';
 import type {
   AppId,
   ComputeUsage,
@@ -45,7 +46,7 @@ import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
-import { validatedAppAccess } from '#lib/validate-app-access.ts';
+import { requiresCustomDomain, validatedAppAccess } from '#lib/validate-app-access.ts';
 import { toVolumeStorageMigration } from '#lib/volume-storage-migration.ts';
 import type {
   AppHostnameRow,
@@ -199,6 +200,9 @@ export class AppsService extends Service {
     config?: NewAppConfig;
   }): Promise<PublicApp> {
     const withDefaults = configWithDefaults(config);
+    if (requiresCustomDomain(withDefaults.access)) {
+      throw new BadRequestError(CLOUDFLARE_ACCESS_DOMAIN_HINT);
+    }
     const environment = config?.environment ?? {};
     refuseRedactedValues(environment);
     refuseValuesNeedingAPort({
