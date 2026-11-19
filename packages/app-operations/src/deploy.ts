@@ -173,8 +173,8 @@ async function createApp({
     await api.api.apps.post({
       name,
       config: {
-        access: DEFAULT_APP_ACCESS,
         ...defaults,
+        access: defaults.access ?? DEFAULT_APP_ACCESS,
         ...(environment !== undefined && {
           environment: Object.fromEntries(
             Object.entries(environment).filter(

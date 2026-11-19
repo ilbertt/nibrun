@@ -72,3 +72,9 @@ test('the API refusal of a name is reported to the caller', async () => {
   );
   expect(sent).toEqual([{ appId: APP_ID, body: { name: '' } }]);
 });
+
+test('an explicit public policy can replace JWT access without editing runtime fields', async () => {
+  const sent: Sent[] = [];
+  await updateApp({ api: apiRecording(sent), appId: APP_ID, access: { kind: 'public' } });
+  expect(sent).toEqual([{ appId: APP_ID, body: { config: { access: { kind: 'public' } } } }]);
+});

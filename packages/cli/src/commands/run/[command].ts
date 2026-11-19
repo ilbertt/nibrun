@@ -11,6 +11,7 @@ import {
   GITHUB_OIDC_DEPLOYMENT_OUTPUT,
 } from '#lib/github-oidc-deployment.ts';
 import { initialDataFrom } from '#lib/initial-data.ts';
+import { ACCESS_OPTIONS, accessFrom } from '#lib/jwt-access.ts';
 import { createOutput } from '#lib/output.ts';
 import { completeOptions } from '#lib/plan.ts';
 import { RELEASE_OUTPUT } from '#lib/release.ts';
@@ -26,6 +27,7 @@ export const command = defineCommand('run [command]', {
     command: { schema: z.string().min(1) },
   },
   options: {
+    ...ACCESS_OPTIONS,
     [GITHUB_TRUSTED_OIDC_FLAG]: {
       schema: z.boolean().optional(),
       hidden: true,
@@ -93,6 +95,7 @@ export const command = defineCommand('run [command]', {
       [DATA_FOLDER_FLAG]: dataFolderPath,
       ...flags
     } = options;
+    const access = accessFrom(options);
     const { binarySource, args } = parseCommandLine(params.command);
     const { api } = context;
 
@@ -122,6 +125,6 @@ export const command = defineCommand('run [command]', {
       );
     }
 
-    emit(await deploy({ ...resolved, api, ui, binary, args, detach }));
+    emit(await deploy({ ...resolved, access, api, ui, binary, args, detach }));
   },
 });
