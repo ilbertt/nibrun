@@ -32,7 +32,7 @@ function appResource(ownerId: OwnerId) {
     idleTimeoutMs: 60_000,
     createdAt: timestamp,
     updatedAt: timestamp,
-    config: { ...configWithDefaults(), environment: {} },
+    config: { ...configWithDefaults(), access: { kind: 'public' }, environment: {} },
     hostnames: [
       {
         hostname: 'test-app.apps.test',

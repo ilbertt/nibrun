@@ -15,12 +15,18 @@ import {
   namesExtraPublicPortValues,
 } from '@repo/protocol/runtime-values';
 import { schema } from '#db/queries.gen.ts';
-import { type App, type AppName, OWNED_APP_STATES, type OwnedAppState } from '#lib/api/app.ts';
+import {
+  type App,
+  type AppConfigPatch,
+  type AppName,
+  type AppPatch,
+  type NewAppConfig,
+  OWNED_APP_STATES,
+  type OwnedAppState,
+} from '#lib/api/app.ts';
 import type { OwnerId } from '#lib/api/identifiers.ts';
 import {
-  type AppConfigPatch,
   configWithDefaults,
-  type NewAppConfig,
   type PublicAppConfig,
   splitEnvironmentPatch,
   toAppConfig,
@@ -39,6 +45,7 @@ import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
+import { validatedAppAccess } from '#lib/validate-app-access.ts';
 import { toVolumeStorageMigration } from '#lib/volume-storage-migration.ts';
 import type {
   AppHostnameRow,
@@ -66,9 +73,6 @@ export type PublicApp = Omit<App, 'config' | 'hostnames'> & {
 };
 
 type AppWithHostnames = { app: AppRow; hostnames: readonly AppHostnameRow[] };
-
-/** Everything an owner may change about an app in one request: what they call it, and how it starts. */
-export type AppPatch = AppConfigPatch & { name?: AppName | undefined };
 
 type OwnedApp = { appId: AppId; ownerId: OwnerId };
 
@@ -203,6 +207,7 @@ export class AppsService extends Service {
     });
     const appConfig = {
       ...withDefaults,
+      access: validatedAppAccess(withDefaults.access),
       environment: sealEnvironment({ key: this.secretsKey, environment }),
     };
 
@@ -277,7 +282,12 @@ export class AppsService extends Service {
     });
   }
 
-  private sealed({ name, environment, ...rest }: AppPatch): SealedAppPatch {
+  private sealed({ name, config }: AppPatch): SealedAppPatch {
+    if (!config) {
+      return { name };
+    }
+    const { environment, access, ...runtime } = config;
+    const rest = { ...runtime, access: validatedAppAccess(access) };
     if (environment === undefined) {
       return { ...rest, name };
     }
@@ -315,16 +325,15 @@ export class AppsService extends Service {
    * The name moves and nothing else does: the slug was minted from the first name and is in
    * somebody's bookmarks by now, so the hostname stays.
    */
-  async update({
-    appId,
-    ownerId,
-    patch: { name, ...config },
-  }: OwnedApp & { patch: AppPatch }): Promise<PublicApp> {
-    await this.refuseValuesTheEditLeavesUngiven({ appId, ownerId, patch: config });
+  async update({ appId, ownerId, patch }: OwnedApp & { patch: AppPatch }): Promise<PublicApp> {
+    const { name, config } = patch;
+    if (config) {
+      await this.refuseValuesTheEditLeavesUngiven({ appId, ownerId, patch: config });
+    }
     const app = await this.appsRepo.update({
       appId,
       ownerId,
-      patch: this.sealed({ name, ...config }),
+      patch: this.sealed(patch),
     });
     const hostnames = await this.hostnamesRepo.listByApp({ appId, ownerId });
     if (name !== undefined) {

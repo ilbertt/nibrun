@@ -283,6 +283,7 @@ describe('a deployment publishes the config version it pins', () => {
     });
 
     expect(deployment.config).toEqual({
+      access: { kind: 'public' },
       volumeSizeBytes: DEFAULT_VOLUME_SIZE_BYTES,
       environment: {},
       httpPort: HTTP_PORT,

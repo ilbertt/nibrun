@@ -24,7 +24,7 @@ export function apiHolding({
       get: () =>
         Promise.resolve(
           listed
-            ? { data: listed, error: null }
+            ? { data: { config: { access: { kind: 'public' } }, ...listed }, error: null }
             : { data: null, error: { status: 404, value: { error: 'App not found.' } } },
         ),
       ...underApp(app),

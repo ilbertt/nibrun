@@ -325,6 +325,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
           WHERE src.id = ${rollbackOf} AND src.app_id = ${appId} AND a.owner_id = ${ownerId}
         ), rollback_config AS (
           INSERT INTO nibrun.app_configs (
+            access_kind, access_header, access_format, access_issuer, access_audiences, access_jwks_url,
             app_id, http_port, has_extra_public_port, args, vcpu_count, memory_mib,
             health_check_path, health_check_interval_ms, health_check_timeout_ms,
             health_check_grace_period_ms, health_check_healthy_threshold,
@@ -336,7 +337,9 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
             volume_storage_secret_access_key, volume_storage_session_token,
             volume_storage_encryption_password
           )
-          SELECT previous.app_id, previous.http_port, previous.has_extra_public_port,
+          SELECT previous.access_kind, previous.access_header, previous.access_format, previous.access_issuer,
+                 previous.access_audiences, previous.access_jwks_url,
+                 previous.app_id, previous.http_port, previous.has_extra_public_port,
                  previous.args, previous.vcpu_count, previous.memory_mib,
                  previous.health_check_path, previous.health_check_interval_ms,
                  previous.health_check_timeout_ms, previous.health_check_grace_period_ms,
@@ -396,7 +399,8 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
+               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+             c.access_kind, c.access_header, c.access_format, c.access_issuer, c.access_audiences, c.access_jwks_url
       FROM nibrun.deployments d
       JOIN nibrun.live_apps a ON a.id = d.app_id
       JOIN nibrun.app_configs_with_environment c ON c.id = d.config_id
@@ -424,7 +428,8 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
                c.health_check_grace_period_ms, c.health_check_healthy_threshold,
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
+               c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+             c.access_kind, c.access_header, c.access_format, c.access_issuer, c.access_audiences, c.access_jwks_url
       FROM nibrun.deployments d
       JOIN nibrun.live_apps a ON a.id = d.app_id
       JOIN nibrun.app_configs_with_environment c ON c.id = d.config_id
@@ -551,7 +556,8 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
              c.health_check_grace_period_ms, c.health_check_healthy_threshold,
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
-             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names
+             c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+             c.access_kind, c.access_header, c.access_format, c.access_issuer, c.access_audiences, c.access_jwks_url
       FROM nibrun.deployments d
       JOIN nibrun.app_configs_with_environment c ON c.id = d.config_id
       LEFT JOIN nibrun.github_deployment_grants g ON g.id = d.github_deployment_grant_id

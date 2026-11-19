@@ -5,6 +5,7 @@ export type ListedApp = {
   id: string;
   name: string;
   slug: string;
+  config?: { access: { kind: 'public' } };
   state?: string;
   hostnames?: Array<{ hostname: string }>;
 };
@@ -12,7 +13,14 @@ export type ListedApp = {
 export const RUNNING_DEPLOYMENT = { id: 'deployment-1', state: 'running' };
 
 export function listedApp(overrides: Partial<ListedApp> = {}): ListedApp {
-  return { id: APP_ID, name: NAME, slug: SLUG, state: 'active', ...overrides };
+  return {
+    id: APP_ID,
+    name: NAME,
+    slug: SLUG,
+    state: 'active',
+    config: { access: { kind: 'public' } },
+    ...overrides,
+  };
 }
 
 /** A route that answers, in the shape Eden hands every reply back in. */

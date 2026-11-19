@@ -11,7 +11,6 @@ import {
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import type { Queries } from '#db/queries.gen.ts';
-import { appAccess } from '#lib/app-access.ts';
 import { toRunConfig } from '#lib/app-config.ts';
 import {
   openEnvironment,
@@ -109,7 +108,6 @@ export function toDesiredInstance({
     deploymentId: row.id,
     volumeId: volumeIdOf(row.app_id),
     desiredState,
-    access: appAccess(row),
     // Left out for an app whose microVM is kept up either way, so a host is never handed a
     // timeout it would be wrong to act on.
     ...(desiredState === 'on-request' ? { idleTimeoutMs: row.idle_timeout_ms } : {}),

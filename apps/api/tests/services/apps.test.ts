@@ -21,7 +21,7 @@ import {
 import { Value } from '@sinclair/typebox/value';
 import { SQL } from 'bun';
 import { schema } from '#db/queries.gen.ts';
-import { accessColumns } from '#lib/app-access.ts';
+import type { NewAppConfig } from '#lib/api/app.ts';
 
 const HOST_ID = Value.Parse(HostIdSchema, 'reporting-host');
 
@@ -29,7 +29,7 @@ import { type AppName, AppNameSchema, type AppState, OWNED_APP_STATES } from '#l
 import { type DnsLabel, DnsLabelSchema } from '#lib/api/dns-label.ts';
 import { type TenantEnvironmentPatch, TenantEnvironmentPatchSchema } from '#lib/api/environment.ts';
 import { type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
-import type { NewAppConfig, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
+import type { PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
 import {
   BadRequestError,
   ConflictError,
@@ -111,7 +111,6 @@ function appRow(slug: DnsLabel): AppRow {
     slug,
     state: 'active',
     activation: 'always',
-    ...accessColumns({ kind: 'public' }),
     idle_timeout_ms: MIN_IDLE_TIMEOUT_MS,
     config_id: 'config-1',
     volume_storage_migration_state: null,
@@ -590,7 +589,7 @@ describe('an app is created with the environment it was given, and never reports
   test('a partial config is completed from the protocol defaults', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
-    await createApp({ appsRepo, config: { args: ['serve'] } });
+    await createApp({ appsRepo, config: { access: { kind: 'public' }, args: ['serve'] } });
 
     expect(appsRepo.offeredConfigs).toEqual([{ ...DEFAULT_STORED_CONFIG, args: ['serve'] }]);
   });
@@ -598,7 +597,10 @@ describe('an app is created with the environment it was given, and never reports
   test('what reaches the database is sealed, never the value that was given', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
-    await createApp({ appsRepo, config: { environment: asEnvironment({ TOKEN: SECRET }) } });
+    await createApp({
+      appsRepo,
+      config: { access: { kind: 'public' }, environment: asEnvironment({ TOKEN: SECRET }) },
+    });
 
     const stored = appsRepo.offeredConfigs[0]?.environment ?? {};
     expect(Object.keys(stored)).toEqual(['TOKEN']);
@@ -611,8 +613,9 @@ describe('an app is created with the environment it was given, and never reports
   test('an unconfigured app falls back to the defaults the protocol publishes', async () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
-    await createApp({ appsRepo });
+    const app = await createApp({ appsRepo });
 
+    expect(app.config.access).toEqual({ kind: 'public' });
     expect(appsRepo.offeredConfigs).toEqual([DEFAULT_STORED_CONFIG]);
   });
 
@@ -621,12 +624,33 @@ describe('an app is created with the environment it was given, and never reports
   test('the wire names every variable and returns none of them', async () => {
     const app = await createApp({
       appsRepo: new StubAppsRepository({ failures: 0 }),
-      config: { environment: asEnvironment({ TOKEN: SECRET }) },
+      config: { access: { kind: 'public' }, environment: asEnvironment({ TOKEN: SECRET }) },
     });
 
     expect(app.config.environment).toEqual({ TOKEN: REDACTED });
     expect(JSON.stringify(app.config)).not.toContain(SECRET);
   });
+});
+
+test('app creation and edits accept the policy through config, and the owner reads it there', async () => {
+  const access = {
+    kind: 'jwt',
+    issuer: 'https://id.example',
+    audiences: ['reports'],
+    token: { header: 'Authorization', format: 'bearer' },
+    publicKeys: { url: 'https://id.example/keys' },
+  } satisfies NewAppConfig['access'];
+  const appsRepo = new StubAppsRepository({ failures: 0 });
+  const created = await createApp({ appsRepo, config: { access } });
+  expect(created.config.access).toEqual(access);
+  expect(created).not.toHaveProperty('access');
+  appsRepo.owns = true;
+  await serviceWith({ appsRepo }).update({
+    appId: APP_ID,
+    ownerId: OWNER_ID,
+    patch: { config: { access } },
+  });
+  expect(appsRepo.offeredPatches[0]?.access).toEqual(access);
 });
 
 test('owner edits retain a platform-enabled extra port', async () => {
@@ -637,7 +661,7 @@ test('owner edits retain a platform-enabled extra port', async () => {
   const app = await serviceWith({ appsRepo }).update({
     appId: APP_ID,
     ownerId: OWNER_ID,
-    patch: { args: ['serve'] },
+    patch: { config: { access: { kind: 'public' }, args: ['serve'] } },
   });
 
   expect(app.config.hasExtraPublicPort).toBe(true);
@@ -658,7 +682,13 @@ describe('a value may name the port an app has, and not one it has not', () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
     await expect(
-      createApp({ appsRepo, config: { environment: asEnvironment({ ANNOUNCED_IP: ADDRESS }) } }),
+      createApp({
+        appsRepo,
+        config: {
+          access: { kind: 'public' },
+          environment: asEnvironment({ ANNOUNCED_IP: ADDRESS }),
+        },
+      }),
     ).rejects.toBeInstanceOf(BadRequestError);
   });
 
@@ -672,7 +702,9 @@ describe('a value may name the port an app has, and not one it has not', () => {
     await serviceWith({ appsRepo }).update({
       appId: APP_ID,
       ownerId: OWNER_ID,
-      patch: { environment: asPatch({ ANNOUNCED_IP: ADDRESS }) },
+      patch: {
+        config: { access: { kind: 'public' }, environment: asPatch({ ANNOUNCED_IP: ADDRESS }) },
+      },
     });
 
     expect(appsRepo.offeredPatches).toHaveLength(1);
@@ -686,7 +718,9 @@ describe('a value may name the port an app has, and not one it has not', () => {
       serviceWith({ appsRepo }).update({
         appId: APP_ID,
         ownerId: OWNER_ID,
-        patch: { environment: asPatch({ ANNOUNCED_IP: ADDRESS }) },
+        patch: {
+          config: { access: { kind: 'public' }, environment: asPatch({ ANNOUNCED_IP: ADDRESS }) },
+        },
       }),
     ).rejects.toBeInstanceOf(BadRequestError);
     expect(appsRepo.offeredPatches).toEqual([]);
@@ -699,7 +733,7 @@ describe('a value may name the port an app has, and not one it has not', () => {
     await serviceWith({ appsRepo }).update({
       appId: APP_ID,
       ownerId: OWNER_ID,
-      patch: { environment: asPatch({ TOKEN: SECRET }) },
+      patch: { config: { access: { kind: 'public' }, environment: asPatch({ TOKEN: SECRET }) } },
     });
 
     expect(appsRepo.reads).toBe(0);
@@ -712,7 +746,11 @@ describe('a config patch edits the environment rather than replacing it', () => 
     appsRepo.owns = true;
     const service = serviceWith({ appsRepo });
 
-    await service.update({ appId: APP_ID, ownerId: OWNER_ID, patch: { args: ['serve'] } });
+    await service.update({
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+      patch: { config: { access: { kind: 'public' }, args: ['serve'] } },
+    });
 
     // Absent rather than empty: the repository reads absence as "carry every variable forward",
     // and there is no shape of empty that means anything else.
@@ -727,7 +765,7 @@ describe('a config patch edits the environment rather than replacing it', () => 
     await service.update({
       appId: APP_ID,
       ownerId: OWNER_ID,
-      patch: { environment: asPatch({ TOKEN: SECRET }) },
+      patch: { config: { access: { kind: 'public' }, environment: asPatch({ TOKEN: SECRET }) } },
     });
 
     const environment = appsRepo.offeredPatches[0]?.environment;
@@ -747,7 +785,7 @@ describe('a config patch edits the environment rather than replacing it', () => 
     await service.update({
       appId: APP_ID,
       ownerId: OWNER_ID,
-      patch: { environment: asPatch({ TOKEN: null }) },
+      patch: { config: { access: { kind: 'public' }, environment: asPatch({ TOKEN: null }) } },
     });
 
     expect(appsRepo.offeredPatches[0]?.environment).toEqual({ set: {}, removed: ['TOKEN'] });
@@ -761,7 +799,9 @@ describe('a config patch edits the environment rather than replacing it', () => 
     await service.update({
       appId: APP_ID,
       ownerId: OWNER_ID,
-      patch: { environment: asPatch({ TOKEN: SECRET, GONE: null }) },
+      patch: {
+        config: { access: { kind: 'public' }, environment: asPatch({ TOKEN: SECRET, GONE: null }) },
+      },
     });
 
     const environment = appsRepo.offeredPatches[0]?.environment;
@@ -785,7 +825,9 @@ describe('the placeholder a read returns cannot be set as a value', () => {
       service.update({
         appId: APP_ID,
         ownerId: OWNER_ID,
-        patch: { environment: asPatch({ TOKEN: REDACTED }) },
+        patch: {
+          config: { access: { kind: 'public' }, environment: asPatch({ TOKEN: REDACTED }) },
+        },
       }),
     ).rejects.toBeInstanceOf(BadRequestError);
     expect(appsRepo.offeredPatches).toHaveLength(0);
@@ -795,7 +837,10 @@ describe('the placeholder a read returns cannot be set as a value', () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
     await expect(
-      createApp({ appsRepo, config: { environment: asEnvironment({ TOKEN: REDACTED }) } }),
+      createApp({
+        appsRepo,
+        config: { access: { kind: 'public' }, environment: asEnvironment({ TOKEN: REDACTED }) },
+      }),
     ).rejects.toBeInstanceOf(BadRequestError);
     expect(appsRepo.offeredConfigs).toHaveLength(0);
   });
@@ -893,9 +938,14 @@ describe('an app is renamed by patching its name, and stays where it is served',
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.owns = true;
 
-    await serviceWith({ appsRepo }).update({ ...owned, patch: { args: ['serve'] } });
+    await serviceWith({ appsRepo }).update({
+      ...owned,
+      patch: { config: { access: { kind: 'public' }, args: ['serve'] } },
+    });
 
-    expect(appsRepo.offeredPatches).toEqual([{ name: undefined, args: ['serve'] }]);
+    expect(appsRepo.offeredPatches).toEqual([
+      { name: undefined, access: { kind: 'public' }, args: ['serve'] },
+    ]);
   });
 });
 

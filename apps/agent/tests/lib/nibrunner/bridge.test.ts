@@ -618,6 +618,7 @@ test('stops and removals bypass a blocked download without omitting an unrelated
     Effect.gen(function* () {
       const fs = yield* FileSystem.FileSystem;
       const first = desiredInstance();
+      first.config.access = JWT_ACCESS;
       const second = desiredInstance({ appId: SECOND_APP_ID });
       const setup = yield* fixture(desiredState({ instances: [first, second] }));
       const opened = yield* Deferred.make<void>();
@@ -631,7 +632,7 @@ test('stops and removals bypass a blocked download without omitting an unrelated
       const bridge = yield* setup.create.pipe(Effect.provide(store));
       setup.world.desired = desiredState({
         instances: [
-          desiredInstance({ deploymentId: NEXT_DEPLOYMENT_ID, access: JWT_ACCESS }),
+          desiredInstance({ deploymentId: NEXT_DEPLOYMENT_ID }),
           desiredInstance({ appId: SECOND_APP_ID, desiredState: 'stopped' }),
         ],
       });

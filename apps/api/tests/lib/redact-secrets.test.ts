@@ -47,7 +47,6 @@ function desiredState(): HostDesiredState {
         deploymentId: Value.Parse(DeploymentIdSchema, 'dep_1'),
         volumeId: Value.Parse(VolumeIdSchema, 'vol_1'),
         desiredState: 'running',
-        access: { kind: 'public' },
         artifact: {
           digest: Value.Parse(Sha256DigestSchema, hexDigest()),
           sizeBytes: 2048,
@@ -55,6 +54,7 @@ function desiredState(): HostDesiredState {
           filename: Value.Parse(FilenameSchema, 'server'),
         },
         config: {
+          access: { kind: 'public' },
           httpPort: DEFAULT_HTTP_PORT,
           hasExtraPublicPort: true,
           args: ['serve', '--http=0.0.0.0:8090'],
