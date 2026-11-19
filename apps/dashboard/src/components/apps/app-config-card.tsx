@@ -4,6 +4,7 @@ import { AppEnvironment } from '#components/apps/app-environment.tsx';
 import { AppExtraPort } from '#components/apps/app-extra-port.tsx';
 import { AppRunCommand } from '#components/apps/app-run-command.tsx';
 import { AppVolume } from '#components/apps/app-volume.tsx';
+import { accessFields, accessModeLabel } from '#lib/app-access-form.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 export function AppConfigCard({ app }: { app: AppSummary }) {
@@ -16,6 +17,10 @@ export function AppConfigCard({ app }: { app: AppSummary }) {
         <div className="flex items-center justify-between gap-4">
           <span className="text-muted-foreground">HTTP port</span>
           <span className="font-mono tabular-nums">{app.config.httpPort}</span>
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-muted-foreground">HTTP access</span>
+          <span>{accessModeLabel(accessFields(app.config.access).mode)}</span>
         </div>
         <AppExtraPort app={app} />
         <AppRunCommand app={app} />

@@ -8,6 +8,7 @@ import {
 import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
 import { Textarea } from '@repo/ui/components/textarea';
+import { DeployAccessField } from '#components/deploy/deploy-access-field.tsx';
 import { DeployEnvironmentField } from '#components/deploy/deploy-environment-field.tsx';
 import { DeployInitialDataField } from '#components/deploy/deploy-initial-data-field.tsx';
 import { DeployNameField } from '#components/deploy/deploy-name-field.tsx';
@@ -58,6 +59,8 @@ export function DeployConfiguration({
           </Field>
         )}
       </api.Field>
+
+      <DeployAccessField api={api} saved={replacing?.config.access} />
 
       <Accordion>
         <AccordionItem>
