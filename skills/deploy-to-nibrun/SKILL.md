@@ -165,6 +165,35 @@ fetched and 2 GiB unpacked, and only as the app is created: this and the app wri
 are the whole of how anything gets onto the volume. A zip made anywhere but unix carries no
 permissions, so an executable bit does not survive one.
 
+### HTTP access
+
+New apps are public by default. To require a signed JWT on every HTTP hostname from the first
+deployment, set `config.access` when creating the app through MCP. With the CLI, use
+`--access jwt --jwt-issuer ISSUER --jwt-audience AUD --jwks-url PUBLIC_HTTPS_URL` on
+`nib run` or `nib apps update`. If your CLI lacks these flags, use MCP or the dashboard's
+**HTTP access** picker. Redeploying without access flags preserves the current policy.
+
+#### Cloudflare Access
+
+Protect the app's proxied custom hostname with a self-hosted Cloudflare Access application and
+an Allow policy. In the nibrun deploy dialog, choose **HTTP access → Cloudflare Access** and
+enter the team domain and application audience (AUD). For MCP deployments, substitute those
+values in `config.access`.
+
+```json
+{
+  "kind": "jwt",
+  "issuer": "https://TEAM.cloudflareaccess.com",
+  "audiences": ["APPLICATION_AUD"],
+  "publicKeys": { "url": "https://TEAM.cloudflareaccess.com/cdn-cgi/access/certs" },
+  "token": { "header": "Cf-Access-Jwt-Assertion", "format": "raw" }
+}
+```
+
+With the CLI, add `--jwt-header Cf-Access-Jwt-Assertion --jwt-format raw` to the JWT flags above.
+If your app exposes an MCP server and Cloudflare handles sign-in, enable
+[Managed OAuth in the Access application](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/managed-oauth/).
+
 ### Try seeding first-run setup before going public
 
 Some apps let the first visitor claim the admin account. Their public URL is reachable as soon
@@ -285,6 +314,9 @@ Use a browser for testing only when the user asks for browser or visual testing.
 ```sh
 curl -fsS https://my-app.nibrun.app/
 ```
+
+For a JWT-protected app, expect the default URL to reject unsigned requests. Check the app
+through its authenticated hostname or with a valid token.
 
 Report which checks passed and which remain unverified. With MCP, use `read_logs` for recent
 output and `list_files` to inspect the app's persistent files when diagnosing failures.
