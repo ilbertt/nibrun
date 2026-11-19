@@ -23,6 +23,7 @@ Object.defineProperty(globalThis, 'window', {
 const { DeployConfiguration } = await import('#components/deploy/deploy-configuration.tsx');
 
 const UNTOUCHED: DeployFormValues = {
+  access: undefined,
   binary: undefined,
   name: '',
   port: undefined,
@@ -32,7 +33,19 @@ const UNTOUCHED: DeployFormValues = {
 };
 
 // Cast because what this file is about is which fields the form offers, not what an app row holds.
-const RUNNING = { config: { args: [], environment: [] } } as unknown as AppSummary;
+const RUNNING = {
+  config: {
+    args: [],
+    environment: {},
+    access: {
+      kind: 'jwt',
+      issuer: 'identity',
+      audiences: ['app'],
+      token: { header: 'Authorization', format: 'bearer' },
+      publicKeys: { url: 'https://identity.example/keys' },
+    },
+  },
+} as unknown as AppSummary;
 
 /** The form as this file needs it: a real api, and around it what the hook would have read. */
 function Configuration({ replacing }: { replacing: AppSummary | undefined }) {
@@ -49,6 +62,14 @@ function Configuration({ replacing }: { replacing: AppSummary | undefined }) {
 
   return <DeployConfiguration form={form} suggested={undefined} />;
 }
+
+test('new deploys show public access and updates show the saved policy', () => {
+  const creating = renderToStaticMarkup(<Configuration replacing={undefined} />);
+  const updating = renderToStaticMarkup(<Configuration replacing={RUNNING} />);
+  expect(creating).toContain('HTTP access');
+  expect(creating).toContain('>Public</span>');
+  expect(updating).toContain('>Custom JWT</span>');
+});
 
 describe('what a deploy is beyond the binary itself', () => {
   test('an app being created is offered the data its filesystem starts as', () => {

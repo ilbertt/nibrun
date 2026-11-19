@@ -10,6 +10,7 @@ import {
 } from '@repo/app-operations';
 import { type DeploySuggestion, namedByUrl, refusedChecksum, refusedUrl } from '@repo/deploy-link';
 import { type ReactFormExtendedApi, useForm } from '@tanstack/react-form';
+import { type AccessFields, parseAccess } from '#lib/app-access-form.ts';
 import {
   askedVariables,
   type EnvironmentVariable,
@@ -34,6 +35,7 @@ import { useDeployRun } from '#lib/hooks/use-deploy-run.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 export type DeployFormValues = {
+  access: AccessFields | undefined;
   binary: FileSource | undefined;
   name: string;
   port: string | undefined;
@@ -73,6 +75,7 @@ export type DeployFormState = {
 };
 
 const UNTOUCHED: DeployFormValues = {
+  access: undefined,
   binary: undefined,
   name: '',
   port: undefined,
@@ -275,7 +278,12 @@ function asReleaseRequest({
     stored: storedNames(replacing),
   });
 
+  const access = value.access && parseAccess(value.access);
+  if (access?.error) {
+    return undefined;
+  }
   const configured = {
+    ...(access?.policy && { access: access.policy }),
     args: tenantArguments(value.args ?? replacing?.config.args.join('\n') ?? ''),
     // Only what the table changed. A row still sealed holds a value this end has never read, so
     // it is sent as nothing at all — which is what leaves it alone — and a name the app has that
