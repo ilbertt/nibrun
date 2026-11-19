@@ -7,8 +7,7 @@ type Carried = { param: string; read: (value: unknown) => unknown };
 
 /**
  * Each part of a deploy a link may ask for, as the parameter that carries it and the way that
- * parameter is read. Keyed by `ConfigEdit`, so anything a release grows the ability to configure
- * is a link that stops compiling until it can carry it.
+ * parameter is read. Access policy is chosen by the owner and cannot be supplied by a deploy link.
  *
  * Every one of these only prefills a field the owner can still edit, and the api validates what is
  * submitted, so an absurd value costs a correction rather than a refusal here.
@@ -20,7 +19,7 @@ const CONFIGURED = {
   port: { param: 'port', read: asPort },
   args: { param: 'arg', read: asWritten },
   environment: { param: 'env', read: asWritten },
-} as const satisfies { [K in keyof Required<ConfigEdit>]: Carried };
+} as const satisfies { [K in Exclude<keyof ConfigEdit, 'access'>]: Carried };
 
 type Written = {
   [K in keyof typeof CONFIGURED as (typeof CONFIGURED)[K]['param']]?: ReturnType<

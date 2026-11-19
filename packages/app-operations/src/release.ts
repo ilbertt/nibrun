@@ -1,4 +1,4 @@
-import type { TenantArguments, TenantEnvironmentPatch } from '@repo/api-client/models';
+import type { App, TenantArguments, TenantEnvironmentPatch } from '@repo/api-client/models';
 
 /** Where a release landed and what to reach it at, whichever way it was asked for. */
 export type Deployed = {
@@ -22,13 +22,15 @@ export type DeployStep =
  * about arguments can only mean the ones already there.
  */
 export type ConfigEdit = {
+  access?: App['config']['access'] | undefined;
   args?: TenantArguments | undefined;
   port?: number | undefined;
   environment?: TenantEnvironmentPatch | undefined;
 };
 
-export function configPatch({ args, port, environment }: ConfigEdit) {
+export function configPatch({ access, args, port, environment }: ConfigEdit) {
   return {
+    ...(access !== undefined && { access }),
     ...(args !== undefined && { args }),
     ...(port !== undefined && { httpPort: port }),
     ...(environment !== undefined && { environment }),

@@ -16,8 +16,6 @@ export async function updateApp({ api, appId, name, currentApp, ...edit }: Updat
   if (Object.keys(changes).length === 0) {
     return unwrap(await app.patch(rename));
   }
-  const current = currentApp ?? (await appById({ api, appId }));
-  return unwrap(
-    await app.patch({ ...rename, config: { ...changes, access: current.config.access } }),
-  );
+  const access = changes.access ?? (currentApp ?? (await appById({ api, appId }))).config.access;
+  return unwrap(await app.patch({ ...rename, config: { ...changes, access } }));
 }
