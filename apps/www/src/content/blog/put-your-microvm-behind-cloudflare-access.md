@@ -15,12 +15,19 @@ Use a custom hostname in your own Cloudflare account, such as `ops.example.com`.
 nibrun manages the `nibrun.app` zone, so your Cloudflare account can't put a login page
 on `my-app.nibrun.app`. Attach your custom hostname to the app in nibrun and enable
 the proxy on its CNAME in Cloudflare DNS so requests pass through your Access policy.
+For this setup, the Cloudflare account that manages your domain must be separate
+from the one that manages `nibrun.app`. When both zones share an account, Cloudflare
+skips Access for the SaaS custom hostname even with the proxy enabled.
+[Cloudflare's custom hostname requirements](https://developers.cloudflare.com/cloudflare-for-platforms/cloudflare-for-saas/security/secure-with-access/#prerequisites)
 
 In Cloudflare Zero Trust, open **Access controls → Applications** and add a
 **Self-hosted** application. Enter the full hostname, such as `ops.example.com`, and
 leave the path empty to cover both the dashboard and `/mcp`. Add an **Allow** policy
 for the teammates who should have access. Save the application and copy its
 **Application Audience (AUD) Tag**. [Cloudflare's self-hosted application guide](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/)
+
+Before enabling JWT verification in nibrun, open the custom hostname in a private
+browser window. You should see the Cloudflare Access sign-in page.
 
 ## Connect the policy to your microVM
 
