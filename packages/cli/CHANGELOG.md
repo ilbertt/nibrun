@@ -2,6 +2,13 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.11.19-3]
+
+### 🚀 Features
+
+- Require an access change before removing the last custom domain (#1282)
+- Require a custom domain for the Cloudflare Access header (#1281)
+
 ## [2026.11.19-2]
 
 ### 🚀 Features
