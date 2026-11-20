@@ -1,5 +1,5 @@
 ---
-title: Put your microVM behind Cloudflare Access
+title: Protect your microVM with Cloudflare Access
 description: Protect a nibrun app with your team's Cloudflare login and let MCP clients sign in through the same Access policy.
 date: 2026-11-19
 ---
