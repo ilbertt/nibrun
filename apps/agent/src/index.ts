@@ -1,99 +1,15 @@
 import { FetchHttpClient } from '@effect/platform';
 import { BunContext, BunRuntime } from '@effect/platform-bun';
-import { Config, Effect, Layer } from 'effect';
-import { run } from '#lib/agent/run.ts';
+import { Effect, Layer } from 'effect';
 import { AgentLogger } from '#lib/logger.ts';
-import { AgentConfig } from '#services/agent-config.service.ts';
-import { AgentSessionHolder } from '#services/agent-session-holder.service.ts';
-import { AgentState } from '#services/agent-state.service.ts';
-import { AppActivator } from '#services/app-activator.service.ts';
-import { AppWaker } from '#services/app-waker.service.ts';
-import { ArtifactImages } from '#services/artifact-images.service.ts';
-import { ArtifactStore } from '#services/artifact-store.service.ts';
-import { CaddyProxy } from '#services/caddy-proxy.service.ts';
-import { CommandRunner } from '#services/command-runner.service.ts';
-import { ControlPlane } from '#services/control-plane.service.ts';
-import { CronExecutions } from '#services/cron-executions.service.ts';
-import { CronRegistrationReceiver } from '#services/cron-registration-receiver.service.ts';
-import { CronRegistry } from '#services/cron-registry.service.ts';
-import { CronScheduler } from '#services/cron-scheduler.service.ts';
-import { DesiredStateCache } from '#services/desired-state-cache.service.ts';
-import { ExportManager } from '#services/export-manager.service.ts';
-import { ExportUploader } from '#services/export-uploader.service.ts';
-import { FilesystemReader } from '#services/filesystem-reader.service.ts';
-import { GuestActivity } from '#services/guest-activity.service.ts';
-import { HostFirewall } from '#services/host-firewall.service.ts';
-import { LogStore } from '#services/log-store.service.ts';
 import { NibrunnerBridge } from '#services/nibrunner-bridge.service.ts';
-import { Reconciler } from '#services/reconciler.service.ts';
-import { RefreshSignal } from '#services/refresh-signal.service.ts';
-import { ReportSignal } from '#services/report-signal.service.ts';
-import { SlotAllocator } from '#services/slot-allocator.service.ts';
-import { SqliteSessions } from '#services/sqlite-sessions.service.ts';
-import { TenantLogQueue } from '#services/tenant-log-queue.service.ts';
-import { TenantLogReceiver } from '#services/tenant-log-receiver.service.ts';
-import { VmManager } from '#services/vm-manager.service.ts';
-import { VolumeManager } from '#services/volume-manager.service.ts';
-import { VolumeMigrationFences } from '#services/volume-migration-fences.service.ts';
-import { ZerofsTopology } from '#services/zerofs-topology.service.ts';
 
 const platform = Layer.mergeAll(BunContext.layer, FetchHttpClient.layer);
+const program = Effect.flatMap(NibrunnerBridge, (bridge) => bridge.run).pipe(
+  Effect.scoped,
+  Effect.provide(NibrunnerBridge.Default),
+  Effect.provide(platform),
+  Effect.provide(AgentLogger),
+);
 
-/**
- * Flat rather than tiered, because each service provides its own requirements. A layer named by
- * two of them is still built once, which is what keeps one slot table, one log queue and one
- * credential cache on a host — so the order here carries nothing.
- */
-const agent = Layer.mergeAll(
-  AgentConfig.Default,
-  AgentState.Default,
-  ReportSignal.Default,
-  RefreshSignal.Default,
-  CommandRunner.Default,
-  ControlPlane.Default,
-  GuestActivity.Default,
-  SqliteSessions.Default,
-  CronExecutions.Default,
-  CronRegistry.Default,
-  CronScheduler.Default,
-  CronRegistrationReceiver.Default,
-  LogStore.Default,
-  ArtifactStore.Default,
-  ArtifactImages.Default,
-  SlotAllocator.Default,
-  ZerofsTopology.Default,
-  HostFirewall.Default,
-  AppWaker.Default,
-  VolumeMigrationFences.Default,
-  AppActivator.Default,
-  CaddyProxy.Default,
-  TenantLogQueue.Default,
-  TenantLogReceiver.Default,
-  VolumeManager.Default,
-  ExportUploader.Default,
-  ExportManager.Default,
-  FilesystemReader.Default,
-  VmManager.Default,
-  DesiredStateCache.Default,
-  AgentSessionHolder.Default,
-  Reconciler.Default,
-).pipe(Layer.provideMerge(platform));
-
-// The agent stopping must not stop anything it started: the VMs are systemd's children, which is
-// what lets this component be redeployed as often as it changes.
-const program = Effect.gen(function* () {
-  const engine = yield* Config.literal(
-    'legacy',
-    'nibrunner',
-  )('AGENT_ENGINE').pipe(Config.withDefault('legacy'));
-  if (engine === 'nibrunner') {
-    return yield* Effect.flatMap(NibrunnerBridge, (bridge) => bridge.run).pipe(
-      Effect.scoped,
-      Effect.provide(NibrunnerBridge.Default),
-      Effect.provide(platform),
-    );
-  }
-  return yield* run.pipe(Effect.provide(agent));
-});
-
-BunRuntime.runMain(program.pipe(Effect.provide(AgentLogger)));
+BunRuntime.runMain(program);

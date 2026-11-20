@@ -4,7 +4,6 @@ import { ARTIFACT_DIGEST } from '#tests/support/artifacts.ts';
 import {
   APP_ID,
   DEPLOYMENT_ID,
-  FIRST_HOST_PORT,
   HOST_ID,
   OBSERVED_AT,
   VOLUME_ID,
@@ -56,7 +55,7 @@ export function nibrunnerReport(overrides: Partial<NibrunnerReport> = {}): Nibru
         deploymentId: DEPLOYMENT_ID,
         state: 'running',
         compute: null,
-        hostPort: FIRST_HOST_PORT,
+        hostPort: 30000,
         layerDigests: [ARTIFACT_DIGEST],
         restartCount: 0,
         startedAt: OBSERVED_AT,

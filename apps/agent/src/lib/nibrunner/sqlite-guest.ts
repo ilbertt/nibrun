@@ -3,7 +3,6 @@ import { Effect } from 'effect';
 import { GUEST_SQLITE_VSOCK_PORT, makeGuestSqliteClient } from '#lib/sqlite/client.ts';
 import { SqliteSessionUnavailable } from '#lib/sqlite/sessions.ts';
 import { NibrunnerGuestConnections } from '#services/nibrunner-guest-connections.service.ts';
-import { SqliteGuest } from '#services/sqlite-guest.service.ts';
 
 export function makeNibrunnerSqliteGuest<E, R>({
   deployments,
@@ -51,6 +50,6 @@ export function makeNibrunnerSqliteGuest<E, R>({
       });
     }
 
-    return SqliteGuest.make({ available, connect });
+    return { available, connect };
   });
 }
