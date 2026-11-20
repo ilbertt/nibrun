@@ -4,9 +4,13 @@ locals {
     logs   = var.victorialogs_hostname
     umami  = var.umami_hostname
   }
+  umami_website_id = jsondecode(file("${path.module}/../../packages/analytics/src/umami.json")).websiteId
   umami_public_paths = {
-    script  = "/script.js"
-    collect = "/api/send"
+    script          = "/script.js"
+    collect         = "/api/send"
+    recorder_script = "/recorder.js"
+    recorder_config = "/api/websites/${local.umami_website_id}/recorder"
+    record          = "/api/record"
   }
 }
 

@@ -81,7 +81,7 @@ export const DEPLOY_PRESETS = {
   openbao: {
     isRecommended: false,
     projectUrl: 'https://github.com/openbao/openbao',
-    version: 'v2.7.2',
+    version: 'v2.7.3',
     markdownContent: openbaoPage,
     category: DeployCategory.DeveloperTools,
     title: 'OpenBao',
@@ -89,8 +89,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'openbao',
       binary:
-        'https://github.com/openbao/openbao/releases/download/v2.7.2/openbao_2.7.2_linux_amd64.tar.gz',
-      sha256: '582b1f3c2fdc5afd443b2d57a225ef654de75adea609fdb66731fd582a9cbc96',
+        'https://github.com/openbao/openbao/releases/download/v2.7.3/openbao_2.7.3_linux_amd64.tar.gz',
+      sha256: '131df9a21cf3dd2dff47107110b369c9974cbdaa482bcbc723b81b3403c68ecd',
       port: 8200,
       arg: ['server', '-config=/app/data/openbao.hcl'],
       env: [
@@ -256,7 +256,7 @@ export const DEPLOY_PRESETS = {
   'open-connector': {
     isRecommended: false,
     projectUrl: 'https://github.com/oomol-lab/open-connector',
-    version: 'v1.10.0',
+    version: 'v1.10.1',
     markdownContent: openConnectorPage,
     category: DeployCategory.DeveloperTools,
     title: 'OpenConnector',
@@ -264,8 +264,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'open-connector',
       binary:
-        'https://github.com/oomol-lab/open-connector/releases/download/v1.10.0/open-connector-linux-x64',
-      sha256: '0d04af111cf75573be1b421c1ced953f5dd8d9a9a8c17ce05b5d50e21f492bb4',
+        'https://github.com/oomol-lab/open-connector/releases/download/v1.10.1/open-connector-linux-x64',
+      sha256: '6bfa45fa88a645b0f86d18d344e71870773c5cf566764c45d1ed6e295ba464b6',
       port: 3000,
       env: [
         'HOST=0.0.0.0',
