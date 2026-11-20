@@ -49,8 +49,8 @@ variable "app_host_spot" {
 
 variable "app_host_count" {
   type        = number
-  default     = 1
-  description = "Size of the app host fleet. Terraform does not provision hosts dynamically, so scaling is changing this."
+  default     = 0
+  description = "Legacy app-host fleet size. Keep zero after migrating apps to nibrunner."
 }
 
 variable "port_relay_instance_type" {

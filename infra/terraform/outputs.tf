@@ -111,6 +111,11 @@ output "app_host_deploy_group" {
   value       = local.app_host_deploy_group
 }
 
+output "app_host_count" {
+  description = "Legacy app hosts to deploy. Zero disables the legacy deployment job."
+  value       = var.app_host_count
+}
+
 output "app_host_public_ips" {
   description = "A record targets for legacy app-host routes."
   value       = aws_eip.app_host[*].public_ip
@@ -153,5 +158,5 @@ output "github_deploy_role_arn" {
 # it, and it is not the address of the machine it runs on anyway.
 output "port_relay_public_ipv4" {
   description = "The address a tenant's own ports are reached at. Stable across replacing the relay, which is what makes moving it later invisible to the clients already using it."
-  value       = aws_eip.port_relay.public_ip
+  value       = one(aws_eip.port_relay[*].public_ip)
 }

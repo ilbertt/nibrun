@@ -189,6 +189,7 @@ jobs:
 
   deploy-app-hosts:
     needs: [terraform, publish-agent]
+    if: ${{ needs.terraform.result == 'success' && fromJSON(needs.terraform.outputs.values).app_host_count > 0 }}
     runs-on: ubuntu-latest
     env:
       DEPLOY_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).deploy_bucket }}

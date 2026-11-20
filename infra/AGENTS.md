@@ -5,6 +5,11 @@ microVMs, and the port relay forwards non-HTTP tenant traffic. `deploy/` is shel
 TypeScript because those scripts run *on* a box and an instance has no Bun; everything CI runs
 lives in `@repo/internal-scripts`.
 
+Legacy compute is disabled by default: `app_host_count = 0` retires the old app hosts and
+extra-port relay, and CD skips legacy host deployment. Setting a nonzero count provisions both
+again. Retiring compute preserves customer S3 filesystems, artifacts, backups and the legacy
+ZeroFS encryption parameter so the retained data remains recoverable.
+
 The Terraform explains itself — read it rather than a description of it here.
 
 The isolated nibrunner host uses an outbound Cloudflare Tunnel and has no security-group

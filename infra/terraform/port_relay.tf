@@ -16,6 +16,8 @@ data "aws_ami" "port_relay" {
 }
 
 resource "aws_instance" "port_relay" {
+  count = var.app_host_count > 0 ? 1 : 0
+
   ami                    = data.aws_ami.port_relay.id
   instance_type          = var.port_relay_instance_type
   subnet_id              = aws_subnet.app.id
@@ -70,7 +72,9 @@ resource "aws_instance" "port_relay" {
 # Outlives the instance behind it, which is what makes moving the relay elsewhere
 # invisible to the clients already using it.
 resource "aws_eip" "port_relay" {
-  instance = aws_instance.port_relay.id
+  count = length(aws_instance.port_relay)
+
+  instance = aws_instance.port_relay[count.index].id
   domain   = "vpc"
 
   tags = {
