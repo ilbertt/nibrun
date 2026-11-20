@@ -3,8 +3,8 @@
 Internal tracking shared by the marketing site and dashboard.
 
 - Seed one Umami website named `nibrun` for marketing and dashboard tracking.
-- Keep both sites on the same Umami website. Derive its ID from `src/config.ts`
-  in clients and seeding; separate websites cannot form one native funnel.
+- Keep both sites on the same Umami website. Clients, seeding and the Terraform recorder
+  route share the website ID in `src/umami.json`. Separate websites cannot form one native funnel.
 - `www` and `dashboard` identify the emitting site inside the shared collection.
 - Require `VITE_UMAMI_HOSTNAME` at build time; do not add a hostname fallback.
 - Declare Vite environment types in `src/vite-env.d.ts`, without local casts.

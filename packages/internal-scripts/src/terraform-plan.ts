@@ -14,11 +14,12 @@ const SUMMARY_LIMIT = 60_000;
 // reports, and a PR waiting on it can never merge.
 const baseRef = optionalEnv('GITHUB_BASE_REF');
 if (baseRef) {
-  const changed = await $`git diff --quiet origin/${baseRef}...HEAD -- infra/terraform`
-    .cwd(repoRoot)
-    .nothrow();
+  const changed =
+    await $`git diff --quiet origin/${baseRef}...HEAD -- infra/terraform packages/analytics/src/umami.json`
+      .cwd(repoRoot)
+      .nothrow();
   if (changed.exitCode === 0) {
-    core.info('No changes under infra/terraform; nothing to plan.');
+    core.info('No Terraform inputs changed; nothing to plan.');
     process.exit(0);
   }
 }

@@ -1,1 +1,3 @@
-export const UMAMI_WEBSITE_ID = '00000000-0000-4000-8000-000000000001';
+import umami from '#umami.json' with { type: 'json' };
+
+export const UMAMI_WEBSITE_ID = umami.websiteId;
