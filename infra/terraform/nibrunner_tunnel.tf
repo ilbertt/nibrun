@@ -8,8 +8,8 @@ variable "nibrunner_domain" {
   }
 
   validation {
-    condition     = var.nibrunner_domain != var.app_host_domain
-    error_message = "nibrunner_domain must use a separate zone from the legacy app-host domain."
+    condition     = var.nibrunner_domain != var.app_domain
+    error_message = "nibrunner_domain must use a separate zone from the application domain."
   }
 }
 
@@ -30,7 +30,7 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "nibrunner" {
   config = {
     ingress = [
       {
-        hostname = var.app_host_domain
+        hostname = var.app_domain
         service  = "http://127.0.0.1:8080"
         origin_request = {
           http_host_header = local.nibrunner_fallback_hostname

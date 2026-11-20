@@ -9,9 +9,7 @@ import { APP_ID } from '#tests/support/fixtures.ts';
 
 export function readVmUnitTemplate() {
   return Effect.promise(() =>
-    Bun.file(
-      new URL('../../../../infra/app-host/systemd/nibrun-vm@.service', import.meta.url),
-    ).text(),
+    Bun.file(new URL('./host-fixtures/systemd/nibrun-vm@.service', import.meta.url)).text(),
   );
 }
 

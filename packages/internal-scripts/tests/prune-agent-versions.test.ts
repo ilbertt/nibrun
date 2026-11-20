@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const scriptPath = new URL(
-  '../../../infra/app-host/deploy/prune_agent_versions.sh',
+  '../../../infra/nibrunner-host/deploy/prune_agent_versions.sh',
   import.meta.url,
 ).pathname;
 const HEX_RADIX = 16;
@@ -26,14 +26,12 @@ const CURRENT_VERSION = 6;
 const LINKED_BINARY_VERSION = 7;
 const UNEXPECTED_CONTENTS_VERSION = 8;
 const INCOMPLETE_VERSION = 9;
-const INSTALLATION_LAYOUTS = ['legacy', 'bridge'] as const;
 
-describe.each(INSTALLATION_LAYOUTS)('%s agent retention', function describeInstallation(layout) {
+describe('bridge agent retention', function describeInstallation() {
   let fixtureRoot: string;
 
   beforeEach(function createHostFixture() {
     fixtureRoot = realpathSync(mkdtempSync(join(tmpdir(), 'nibrun-agent-retention-')));
-    mkdirSync(join(fixtureRoot, 'bin'));
     mkdirSync(join(fixtureRoot, 'proc'));
   });
 
@@ -44,7 +42,7 @@ describe.each(INSTALLATION_LAYOUTS)('%s agent retention', function describeInsta
   function versionPath(version: number) {
     return join(
       fixtureRoot,
-      layout === 'legacy' ? 'versions/agent' : 'versions',
+      'versions',
       version.toString(HEX_RADIX).padStart(COMMIT_HASH_LENGTH, '0'),
     );
   }
@@ -53,15 +51,12 @@ describe.each(INSTALLATION_LAYOUTS)('%s agent retention', function describeInsta
     const directory = versionPath(version);
     mkdirSync(directory, { recursive: true });
     writeFileSync(join(directory, 'nibrun-agent'), 'binary');
-    if (layout === 'legacy') {
-      writeFileSync(join(directory, '.installed'), '');
-    }
     utimesSync(directory, version, version);
     return directory;
   }
 
   function activeLink() {
-    return join(fixtureRoot, layout === 'legacy' ? 'bin/agent' : 'current');
+    return join(fixtureRoot, 'current');
   }
 
   function activateVersion(version: number) {
@@ -69,7 +64,7 @@ describe.each(INSTALLATION_LAYOUTS)('%s agent retention', function describeInsta
   }
 
   function runPrune() {
-    return Bun.spawnSync(['bash', scriptPath, fixtureRoot, join(fixtureRoot, 'proc'), layout]);
+    return Bun.spawnSync(['bash', scriptPath, fixtureRoot, join(fixtureRoot, 'proc')]);
   }
 
   test('keeps the active version and two newest rollback versions, without touching other components', function retainsRollbackVersions() {
@@ -118,9 +113,7 @@ describe.each(INSTALLATION_LAYOUTS)('%s agent retention', function describeInsta
       installVersion(version);
     }
     activateVersion(1);
-    rmSync(
-      join(versionPath(INCOMPLETE_VERSION), layout === 'legacy' ? '.installed' : 'nibrun-agent'),
-    );
+    rmSync(join(versionPath(INCOMPLETE_VERSION), 'nibrun-agent'));
     writeFileSync(join(versionPath(UNEXPECTED_CONTENTS_VERSION), 'tenant-data'), 'preserve');
     rmSync(join(versionPath(LINKED_BINARY_VERSION), 'nibrun-agent'));
     symlinkSync(
@@ -129,12 +122,8 @@ describe.each(INSTALLATION_LAYOUTS)('%s agent retention', function describeInsta
     );
     rmSync(versionPath(CURRENT_VERSION), { recursive: true });
     symlinkSync(versionPath(1), versionPath(CURRENT_VERSION));
-    const unexpected = join(
-      fixtureRoot,
-      layout === 'legacy' ? 'versions/agent/not-a-version' : 'versions/not-a-version',
-    );
+    const unexpected = join(fixtureRoot, 'versions/not-a-version');
     mkdirSync(unexpected);
-    writeFileSync(join(unexpected, '.installed'), '');
     writeFileSync(join(unexpected, 'nibrun-agent'), 'preserve');
 
     expect(runPrune().exitCode).toBe(0);

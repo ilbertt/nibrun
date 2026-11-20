@@ -6,11 +6,6 @@ cd "$(dirname "$0")"
 : "${NIBRUNNER_VERSION:?}" "${NIBRUNNER_BINARY_SHA256:?}"
 : "${NIBRUNNER_GUEST_IMAGE_URL:?}" "${NIBRUNNER_GUEST_IMAGE_SHA256:?}"
 
-if [ -e /var/lib/nibrun/host-id ]; then
-  echo "refusing to install nibrunner over a registered legacy app host" >&2
-  exit 1
-fi
-
 install -m 0644 apt.conf /etc/apt/apt.conf.d/99nibrun-lock-timeout
 
 if [ -d /var/lib/nibrunner/volumes ] &&

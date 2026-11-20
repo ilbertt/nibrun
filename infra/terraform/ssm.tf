@@ -117,33 +117,6 @@ resource "aws_ssm_parameter" "pgweb_auth_pass" {
   }
 }
 
-# --- App hosts ---
-
-# Base64 keeps each PEM on one line for SSM's text output. The app host fetches
-# both halves directly so private keys never enter the deploy workflow.
-resource "aws_ssm_parameter" "app_host_caddy_tls_cert" {
-  name  = "${var.ssm_secret_prefix}/app_host_caddy_tls_cert"
-  type  = "SecureString"
-  value = base64encode(cloudflare_origin_ca_certificate.origin["app_host"].certificate)
-
-  tags = {
-    Name = "${local.resource_name_prefix}-app-host-caddy-tls-cert"
-  }
-}
-
-resource "aws_ssm_parameter" "app_host_caddy_tls_key" {
-  name  = "${var.ssm_secret_prefix}/app_host_caddy_tls_key"
-  type  = "SecureString"
-  value = base64encode(tls_private_key.origin["app_host"].private_key_pem_pkcs8)
-
-  # Failed issuance must leave the existing certificate/key pair in SSM intact.
-  depends_on = [cloudflare_origin_ca_certificate.origin["app_host"]]
-
-  tags = {
-    Name = "${local.resource_name_prefix}-app-host-caddy-tls-key"
-  }
-}
-
 # ZeroFS encrypts everything it writes to the filesystems bucket under this. It
 # is generated once and never rotated in place: changing it does not re-encrypt
 # anything, it makes every existing tenant filesystem unreadable. Treat it as

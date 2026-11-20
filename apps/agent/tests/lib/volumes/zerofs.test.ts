@@ -87,7 +87,7 @@ describe('configured checkpoints use the pinned ZeroFS CLI format', () => {
 describe('the disk ZeroFS is entitled to is read out of its own config', () => {
   test('the config an app host is deployed with says what it says', async () => {
     const config = await readFile(
-      join(import.meta.dir, '../../../../../infra/app-host/zerofs/config.toml'),
+      join(import.meta.dir, '../../support/host-fixtures/zerofs/config.toml'),
       'utf8',
     );
     expect(cacheDiskGigabytes(config)).toEqual(Option.some(DEPLOYED_CACHE_GIB));
@@ -114,7 +114,7 @@ describe('the disk ZeroFS is entitled to is read out of its own config', () => {
 describe('the memory ZeroFS is entitled to is read out of its own config', () => {
   test('the config an app host is deployed with says what it says', async () => {
     const config = await readFile(
-      join(import.meta.dir, '../../../../../infra/app-host/zerofs/config.toml'),
+      join(import.meta.dir, '../../support/host-fixtures/zerofs/config.toml'),
       'utf8',
     );
 

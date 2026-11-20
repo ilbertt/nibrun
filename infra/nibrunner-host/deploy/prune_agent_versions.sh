@@ -3,24 +3,8 @@ set -euo pipefail
 
 nibrun_dir=${1:-/opt/nibrun}
 proc_dir=${2:-/proc}
-layout=${3:-legacy}
-
-case "$layout" in
-  legacy)
-    versions_path="$nibrun_dir/versions/agent"
-    active_link="$nibrun_dir/bin/agent"
-    marker=.installed
-    ;;
-  bridge)
-    versions_path="$nibrun_dir/versions"
-    active_link="$nibrun_dir/current"
-    marker=
-    ;;
-  *)
-    echo "Unknown agent installation layout: $layout" >&2
-    exit 1
-    ;;
-esac
+versions_path="$nibrun_dir/versions"
+active_link="$nibrun_dir/current"
 
 [ -d "$versions_path" ] || exit 0
 versions_dir=$(cd "$versions_path" && pwd -P)
@@ -37,11 +21,8 @@ for directory in "$versions_dir"/*; do
   [ -d "$directory" ] && [ ! -L "$directory" ] || continue
   version=${directory##*/}
   [[ "$version" =~ ^[[:xdigit:]]{40}$ ]] || continue
-  if [ -n "$marker" ]; then
-    [ -f "$directory/$marker" ] && [ ! -L "$directory/$marker" ] || continue
-  fi
   [ -f "$directory/nibrun-agent" ] && [ ! -L "$directory/nibrun-agent" ] || continue
-  [ -z "$(find "$directory" -mindepth 1 -maxdepth 1 ! -name "$marker" ! -name nibrun-agent -print -quit)" ] || continue
+  [ -z "$(find "$directory" -mindepth 1 -maxdepth 1 ! -name nibrun-agent -print -quit)" ] || continue
   installed_dirs+=("$directory")
 done
 

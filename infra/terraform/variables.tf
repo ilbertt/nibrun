@@ -21,66 +21,6 @@ variable "data_volume_size" {
   description = "Persistent data EBS volume size in GB. Backs Postgres. Survives instance replacement."
 }
 
-# Local NVMe storage backs /data. ensure_ephemeral_data.sh fails without it,
-# so changing the host size must retain an instance store.
-variable "app_host_instance_type" {
-  type        = string
-  default     = "m8id.large"
-  description = "Runs Firecracker microVMs and ZeroFS. Nested virtualisation works on ordinary Intel instances, so this is not a metal type and does not need to be — but it must be a type whose ProcessorInfo.SupportedFeatures lists nested-virtualization, or the host boots no microVM."
-}
-
-# Spot for the app host, and only ever the stopping kind. A reclaimed on-demand
-# request is terminated, which would put a replacement host on the same ZeroFS
-# prefix while the old one still held the writer epoch — and infra/app-host/AGENTS.md
-# is explicit that two read-write `zerofs run` against one prefix is an outage
-# rather than an error message. Stopping keeps the instance id and the elastic ip,
-# so what comes back is the same host rather than a rival to it — with a cold /data,
-# which is an instance store and blank on every start.
-#
-# What this does not buy: `ignore_fsync = true` puts the entire durability
-# guarantee in ZeroFS's five-second flush, so a reclaim loses 5-15 s of writes the
-# guest was told were durable. Cheap capacity is a decision about cost; that window
-# is a decision about tenants, and it is the one to revisit before launch.
-variable "app_host_spot" {
-  type        = bool
-  default     = true
-  description = "Buy app host capacity on the spot market. An interruption stops the instance rather than terminating it, and AWS starts it again when capacity returns."
-}
-
-variable "app_host_count" {
-  type        = number
-  default     = 1
-  description = "Size of the app host fleet. Terraform does not provision hosts dynamically, so scaling is changing this."
-}
-
-variable "port_relay_instance_type" {
-  type        = string
-  default     = "t3.micro"
-  description = "Sized by network baseline rather than CPU: forwarding is kernel work. t3.micro sustains 64 Mbps and bursts above it."
-}
-
-# Restated from the agent's own base, because a security group is the other half
-# of opening a port and nothing compares the two numbers. One per slot, so it
-# cannot run out: `tenant_port_last` is the base plus the last slot, which is
-# `SLOT_COUNT - 1` in apps/agent/src/lib/network/slot.ts.
-variable "tenant_port_first" {
-  type        = number
-  default     = 22000
-  description = "First port a tenant can be given. Must match the agent's own base, and must not overlap the loopback range the proxy reaches an app's HTTP on — those ports are reachable only from the host and must stay that way."
-}
-
-variable "tenant_port_last" {
-  type        = number
-  default     = 22126
-  description = "Last port a tenant can be given, inclusive. Headroom runs to about 32767, where this would meet the kernel's own ephemeral range."
-}
-
-variable "app_host_root_volume_size" {
-  type        = number
-  default     = 50
-  description = "Root EBS volume size in GB for an app host. Holds the OS, the versioned binaries under /opt/nibrun and the artifact cache under /var/lib/nibrun."
-}
-
 variable "export_retention_days" {
   type        = number
   default     = 1
@@ -96,7 +36,7 @@ variable "import_retention_days" {
 variable "internal_port" {
   type        = number
   default     = 19080
-  description = "Port the control plane serves /internal on over plain HTTP, reachable only from app hosts and nibrunner through their VPC security groups."
+  description = "Port the control plane serves /internal on over plain HTTP, reachable only from nibrunner through their VPC security groups."
 
   # Not 8080, which Dozzle already publishes in the same compose stack — the
   # edge could not bind it and the deploy died on `compose up`. Chosen against
@@ -109,7 +49,7 @@ variable "internal_port" {
 variable "log_ingest_port" {
   type        = number
   default     = 19081
-  description = "Port the control plane accepts log writes on, reachable from app hosts over the VPC and from nowhere else. Separate from internal_port so the fleet's write path and its control channel widen independently."
+  description = "Port the control plane accepts log writes on, reachable from nibrunner over the VPC and from nowhere else. Separate from internal_port so the fleet's write path and its control channel widen independently."
 
   # Adjacent to internal_port and chosen on the same grounds: unregistered in
   # /etc/services, outside the 3000/8000/9000 band anything added to the stack
@@ -161,13 +101,13 @@ variable "victorialogs_hostname" {
 # No default for the same reason api_hostname has none, and read the validation
 # below before choosing a value: user apps must not share a registrable domain
 # with the dashboard.
-variable "app_host_domain" {
+variable "app_domain" {
   type        = string
-  description = "Registrable domain user apps are served under, as <slug>.<app_host_domain>. Its wildcard routes to the nibrunner Tunnel."
+  description = "Registrable domain user apps are served under, as <slug>.<app_domain>. Its wildcard routes to the nibrunner Tunnel."
 
   validation {
-    condition     = trimspace(var.app_host_domain) != ""
-    error_message = "app_host_domain must not be empty."
+    condition     = trimspace(var.app_domain) != ""
+    error_message = "app_domain must not be empty."
   }
 
   # A user app is somebody else's code on a hostname we hand out. On a subdomain
@@ -176,8 +116,8 @@ variable "app_host_domain" {
   # A separate registrable domain is what puts them either side of the public
   # suffix boundary, so this is a security bound rather than a preference.
   validation {
-    condition     = var.api_hostname != var.app_host_domain && !endswith(var.api_hostname, ".${var.app_host_domain}")
-    error_message = "app_host_domain must be a different registrable domain from api_hostname."
+    condition     = var.api_hostname != var.app_domain && !endswith(var.api_hostname, ".${var.app_domain}")
+    error_message = "app_domain must be a different registrable domain from api_hostname."
   }
 }
 
