@@ -37,6 +37,15 @@ resource "cloudflare_zero_trust_access_application" "control_plane" {
   session_duration           = cloudflare_zero_trust_access_policy.control_plane.session_duration
   http_only_cookie_attribute = true
 
+  oauth_configuration = each.key == "umami" ? {
+    enabled = true
+    dynamic_client_registration = {
+      enabled                = true
+      allow_any_on_loopback  = true
+      allow_any_on_localhost = true
+    }
+  } : null
+
   destinations = [{
     type = "public"
     uri  = each.value

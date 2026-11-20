@@ -109,8 +109,12 @@ behind Access; it does not authenticate Cloudflare identities. Only `/script.js`
 bypass Access so anonymous visitors can load the tracker and submit analytics. The Tunnel
 matches these exact paths before its hostname-wide token validation rule, with path normalization
 enabled. All other paths, including `/mcp` and the read API, require Access authentication.
-Machine clients need an Access service-auth policy and token in addition to their Umami API key;
-the account-member policy does not grant service tokens access.
+
+For a local MCP client, connect to `https://<UMAMI_HOSTNAME>/mcp` with managed OAuth.
+Set the client's `X-Umami-Api-Key` header to the raw Umami API key and remove any static
+`Authorization` header. Sign in to Access from the client (`codex mcp login nibrun_umami`
+for the existing Codex connection). Access accepts local OAuth callbacks and checks account
+membership. On `/mcp`, Caddy forwards the client's key as the bearer credential Umami verifies.
 
 For Umami's region and city data, enable **Rules → Settings → Managed Transforms → Add visitor
 location headers** in the control-plane zone. Caddy forwards Cloudflare's headers to Umami, which
