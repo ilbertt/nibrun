@@ -110,11 +110,16 @@ bypass Access so anonymous visitors can load the tracker and submit analytics. T
 matches these exact paths before its hostname-wide token validation rule, with path normalization
 enabled. All other paths, including `/mcp` and the read API, require Access authentication.
 
-For a local MCP client, connect to `https://<UMAMI_HOSTNAME>/mcp` with managed OAuth.
-Set the client's `X-Umami-Api-Key` header to the raw Umami API key and remove any static
-`Authorization` header. Sign in to Access from the client (`codex mcp login nibrun_umami`
-for the existing Codex connection). Access accepts local OAuth callbacks and checks account
-membership. On `/mcp`, Caddy forwards the client's key as the bearer credential Umami verifies.
+Local MCP clients connect to `https://<UMAMI_HOSTNAME>/mcp` using Access managed OAuth.
+Remove any static Umami key or Authorization header from the client and sign in
+(`codex mcp login nibrun_umami` for the existing Codex connection). All admitted account
+members query analytics with the seeded Umami administrator's visibility through read-only MCP tools.
+
+Terraform generates `UMAMI_MCP_API_KEY` and stores it in SSM. The deploy passes it to the
+Umami seed, which registers its SHA-512 hash under a stable key ID. To rotate it, replace
+`random_password.umami_mcp_api_key` during the Terraform apply and run the control-plane deploy.
+The seed replaces the previous hash in place. A deploy also restores a manually deleted managed key.
+Only the audience-validated `/mcp` tunnel route reaches the Caddy socket that supplies this key.
 
 For Umami's region and city data, enable **Rules → Settings → Managed Transforms → Add visitor
 location headers** in the control-plane zone. Caddy forwards Cloudflare's headers to Umami, which

@@ -89,16 +89,25 @@ http://{$DOZZLE_HOSTNAME} {
 }
 
 http://{$UMAMI_HOSTNAME} {
-	@mcpApiKey {
-		path /mcp
-		header X-Umami-Api-Key *
-	}
-	request_header @mcpApiKey Authorization "Bearer {http.request.header.X-Umami-Api-Key}"
 	reverse_proxy umami:3000 {
-		header_up -X-Umami-Api-Key
 		header_up X-Forwarded-Proto https
 		lb_try_duration 30s
 		lb_try_interval 250ms
+	}
+}
+
+# Only the tunnel route that validates the Umami Access audience can reach this socket.
+:0 {
+	bind unix//run/umami-mcp/caddy.sock|0222
+	handle /mcp {
+		reverse_proxy umami:3000 {
+			rewrite /mcp
+			header_up Authorization "Bearer {env.UMAMI_MCP_API_KEY}"
+			header_up X-Forwarded-Proto https
+		}
+	}
+	handle {
+		respond 404
 	}
 }
 

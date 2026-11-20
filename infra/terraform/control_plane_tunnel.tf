@@ -29,7 +29,15 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "control_plane" {
           http_host_header = var.umami_hostname
         }
       }
-      ], [
+      ], [{
+        hostname = var.umami_hostname
+        path     = "^/mcp$"
+        service  = "unix:/run/umami-mcp/caddy.sock"
+        origin_request = {
+          http_host_header = var.umami_hostname
+          access           = local.control_plane_access[var.umami_hostname]
+        }
+      }], [
       for hostname in local.control_plane_hostnames : {
         hostname = hostname
         service  = "http://caddy:80"
