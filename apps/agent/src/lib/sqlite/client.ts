@@ -1,6 +1,5 @@
 import { Buffer } from 'node:buffer';
 import { Agent, request } from 'node:http';
-import { createConnection, type Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
 import { type GuestPath, SqliteOutcomeSchema } from '@repo/protocol';
 import {
@@ -20,13 +19,9 @@ import {
   MalformedSqliteReply,
   SqliteDisconnected,
 } from '#lib/sqlite/errors.ts';
-import { connectRequest } from '#lib/vm/vsock.ts';
 
 export const GUEST_SQLITE_VSOCK_PORT = 51005;
 const RESPONSE_TIMEOUT = Duration.seconds(10);
-const MAX_HANDSHAKE_BYTES = 64;
-const MAX_VSOCK_PORT = 0xffffffff;
-const CONNECT_ACCEPTED = 'OK ';
 const SUCCESS_MIN = 200;
 const SUCCESS_MAX = 300;
 
@@ -36,54 +31,6 @@ type SqliteHttpError =
   | InvalidSqliteRequest
   | MalformedSqliteReply
   | SqliteDisconnected;
-
-function connect(socket: Socket) {
-  return Effect.async<Socket, MalformedSqliteReply | SqliteDisconnected>((resume) => {
-    let buffered = Buffer.alloc(0);
-    function failed() {
-      socket.destroy();
-      resume(Effect.fail(new SqliteDisconnected()));
-    }
-    function received(bytes: Buffer) {
-      if (buffered.byteLength + bytes.byteLength > MAX_HANDSHAKE_BYTES) {
-        socket.destroy();
-        resume(Effect.fail(new MalformedSqliteReply()));
-        return;
-      }
-      buffered = Buffer.concat([buffered, bytes]);
-      const newline = buffered.indexOf('\n');
-      if (newline < 0 && buffered.byteLength <= MAX_HANDSHAKE_BYTES) {
-        return;
-      }
-      socket.off('data', received);
-      socket.off('error', failed);
-      socket.off('close', failed);
-      if (
-        newline < 0 ||
-        newline >= MAX_HANDSHAKE_BYTES ||
-        !/^OK [0-9]{1,10}$/.test(buffered.subarray(0, newline).toString()) ||
-        Number(buffered.subarray(CONNECT_ACCEPTED.length, newline).toString()) < 1 ||
-        Number(buffered.subarray(CONNECT_ACCEPTED.length, newline).toString()) > MAX_VSOCK_PORT
-      ) {
-        socket.destroy();
-        resume(Effect.fail(new MalformedSqliteReply()));
-        return;
-      }
-      socket.pause();
-      if (buffered.byteLength > newline + 1) {
-        socket.unshift(buffered.subarray(newline + 1));
-      }
-      resume(Effect.succeed(socket));
-    }
-    socket.once('connect', () => socket.write(connectRequest(GUEST_SQLITE_VSOCK_PORT)));
-    socket.on('data', received);
-    socket.once('error', failed);
-    socket.once('close', failed);
-    return Effect.sync(() => socket.destroy());
-  }).pipe(
-    Effect.timeoutFail({ duration: RESPONSE_TIMEOUT, onTimeout: () => new SqliteDisconnected() }),
-  );
-}
 
 function httpReply({
   agent,
@@ -175,17 +122,6 @@ function isMalformedReply(error: unknown): error is MalformedSqliteReply {
     '_tag' in error &&
     error._tag === 'MalformedSqliteReply'
   );
-}
-
-export function connectGuestSqlite({ socketPath }: { socketPath: string }) {
-  return Effect.gen(function* () {
-    const socket = yield* Effect.acquireRelease(
-      Effect.sync(() => createConnection({ path: socketPath })),
-      (held) => Effect.sync(() => held.destroy()),
-    );
-    yield* connect(socket);
-    return yield* makeGuestSqliteClient({ socket });
-  });
 }
 
 export function makeGuestSqliteClient({ socket }: { socket: Duplex }) {

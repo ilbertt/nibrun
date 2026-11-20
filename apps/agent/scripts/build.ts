@@ -6,7 +6,7 @@ const AGENT_DIST_DIR = join(AGENT_DIR, 'dist');
 const AGENT_BINARY_FILE = join(AGENT_DIST_DIR, 'nibrun-agent');
 const AGENT_ENTRYPOINT = 'src/index.ts';
 
-// App hosts are x86_64 Linux, so this cross-compiles rather than taking the host it was built on.
+// The nibrunner host is x86_64 Linux; builds also run on developer machines.
 const AGENT_COMPILE_TARGET = 'bun-linux-x64';
 
 const FAILURE_EXIT_CODE = 1;

@@ -28,7 +28,6 @@
         "effect": "3.22.1",
       },
       "devDependencies": {
-        "@repo/app-operations": "workspace:*",
         "@repo/internal-scripts": "workspace:*",
         "@repo/typescript-config": "workspace:*",
         "typescript": "catalog:",

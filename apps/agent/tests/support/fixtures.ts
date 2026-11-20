@@ -15,7 +15,6 @@ import {
   type HostDesiredState,
   HostIdSchema,
   HostnameSchema,
-  HostPortSchema,
   HttpPortSchema,
   type InstanceResources,
   ObjectKeySchema,
@@ -26,13 +25,8 @@ import {
   VolumeIdSchema,
 } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
-import { initialTracker } from '#lib/health/state.ts';
 import type { TenantLogEvent } from '#lib/logs/event.ts';
-import { describeSlot, FIRST_SLOT, HOST_PORT_BASE } from '#lib/network/slot.ts';
-import type { ObservedInstance, ObservedState, ObservedVolume } from '#lib/reconcile/plan.ts';
-import { type InstanceRecord, newInstanceRecord } from '#lib/report/instance-record.ts';
 import { ARTIFACT_BYTES, ARTIFACT_DIGEST } from '#tests/support/artifacts.ts';
-import { HOST_STORAGE_PREFIX } from '#tests/support/config.ts';
 
 const HTTP_PORT_NUMBER = 3000;
 export const HTTP_PORT_FIXTURE = Value.Parse(HttpPortSchema, HTTP_PORT_NUMBER);
@@ -65,7 +59,6 @@ export const EXPORT_ID = Value.Parse(ExportIdSchema, 'exp-1');
 export const OBSERVED_AT = Value.Parse(TimestampSchema, '2026-08-03T10:00:00.000Z');
 
 export const VOLUME_SIZE_BYTES = 4_096;
-export const FIRST_HOST_PORT = Value.Parse(HostPortSchema, HOST_PORT_BASE);
 
 export const JWT_ACCESS = {
   kind: 'jwt',
@@ -157,63 +150,6 @@ export function desiredState(overrides: Partial<HostDesiredState> = {}): HostDes
     hostId: HOST_ID,
     volumes: [],
     instances: [],
-    checkpoints: [],
-    exports: [],
-    ...overrides,
-  };
-}
-
-export function instanceRecord(overrides: Partial<InstanceRecord> = {}): InstanceRecord {
-  return {
-    ...newInstanceRecord({
-      appId: APP_ID,
-      deploymentId: DEPLOYMENT_ID,
-      volumeId: VOLUME_ID,
-      hostnames: [APP_HOSTNAME],
-      hostPort: FIRST_HOST_PORT,
-      httpPort: HTTP_PORT_FIXTURE,
-      guestIpv4: describeSlot({ slot: FIRST_SLOT, appId: APP_ID }).guestIpv4,
-      artifactDigest: ARTIFACT_DIGEST,
-      state: 'running',
-      onRequest: false,
-      health: initialTracker(),
-      healthCheck: HEALTH_CHECK_FIXTURE,
-      resources: RESOURCES_FIXTURE,
-      desiredRunning: true,
-    }),
-    ...overrides,
-  };
-}
-
-export function observedInstance(overrides: Partial<ObservedInstance> = {}): ObservedInstance {
-  return {
-    appId: APP_ID,
-    volumeId: VOLUME_ID,
-    deploymentId: DEPLOYMENT_ID,
-    present: true,
-    running: true,
-    exited: false,
-    ...overrides,
-  };
-}
-
-export function observedVolume(overrides: Partial<ObservedVolume> = {}): ObservedVolume {
-  return {
-    volumeId: VOLUME_ID,
-    appId: APP_ID,
-    attached: true,
-    sizeBytes: VOLUME_SIZE_BYTES,
-    storagePrefix: HOST_STORAGE_PREFIX,
-    devicePath: '/dev/nbd0',
-    ...overrides,
-  };
-}
-
-export function observedState(overrides: Partial<ObservedState> = {}): ObservedState {
-  return {
-    instances: [],
-    volumes: [],
-    deletedVolumes: [],
     checkpoints: [],
     exports: [],
     ...overrides,

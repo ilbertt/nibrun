@@ -57,7 +57,6 @@ const bridgeUnit = await Bun.file(join(hostDirectory, 'systemd/nibrun-nibrunner-
   .text()
   .then((unit) => unit.replaceAll('{{EXPORTS_DIRECTORY}}', NIBRUNNER_EXPORTS_DIRECTORY));
 const bridgeEnvironment = {
-  AGENT_ENGINE: 'nibrunner',
   AGENT_CONTROL_PLANE_URL: requiredEnv('AGENT_CONTROL_PLANE_URL'),
   AGENT_LOG_INGEST_URL: requiredEnv('AGENT_LOG_INGEST_URL'),
   AGENT_ARTIFACT_BUCKET: requiredEnv('AGENT_ARTIFACT_BUCKET'),

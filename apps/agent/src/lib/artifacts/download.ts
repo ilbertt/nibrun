@@ -1,4 +1,4 @@
-import { FileSystem, type Path } from '@effect/platform';
+import { FileSystem } from '@effect/platform';
 import type { DesiredArtifact, Sha256Digest } from '@repo/protocol';
 import { Data, Effect, Ref, Stream } from 'effect';
 import { ArtifactTransferError } from '#lib/artifacts/store.ts';
@@ -6,7 +6,6 @@ import { ArtifactStore } from '#services/artifact-store.service.ts';
 
 const DIGEST_ALGORITHM = 'sha256';
 const HEX_ENCODING = 'hex';
-export const SQUASHFS_FILENAME = 'artifact.squashfs';
 /** What a binary has to be to be one, wherever it lands — the guest's squashfs or an export. */
 export const BINARY_MODE = 0o755;
 
@@ -27,17 +26,6 @@ export class ArtifactSizeMismatch extends Data.TaggedError('ArtifactSizeMismatch
     return `the artifact is ${this.actual} bytes, not the ${this.expected} its manifest declares`;
   }
 }
-
-/** Content-addressed, so a redeploy of a known digest costs nothing and two apps share one image. */
-export const artifactImagePath = ({
-  cacheDir,
-  digest,
-  path,
-}: {
-  cacheDir: string;
-  digest: Sha256Digest;
-  path: Path.Path;
-}) => path.join(cacheDir, digest, SQUASHFS_FILENAME);
 
 /**
  * Hashed during the transfer rather than after it, so the bytes are never read twice and the

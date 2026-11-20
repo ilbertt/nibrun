@@ -1,6 +1,7 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { DesiredArtifact } from '@repo/protocol';
 import { Data, Effect, Option } from 'effect';
+import { BINARY_MODE, downloadAndVerify } from '#lib/artifacts/download.ts';
 import {
   BUNDLE_NAME,
   bundleBinaryName,
@@ -9,7 +10,6 @@ import {
   ENV_FILENAME,
 } from '#lib/exports/bundle.ts';
 import { NIBRUNNER_DATA_DIRECTORY } from '#lib/nibrunner/paths.ts';
-import { BINARY_MODE, downloadAndVerify } from '#lib/vm/artifacts.ts';
 import { stdoutOf } from '#services/command-runner.service.ts';
 
 const STAGING_MODE = 0o700;

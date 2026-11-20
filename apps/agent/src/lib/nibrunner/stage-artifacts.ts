@@ -1,8 +1,8 @@
 import { FileSystem, Path } from '@effect/platform';
 import type { DesiredArtifact, HostDesiredState } from '@repo/protocol';
 import { Effect } from 'effect';
+import { downloadAndVerify } from '#lib/artifacts/download.ts';
 import { emptyDataArchive } from '#lib/nibrunner/artifact.ts';
-import { downloadAndVerify } from '#lib/vm/artifacts.ts';
 
 const PRIVATE_FILE_MODE = 0o600;
 const PRIVATE_DIRECTORY_MODE = 0o700;

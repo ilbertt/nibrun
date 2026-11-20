@@ -2,6 +2,21 @@ import { Buffer } from 'node:buffer';
 import { createServer, type Socket } from 'node:net';
 import { join } from 'node:path';
 import { Effect } from 'effect';
+import { connectNibrunnerGuest } from '#lib/nibrunner/guest-connection.ts';
+import { GUEST_SQLITE_VSOCK_PORT, makeGuestSqliteClient } from '#lib/sqlite/client.ts';
+import { APP_ID, DEPLOYMENT_ID } from '#tests/support/fixtures.ts';
+
+export function connectSqliteClient({ socketPath }: { socketPath: string }) {
+  return Effect.gen(function* () {
+    const socket = yield* connectNibrunnerGuest({
+      socketPath,
+      appId: APP_ID,
+      deploymentId: DEPLOYMENT_ID,
+      port: GUEST_SQLITE_VSOCK_PORT,
+    });
+    return yield* makeGuestSqliteClient({ socket });
+  });
+}
 
 export function sqliteHttpBytes(body: Buffer) {
   return Buffer.concat([
@@ -77,12 +92,12 @@ export function servingSqliteGuest({
     let buffered = Buffer.alloc(0);
     let accepted = false;
     function acceptHandshake() {
-      const newline = buffered.indexOf('\n');
+      const newline = buffered.indexOf('\r\n\r\n');
       if (newline < 0) {
         return false;
       }
-      requests.push(buffered.subarray(0, newline + 1));
-      buffered = buffered.subarray(newline + 1);
+      requests.push(buffered.subarray(0, newline + Buffer.byteLength('\r\n\r\n')));
+      buffered = buffered.subarray(newline + Buffer.byteLength('\r\n\r\n'));
       accepted = true;
       connected.resolve();
       void send({ socket, bytes: Buffer.from(handshake) });
