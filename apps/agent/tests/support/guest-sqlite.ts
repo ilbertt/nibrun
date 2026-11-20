@@ -2,7 +2,7 @@ import { Buffer } from 'node:buffer';
 import { createServer, type Socket } from 'node:net';
 import { join } from 'node:path';
 import { Effect } from 'effect';
-import { connectNibrunnerGuest } from '#lib/nibrunner/guest-connection.ts';
+import { connectNibrunnerGuest } from '#guest-connection.ts';
 import { GUEST_SQLITE_VSOCK_PORT, makeGuestSqliteClient } from '#lib/sqlite/client.ts';
 import { APP_ID, DEPLOYMENT_ID } from '#tests/support/fixtures.ts';
 

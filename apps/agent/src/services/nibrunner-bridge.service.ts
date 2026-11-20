@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
+import { makeNibrunnerBridge } from '#bridge.ts';
 import { makeArtifactStore } from '#lib/artifacts/store.ts';
 import { makeControlPlaneClient } from '#lib/control/client.ts';
-import { makeNibrunnerBridge } from '#lib/nibrunner/bridge.ts';
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { AwsCredentialProvider } from '#services/aws-credential-provider.service.ts';
 import { NibrunnerBridgeConfig } from '#services/nibrunner-bridge-config.service.ts';

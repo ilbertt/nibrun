@@ -1,5 +1,5 @@
-import type { HostReportedState as NibrunnerReport } from '#lib/nibrunner/reported.gen.ts';
-import type { TenantLogEvent } from '#lib/nibrunner/tenant-log.gen.ts';
+import type { HostReportedState as NibrunnerReport } from '#reported.gen.ts';
+import type { TenantLogEvent } from '#tenant-log.gen.ts';
 import { ARTIFACT_DIGEST } from '#tests/support/artifacts.ts';
 import {
   APP_ID,
