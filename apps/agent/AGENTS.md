@@ -4,8 +4,9 @@ The control-plane bridge for nibrunner. One compiled binary on the nibrunner hos
 its durable identity, polls the API, stages artifacts and publishes desired state to nibrunner.
 Nibrunner owns microVM lifecycle, networking, storage, wakeups and cron execution.
 
-`src/index.ts` composes the platform and bridge layers. Services live in `src/services/`,
-one `Effect.Service` per file; bridge mechanics live in `src/lib/`. Tests mirror source paths
+`src/index.ts` composes the platform and bridge layers. Bridge modules and generated wire types
+live directly in `src/`. Services live in `src/services/`, one `Effect.Service` per file;
+shared helpers live in `src/lib/`. Tests mirror source paths
 under `tests/`, with shared fixtures in `tests/support/`.
 
 Persist the registration identity before the first session request and reuse it on renewal.
