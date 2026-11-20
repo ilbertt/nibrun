@@ -106,8 +106,9 @@ Sign-in needs a GitHub OAuth App whose callback URL is
 
 Umami uses the `UMAMI_HOSTNAME` repository variable (`umami.nibrun.com` for this deployment).
 Its admin credentials are seeded before the public proxy starts. Umami keeps its own login
-behind Access; it does not authenticate Cloudflare identities. Only `/script.js` and `/api/send`
-bypass Access so anonymous visitors can load the tracker and submit analytics. The Tunnel
+behind Access; it does not authenticate Cloudflare identities. Anonymous browsers load
+`/script.js` and `/recorder.js`, fetch `/api/websites/<seeded-website-id>/recorder`, and submit
+analytics to `/api/send` and `/api/record`. Replay and heatmap reads require Access. The Tunnel
 matches these exact paths before its hostname-wide token validation rule, with path normalization
 enabled. All other paths, including `/mcp` and the read API, require Access authentication.
 
