@@ -103,6 +103,8 @@ jobs:
           TF_VAR_dozzle_hostname: ${{ vars.DOZZLE_HOSTNAME }}
           TF_VAR_victorialogs_hostname: ${{ vars.VICTORIALOGS_HOSTNAME }}
           TF_VAR_umami_hostname: ${{ vars.UMAMI_HOSTNAME }}
+          TF_VAR_grafana_hostname: ${{ vars.GRAFANA_HOSTNAME }}
+          TF_VAR_metrics_hostname: ${{ vars.METRICS_HOSTNAME }}
           # Still APP_DOMAIN on purpose: the repository variable is read outside this repo
           # too, so it is not ours alone to rename.
           TF_VAR_app_host_domain: ${{ vars.APP_DOMAIN }}
@@ -128,6 +130,10 @@ jobs:
       DOZZLE_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).dozzle_hostname }}
       VICTORIALOGS_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).victorialogs_hostname }}
       UMAMI_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).umami_hostname }}
+      GRAFANA_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).grafana_hostname }}
+      METRICS_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).metrics_hostname }}
+      GRAFANA_PUBLIC_DASHBOARD_TOKEN: ${{ fromJSON(needs.terraform.outputs.values).grafana_public_dashboard_token }}
+      METRICS_INGEST_PORT: ${{ fromJSON(needs.terraform.outputs.values).metrics_ingest_port }}
       API_GITHUB_CLIENT_ID: ${{ fromJSON(needs.terraform.outputs.values).api_github_client_id }}
       API_CLOUDFLARE_ZONE_ID: ${{ fromJSON(needs.terraform.outputs.values).api_cloudflare_zone_id }}
       ARTIFACTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).artifacts_bucket }}
@@ -255,6 +261,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NIBRUNNER_HOST_INSTANCE_ID: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_host_instance_id }}
+      METRICS_REMOTE_WRITE_URL: ${{ fromJSON(needs.terraform.outputs.values).metrics_remote_write_url }}
       NIBRUNNER_HTTP_PROXY_PORT: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_http_proxy_port }}
       NIBRUNNER_ZEROFS_STORAGE_URL: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_zerofs_storage_url }}
       NIBRUNNER_ZEROFS_ENCRYPTION_PASSWORD_PARAMETER: ${{ fromJSON(needs.terraform.outputs.values).nibrunner_zerofs_encryption_password_parameter }}

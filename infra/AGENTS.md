@@ -44,7 +44,7 @@ The host installs `apt.conf` before any package operations so APT waits up to fi
 the dpkg lock when unattended upgrades are running.
 
 Config carries its component's prefix (`API_`, `POSTGRES_`, `PG_BACKUP_`, `CADDY_`, `DOZZLE_`,
-`VICTORIALOGS_`, `PGWEB_`, `UMAMI_`, `CLOUDFLARED_`) unless more than one component reads it, and keeps one name from
+`VICTORIALOGS_`, `PGWEB_`, `UMAMI_`, `GRAFANA_`, `PROMETHEUS_`, `CLOUDFLARED_`) unless more than one component reads it, and keeps one name from
 the Terraform output through the SSM command to the `.env` the box writes. Nothing is aliased in
 transit, so nothing can drift.
 
@@ -85,9 +85,9 @@ SSM-managed secrets. Certificate rotation requires deploying a second certificat
 revoking the first; `prevent_destroy` blocks revocation during an ordinary apply.
 
 The control plane and nibrunner use Tunnels and need no origin certificates or Authenticated
-Origin Pulls. The control plane publishes only its VPC control and log-ingest listeners.
+Origin Pulls. The control plane publishes only its VPC control, log-ingest and metrics-ingest listeners.
 
-Terraform protects the Dozzle and VictoriaLogs public hostnames with Cloudflare Access,
+Terraform protects the Grafana, Dozzle and VictoriaLogs public hostnames with Cloudflare Access,
 allowing only members of `cloudflare_account_id` with 24-hour sessions. The account must
 already have a Zero Trust organization and the Cloudflare identity provider configured.
 `CLOUDFLARE_TERRAFORM_API_TOKEN` needs **Access: Apps and Policies Write** and
@@ -162,3 +162,31 @@ Control-plane deploys prune unused Docker images, including tagged releases, bef
 and again after the health gate and Caddy reload. Images created within the last 24 hours stay
 cached for rollbacks; every image referenced by a container is preserved regardless of age.
 Cleanup never prunes volumes or removes persistent data.
+
+## Metrics
+
+Grafana and Prometheus run on the existing control plane, with persistent volumes and 512 MiB
+memory limits each. Prometheus keeps up to 30 days or 2 GB of retained blocks, whichever comes
+first; its WAL and head chunks need additional disk space. Alloy runs as an unprivileged
+systemd service on nibrunner, scraping loopback every 30 seconds and writing outbound across
+the VPC. Only the nibrunner security group can reach Caddy's metrics listener, which forwards
+`POST /api/v1/write` and exposes no query API. The nibrunner security group retains no ingress.
+
+`GRAFANA_HOSTNAME` and `METRICS_HOSTNAME` are repository variables passed through Terraform.
+The Grafana hostname requires Cloudflare Access and Grafana login; its initial `admin` password
+is the `grafana_admin_password` SSM parameter. Keep that password in sync with SSM if changing
+it in Grafana, because deployments use it to reconcile public sharing.
+
+The metrics hostname has no Access gate. Caddy permits only the configured externally shared
+dashboard, its fixed panel-query endpoints and static assets. Anonymous Grafana access stays
+disabled. Public panels query only the recording rules in `infra/prometheus/public-rules.yml`;
+those rules aggregate away tenant and host identities. Annotations and time selection are
+disabled, and a failed scrape produces gaps rather than zero activity. This covers nibrunner,
+not the legacy host fleet, and is not an uptime measurement.
+
+`seed-grafana` is bundled for Node and run before the public Caddy route is reloaded. Both
+dashboards are file-provisioned; edit their JSON under `infra/grafana/dashboards/`. The public
+share token is a stable Terraform-generated identifier for intentionally public content, not a
+secret. `check-metrics` validates the collector and rules and tests aggregate labels and scrape
+failure behavior with Docker. Removing the metrics hostname from the control-plane Tunnel
+revokes public access without disturbing collection or private dashboards.

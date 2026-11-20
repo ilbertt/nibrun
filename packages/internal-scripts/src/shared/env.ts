@@ -1,5 +1,5 @@
 export function requiredEnv(name: string): string {
-  const value = Bun.env[name];
+  const value = process.env[name];
   if (!value) {
     throw new Error(`Missing required environment variable: ${name}`);
   }
@@ -7,5 +7,5 @@ export function requiredEnv(name: string): string {
 }
 
 export function optionalEnv(name: string): string | undefined {
-  return Bun.env[name] || undefined;
+  return process.env[name] || undefined;
 }

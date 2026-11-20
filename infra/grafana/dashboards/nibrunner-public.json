@@ -1,0 +1,361 @@
+{
+  "uid": "nibrunner-public",
+  "title": "nibrun public metrics",
+  "description": "Aggregate production metrics for apps hosted on nibrunner. This does not cover legacy hosts and is not an uptime SLA.",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "timezone": "utc",
+  "tags": ["nibrunner"],
+  "refresh": "1m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "title": "Apps running and sleeping",
+      "type": "timeseries",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nibrun_public:apps",
+          "legendFormat": "{{state}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 1,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "title": "Requests per second",
+      "type": "timeseries",
+      "description": "Proxy answers for served, unreachable and refused outcomes, including wake activator responses. Excludes unknown hosts and fallback redirects.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nibrun_public:requests_per_second",
+          "legendFormat": "requests"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 2,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      }
+    },
+    {
+      "title": "Time to response headers",
+      "type": "timeseries",
+      "description": "Five-minute percentiles across proxy requests. Includes customer application time and wakes; excludes TLS and response-body transfer.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nibrun_public:response_seconds_p50",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "nibrun_public:response_seconds_p95",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 3,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      }
+    },
+    {
+      "title": "Wake latency",
+      "type": "timeseries",
+      "description": "One-hour percentiles from a request reaching the waker until the app is ready, including requests joining an existing wake. Empty when there are no wakes.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nibrun_public:wake_seconds_p50",
+          "legendFormat": "p50"
+        },
+        {
+          "refId": "B",
+          "expr": "nibrun_public:wake_seconds_p95",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 4,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      }
+    },
+    {
+      "title": "Proxy requests without an app response",
+      "type": "timeseries",
+      "description": "The proxy answered because the app could not be reached. Customer-generated HTTP 5xx responses are not counted here.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nibrun_public:unreachable_requests_per_second",
+          "legendFormat": "unreachable"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 5,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      }
+    },
+    {
+      "title": "Deployment readiness",
+      "type": "timeseries",
+      "description": "One-hour p95 for changes targeting running apps, from the host noticing the change to readiness. Excludes upload time.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nibrun_public:deployment_seconds_p95",
+          "legendFormat": "p95"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 6,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      }
+    },
+    {
+      "title": "Requests waiting for a wake in the last hour",
+      "type": "timeseries",
+      "description": "Includes requests joining a wake already in progress; this is not a count of distinct VM restores.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nibrun_public:wakes_per_hour",
+          "legendFormat": "requests"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 7,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      }
+    },
+    {
+      "title": "Last successful metrics collection",
+      "type": "timeseries",
+      "description": "Data covers nibrunner hosts only. Missing metrics are gaps, not zero traffic or a claim of uptime.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nibrun_public:last_successful_scrape_timestamp_seconds * 1000",
+          "legendFormat": "last collection"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "dateTimeAsIso",
+          "custom": {
+            "spanNulls": false
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 8,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      }
+    }
+  ]
+}

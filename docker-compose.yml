@@ -1,4 +1,4 @@
-# Local stack: Postgres, MinIO, the API, VictoriaLogs, Dozzle, pgweb and Umami. Copy
+# Local stack: API, databases, storage, logs, analytics and metrics. Copy
 # .env.example to .env first.
 #
 # Anything truly opinionated (internal service URLs, container ports, bucket
@@ -223,6 +223,70 @@ services:
     networks:
       - nibrun
 
+  prometheus:
+    image: prom/prometheus:v3.16.0
+    container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --config.auto-reload
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --storage.tsdb.retention.size=2GB
+      - --web.enable-remote-write-receiver
+      - --query.max-concurrency=4
+      - --query.max-samples=5000000
+      - --query.timeout=15s
+    volumes:
+      - ./infra/prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT}:9090"
+    mem_limit: 512m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: always
+    networks:
+      - nibrun
+
+  grafana:
+    image: grafana/grafana:13.3
+    container_name: grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:?}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+      - GF_PLUGINS_PREINSTALL_DISABLED=true
+      - GF_ANALYTICS_REPORTING_ENABLED=false
+      - GF_ANALYTICS_CHECK_FOR_UPDATES=false
+      - GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES=false
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/nibrunner-operations.json
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "127.0.0.1:${GRAFANA_PORT}:3000"
+    mem_limit: 512m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    restart: always
+    networks:
+      - nibrun
+
   # Every container's logs, read off the Docker socket, in local and prod alike.
   # Authentication belongs to the production Tunnel. Local access stays
   # loopback-only, and production removes the host port binding entirely.
@@ -298,4 +362,8 @@ volumes:
   minio-data:
     driver: local
   victorialogs-data:
+    driver: local
+  grafana-data:
+    driver: local
+  prometheus-data:
     driver: local

@@ -26,7 +26,7 @@ services:
         condition: service_healthy
 
   # Cloudflared reaches Caddy over Docker networking. Only the fleet's private
-  # control and log listeners are published on the host.
+  # control, log and metrics listeners are published on the host.
   #
   # No depends_on: it makes compose restart Caddy whenever an upstream is
   # recreated, which every deploy does to the api, taking the edge down for the
@@ -42,9 +42,10 @@ services:
     container_name: caddy
     restart: always
     ports:
-      # The security group admits only the fleet's control and log sources.
+      # Each listener is admitted only from its fleet security groups.
       - "${INTERNAL_PORT}:${INTERNAL_PORT}"
       - "${LOG_INGEST_PORT}:${LOG_INGEST_PORT}"
+      - "${METRICS_INGEST_PORT}:${METRICS_INGEST_PORT}"
     healthcheck:
       test:
         ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:2019/config/ || exit 1"]
@@ -57,6 +58,10 @@ services:
       - DOZZLE_HOSTNAME
       - VICTORIALOGS_HOSTNAME
       - UMAMI_HOSTNAME
+      - GRAFANA_HOSTNAME
+      - METRICS_HOSTNAME
+      - GRAFANA_PUBLIC_DASHBOARD_TOKEN
+      - METRICS_INGEST_PORT
       - INTERNAL_PORT
       # Without this the Caddyfile's `:{$LOG_INGEST_PORT}` site address expands
       # to a bare `:`, which Caddy drops silently rather than refusing — the
@@ -85,6 +90,32 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - nibrun
+
+  prometheus:
+    ports: !reset []
+
+  grafana:
+    ports: !reset []
+    environment:
+      - GF_SERVER_ROOT_URL=https://${GRAFANA_HOSTNAME}
+      - GF_SECURITY_COOKIE_SECURE=true
+      - GF_SECURITY_COOKIE_SAMESITE=strict
+
+  grafana-bootstrap:
+    image: node:26-alpine
+    profiles: [setup]
+    environment:
+      - GRAFANA_ADMIN_PASSWORD
+      - GRAFANA_PUBLIC_DASHBOARD_TOKEN
+    command: ["node", "/seed-grafana.mjs"]
+    volumes:
+      - ./seed-grafana.mjs:/seed-grafana.mjs:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: "no"
     networks:
       - nibrun
 
@@ -164,3 +195,15 @@ volumes:
       type: none
       o: bind
       device: /data/volumes/victorialogs-data
+
+  grafana-data:
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/volumes/grafana-data
+
+  prometheus-data:
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/volumes/prometheus-data
