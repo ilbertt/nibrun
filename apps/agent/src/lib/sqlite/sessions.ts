@@ -1,7 +1,7 @@
 import type { DesiredInstance, SqliteOutcome, SqliteQuery, SqliteSessionId } from '@repo/protocol';
 import { SQLITE_MAX_ERROR_MESSAGE_LENGTH } from '@repo/sqlite';
 import { Data, type Deferred, type Effect, type Scope } from 'effect';
-import type { connectGuestSqlite } from '#lib/sqlite/client.ts';
+import type { makeGuestSqliteClient } from '#lib/sqlite/client.ts';
 import type {
   GuestSqliteFailed,
   InvalidSqliteRequest,
@@ -32,7 +32,7 @@ export type SqliteSessionError =
   | SqliteDisconnected
   | SqliteSessionUnavailable
   | SqliteSessionCapacity;
-export type SqliteClient = Effect.Effect.Success<ReturnType<typeof connectGuestSqlite>>;
+export type SqliteClient = Effect.Effect.Success<ReturnType<typeof makeGuestSqliteClient>>;
 export type SqliteSession = {
   readonly appId: SqliteQuery['appId'];
   readonly deploymentId: SqliteQuery['deploymentId'];
