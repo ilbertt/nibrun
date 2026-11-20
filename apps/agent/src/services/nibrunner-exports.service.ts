@@ -1,7 +1,7 @@
 import { Effect } from 'effect';
+import { makeNibrunnerExports } from '#exports.ts';
 import { makeArtifactStore } from '#lib/artifacts/store.ts';
 import { makeExportUploader } from '#lib/exports/upload.ts';
-import { makeNibrunnerExports } from '#lib/nibrunner/exports.ts';
 import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { AwsCredentialProvider } from '#services/aws-credential-provider.service.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
