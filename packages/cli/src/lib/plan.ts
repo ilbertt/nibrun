@@ -15,7 +15,6 @@ export type RunOptions = {
   app?: AddressedApp | undefined;
   name?: string | undefined;
   port?: number | undefined;
-  extraPublicPort?: boolean | undefined;
   env?: string[] | undefined;
   unset?: string[] | undefined;
   dataFolder?: InitialData | undefined;
@@ -141,7 +140,6 @@ function summary({ options, binarySource, args }: Plan): string {
       options.dataFolder?.kind === 'url' ? options.dataFolder.url : options.dataFolder?.path,
     ],
     // Only when it was asked for: a row saying no on every run is one nobody reads.
-    ['extra public port', options.extraPublicPort ? 'yes' : undefined],
     ['args', args.length === 0 ? undefined : args.join(' ')],
   ];
   return rows

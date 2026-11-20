@@ -82,6 +82,6 @@ export function nibrunnerInstance(instance: DesiredInstance): NibrunnerInstance 
       restartPolicy: instance.config.restartPolicy,
     },
     hostnames: instance.hostnames,
-    access: { kind: 'public' },
+    access: instance.config.access,
   };
 }

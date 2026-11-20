@@ -22,7 +22,7 @@ export type OwnedAppState = Extract<
   { state: unknown }
 >['state'];
 export type TenantArguments = App['config']['args'];
-export type TenantEnvironmentPatch = NonNullable<AppPatch['environment']>;
+export type TenantEnvironmentPatch = NonNullable<NonNullable<AppPatch['config']>['environment']>;
 export type Deployment = Treaty.Data<DeploymentRoutes['get']>;
 export type DeploymentState = Deployment['state'];
 export type InstanceState = NonNullable<Deployment['instanceState']>;

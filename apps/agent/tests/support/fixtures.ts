@@ -67,6 +67,14 @@ export const OBSERVED_AT = Value.Parse(TimestampSchema, '2026-08-03T10:00:00.000
 export const VOLUME_SIZE_BYTES = 4_096;
 export const FIRST_HOST_PORT = Value.Parse(HostPortSchema, HOST_PORT_BASE);
 
+export const JWT_ACCESS = {
+  kind: 'jwt',
+  issuer: 'https://id.example',
+  audiences: ['reports'],
+  token: { header: 'Authorization', format: 'bearer' },
+  publicKeys: { url: 'https://id.example/keys' },
+} satisfies DesiredInstance['config']['access'];
+
 export const APP_HOSTNAME: AppHostname = {
   hostname: Value.Parse(HostnameSchema, 'app-1.apps.example.com'),
   kind: 'platform',
@@ -98,6 +106,7 @@ export function desiredInstance(overrides: Partial<DesiredInstance> = {}): Desir
     desiredState: 'running',
     artifact: artifact(),
     config: {
+      access: { kind: 'public' },
       httpPort: HTTP_PORT_FIXTURE,
       hasExtraPublicPort: false,
       args: [],

@@ -7,8 +7,7 @@ type Carried = { param: string; read: (value: unknown) => unknown };
 
 /**
  * Each part of a deploy a link may ask for, as the parameter that carries it and the way that
- * parameter is read. Keyed by `ConfigEdit`, so anything a release grows the ability to configure
- * is a link that stops compiling until it can carry it.
+ * parameter is read. Access policy is chosen by the owner and cannot be supplied by a deploy link.
  *
  * Every one of these only prefills a field the owner can still edit, and the api validates what is
  * submitted, so an absurd value costs a correction rather than a refusal here.
@@ -18,10 +17,9 @@ const CONFIGURED = {
   // held as a string, `?port=3000` would be rewritten to `?port="3000"` in the address bar of
   // everyone who followed the link.
   port: { param: 'port', read: asPort },
-  extraPublicPort: { param: 'extra-public-port', read: asFlag },
   args: { param: 'arg', read: asWritten },
   environment: { param: 'env', read: asWritten },
-} as const satisfies { [K in keyof Required<ConfigEdit>]: Carried };
+} as const satisfies { [K in Exclude<keyof ConfigEdit, 'access'>]: Carried };
 
 type Written = {
   [K in keyof typeof CONFIGURED as (typeof CONFIGURED)[K]['param']]?: ReturnType<
@@ -87,7 +85,6 @@ function written(search: Record<string, unknown>): Written {
 
 type Meant = {
   port: number;
-  extraPublicPort: boolean;
   args: string[];
   environment: EnvironmentAssignment[];
 };
@@ -112,14 +109,13 @@ export function deploySuggestion(link: DeployLink): DeploySuggestion {
     sha256: link.sha256,
     initialData: link['initial-data'],
     port: link.port,
-    extraPublicPort: link['extra-public-port'],
     args: link.arg,
     environment: link.env && assignments(link.env),
   };
 }
 
 // A value reaches here already taken for what it looks like: `?port=3000` is a number and
-// `?extra-public-port=true` a boolean before anything below sees them, so text is what is left of
+// `?minimal=true` a boolean before anything below sees them, so text is what is left of
 // one rather than what it arrives as.
 function asText(value: unknown): string | undefined {
   return typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean'
@@ -133,7 +129,7 @@ function asPort(value: unknown): number | undefined {
 }
 
 // A parameter written without a value is how a flag is asked for everywhere else, and the only
-// thing `?extra-public-port` on its own could mean.
+// thing `?minimal` on its own could mean.
 function asFlag(value: unknown): boolean | undefined {
   if (typeof value === 'boolean') {
     return value;

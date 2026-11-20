@@ -8,7 +8,8 @@ import { createOutput } from '#lib/output.ts';
 // Unasked, unlike `apps delete`: the app keeps running on every other hostname, and re-adding
 // this one costs the same two records it cost the first time.
 export const command = defineCommand('apps domains remove [hostname]', {
-  description: 'Stop serving this app on a domain you brought. The app keeps its other hostnames.',
+  description:
+    'Stop serving this app on a domain you brought. Deploy Public or Custom JWT access before removing the last domain from a Cloudflare Access app.',
   options: {},
   params: {
     hostname: {

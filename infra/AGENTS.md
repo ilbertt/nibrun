@@ -69,8 +69,9 @@ a rebuilt account to names its predecessor still holds for ~90 days.
 DNS, every record **proxied** (orange cloud):
 
 - Terraform manages the four control-plane hostnames as CNAMEs to the control-plane Tunnel.
-- `*.<app_domain>` A → `app_host_public_ips`. One record covers the whole fleet, so there is
-  nothing per app in DNS.
+- Terraform manages `<app_domain>` and `*.<app_domain>` as CNAMEs to the nibrunner Tunnel.
+  A fresh setup creates these records; existing deployments keep their Terraform state so the
+  same resources remain managed after the migration imports are removed.
 
 App-host origins use A records only. Cloudflare serves visitors over IPv6 from its own edge;
 the Tunnel needs no public origin address. App-host addresses outlive a replacement.
@@ -127,11 +128,9 @@ uses `CF-Connecting-IP` for the visitor IP. See [Umami's guide](https://docs.uma
 
 Custom domains, in the `app_domain` zone only:
 
-- **Cloudflare for SaaS** on, and `fallback.<app_domain>` A → `app_host_public_ips`, **proxied**,
-  set as the zone's **fallback origin**. Nothing serves that name — the site blocks are still
-  written per hostname — it exists so the edge has an address to resolve. Traffic for a custom
-  hostname reaches the origin naming *the custom hostname* in both the handshake and the request,
-  which is what lets Caddy's rendered site blocks match it with nothing added.
+- **Cloudflare for SaaS** on. Terraform sets the zone's **fallback origin** to `<app_domain>`,
+  whose CNAME points to the nibrunner Tunnel. The Tunnel preserves the custom hostname in the
+  request so nibrunner can route it to the owning app.
 - A **Configuration Rule**: where the host is not under `app_domain`, SSL → **Full**. The zone
   stays Full (strict), so platform hostnames are unaffected. This is the one place the posture is
   weakened, and it is deliberate: the origin certificate names `*.<app_domain>` and a brought
@@ -139,10 +138,8 @@ Custom domains, in the `app_domain` zone only:
   Authenticated Origin Pulls still applies — global AOP covers custom hostnames on a
   Cloudflare-for-SaaS zone — so what is given up is the origin proving itself to the edge, not
   the edge proving itself to the origin, which is the half `security_group.tf` rests on.
-- The apex redirects to the marketing site from the app-host proxy, and reaching it takes two
-  things here: `<app_domain>` A → `app_host_public_ips`, **proxied**, since the bare name has no
-  record of its own. Terraform's origin certificate includes both `<app_domain>` and
-  `*.<app_domain>` because a wildcard does not cover the bare name.
+- Terraform's apex CNAME routes `<app_domain>` through the nibrunner Tunnel. Nibrunner redirects
+  the apex to the marketing site.
 
 Terraform looks up the existing `app_host_domain` zone and provisions the API's account-owned
 token with *Zone → SSL and Certificates → Edit* on that zone only. The token goes to SSM and
@@ -156,6 +153,12 @@ domain arrives whenever an owner adds one — which is what the token is for.
 
 `.github/workflows/cd.yml`, on every push to main. No SSH and no key material in CI: the last leg
 triggers `on_box_deploy.sh` over SSM RunCommand.
+
+Bridge installation prunes obsolete SHA-named builds after its service health gate, under the
+deployment lock. It shares the legacy agent's retention implementation: keep the active build,
+the two newest other complete builds, and every executable still running. Bridge builds contain
+only `nibrun-agent`; legacy builds additionally require their `.installed` marker. Artifact caches,
+guest images, and tenant data are outside this cleanup.
 
 **No secret may pass through the workflow's own environment.** RunCommand keeps its parameters in
 command history, in the clear, for 30 days — so Terraform writes secrets into SSM parameters the

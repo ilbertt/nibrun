@@ -1,7 +1,12 @@
-import type { AppHostnameKind, AppId, Hostname } from '@repo/protocol';
+import { isCloudflareAccessHeader } from '@repo/api-constants';
+import { CLOUDFLARE_ACCESS_REMOVAL_HINT } from '@repo/app-ui';
+import type { AppId, Hostname } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import type { AppHostnameState } from '#lib/api/app.ts';
 import type { OwnerId } from '#lib/api/identifiers.ts';
+import { CUSTOM_KIND } from '#lib/app-hostname.ts';
+import { ConflictError } from '#lib/errors.ts';
+import { lockApp } from '#repositories/apps.repository.ts';
 import type { EdgeReport } from '#repositories/custom-hostnames.repository.ts';
 import { Repository, TEXT_ARRAY } from '#repositories/repository.ts';
 
@@ -25,7 +30,7 @@ export type DisposableAppHostnameRow = Queries['SelectDisposableAppHostnames'];
 
 type OwnedApp = { appId: AppId; ownerId: OwnerId };
 
-export const CUSTOM_KIND: AppHostnameKind = 'custom';
+type RemovedHostname = Queries['DeleteCustomAppHostname'];
 
 /**
  * The names an app answers on.
@@ -46,7 +51,7 @@ export abstract class AppHostnamesRepositoryContract {
   }): Promise<AppHostnameRow | null>;
   abstract setCustomState(input: { hostname: Hostname; state: AppHostnameState }): Promise<boolean>;
   abstract recordEdgeReport(input: { hostname: Hostname; report: EdgeReport }): Promise<boolean>;
-  abstract removeCustom(input: OwnedApp & { hostname: Hostname }): Promise<string | null>;
+  abstract removeCustom(input: OwnedApp & { hostname: Hostname }): Promise<RemovedHostname | null>;
   abstract listPendingCustom(input: {
     after: string | null;
     limit: number;
@@ -223,23 +228,49 @@ export class AppHostnamesRepository extends Repository implements AppHostnamesRe
    * unique across every app. Guarded on ownership and on kind, so neither another owner's domain
    * nor an app's own platform hostname can be removed through this.
    */
-  async removeCustom({
+  removeCustom({
     appId,
     ownerId,
     hostname,
-  }: OwnedApp & { hostname: Hostname }): Promise<string | null> {
-    const [row] = await this.sql.DeleteCustomAppHostname`
-      DELETE FROM nibrun.app_hostnames h
-      USING nibrun.live_apps a
-      WHERE h.app_id = a.id
-        AND h.app_id = ${appId} AND a.owner_id = ${ownerId}
-        AND h.hostname = ${hostname} AND h.kind = ${CUSTOM_KIND}
-      RETURNING h.cloudflare_id
-    `;
-    if (!row) {
-      return null;
-    }
-    return row.cloudflare_id ?? null;
+  }: OwnedApp & { hostname: Hostname }): Promise<RemovedHostname | null> {
+    return this.sql.begin(async (tx) => {
+      if (!(await lockApp({ tx, appId, ownerId }))) {
+        return null;
+      }
+      const [removed] = await tx.DeleteCustomAppHostname`
+        DELETE FROM nibrun.app_hostnames h
+        USING nibrun.live_apps a
+        WHERE h.app_id = a.id
+          AND h.app_id = ${appId} AND a.owner_id = ${ownerId}
+          AND h.hostname = ${hostname} AND h.kind = ${CUSTOM_KIND}
+        RETURNING h.cloudflare_id
+      `;
+      if (!removed) {
+        return null;
+      }
+      const [last] = await tx.SelectAccessAfterLastDomainRemoval`
+        SELECT saved.access_header AS saved_header, deployed.access_header AS deployed_header
+        FROM nibrun.live_apps a
+        JOIN LATERAL (
+          SELECT c.access_header FROM nibrun.app_configs c
+          WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
+        ) saved ON true
+        LEFT JOIN nibrun.latest_app_deployments latest ON latest.app_id = a.id
+        LEFT JOIN nibrun.deployments d ON d.id = latest.deployment_id
+        LEFT JOIN nibrun.app_configs deployed ON deployed.id = d.config_id
+        WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+          AND NOT EXISTS (
+            SELECT 1 FROM nibrun.app_hostnames h WHERE h.app_id = a.id AND h.kind = ${CUSTOM_KIND}
+          )
+      `;
+      if (
+        isCloudflareAccessHeader(last?.saved_header) ||
+        isCloudflareAccessHeader(last?.deployed_header)
+      ) {
+        throw new ConflictError(CLOUDFLARE_ACCESS_REMOVAL_HINT);
+      }
+      return removed;
+    });
   }
 
   /**

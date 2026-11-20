@@ -105,7 +105,7 @@ export const DEPLOY_PRESETS = {
   opencloud: {
     isRecommended: false,
     projectUrl: 'https://github.com/opencloud-eu/opencloud',
-    version: 'v9.0.0',
+    version: 'v9.2.0',
     markdownContent: opencloudPage,
     category: DeployCategory.FilesAndSharing,
     title: 'OpenCloud',
@@ -113,8 +113,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'opencloud',
       binary:
-        'https://github.com/opencloud-eu/opencloud/releases/download/v9.0.0/opencloud-9.0.0-linux-amd64',
-      sha256: '2944b956461107cf8d73424c3602d83ac157988e28dc6ce95370c45633de45c4',
+        'https://github.com/opencloud-eu/opencloud/releases/download/v9.2.0/opencloud-9.2.0-linux-amd64',
+      sha256: '6dd961024170b77838b9c61f0b03767fe9bf27d4ba8265d6537cb2e6a228b9be',
       port: 9200,
       arg: ['server'],
       env: [
@@ -142,23 +142,17 @@ export const DEPLOY_PRESETS = {
   sharkord: {
     isRecommended: false,
     projectUrl: 'https://github.com/sharkord/sharkord',
-    version: 'v0.0.30',
+    version: 'v0.0.31',
     markdownContent: sharkordPage,
     category: DeployCategory.Communication,
     title: 'Sharkord',
     subtitle: 'A self-hosted chat server with voice, video and screen sharing.',
     deployLink: {
       name: 'sharkord',
-      binary: 'https://github.com/Sharkord/sharkord/releases/download/v0.0.30/sharkord-linux-x64',
-      sha256: '592be523368445259269fbd23e112ffbc8179443d038b89b90e92dae94f0ab64',
+      binary: 'https://github.com/Sharkord/sharkord/releases/download/v0.0.31/sharkord-linux-x64',
+      sha256: '9760f45cfee0a316835bd2764643ecf5b5f1e707f04f436283c996b78ea69762',
       port: 4991,
-      'extra-public-port': true,
-      env: [
-        'SHARKORD_DATA_PATH=data',
-        'SHARKORD_AUTOUPDATE=false',
-        `SHARKORD_WEBRTC_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.EXTRA_PUBLIC_PORT.name)}`,
-        `SHARKORD_WEBRTC_ANNOUNCED_ADDRESS=${interpolableRuntimeValue(RUNTIME_VALUES.PUBLIC_IPV4.name)}`,
-      ],
+      env: ['SHARKORD_DATA_PATH=data', 'SHARKORD_AUTOUPDATE=false'],
       minimal: true,
     },
   },
@@ -262,7 +256,7 @@ export const DEPLOY_PRESETS = {
   'open-connector': {
     isRecommended: false,
     projectUrl: 'https://github.com/oomol-lab/open-connector',
-    version: 'v1.9.9',
+    version: 'v1.10.0',
     markdownContent: openConnectorPage,
     category: DeployCategory.DeveloperTools,
     title: 'OpenConnector',
@@ -270,8 +264,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'open-connector',
       binary:
-        'https://github.com/oomol-lab/open-connector/releases/download/v1.9.9/open-connector-linux-x64',
-      sha256: '44ceb28072b8fa550e75d63c1f27bfa046bf4d289d6e34d60130c85ce3cb4886',
+        'https://github.com/oomol-lab/open-connector/releases/download/v1.10.0/open-connector-linux-x64',
+      sha256: '0d04af111cf75573be1b421c1ced953f5dd8d9a9a8c17ce05b5d50e21f492bb4',
       port: 3000,
       env: [
         'HOST=0.0.0.0',
@@ -327,7 +321,7 @@ export const DEPLOY_PRESETS = {
   picoshare: {
     isRecommended: false,
     projectUrl: 'https://github.com/mtlynch/picoshare',
-    version: 'v1.5.4',
+    version: 'v1.5.5',
     markdownContent: picosharePage,
     category: DeployCategory.FilesAndSharing,
     title: 'PicoShare',
@@ -335,8 +329,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'picoshare',
       binary:
-        'https://github.com/mtlynch/picoshare/releases/download/v1.5.4/picoshare-v1.5.4-linux-amd64.tar.gz',
-      sha256: '5cd141ac24373b61ed4feaa64850c0de56f88455bc7695b43624ae2fae014431',
+        'https://github.com/mtlynch/picoshare/releases/download/v1.5.5/picoshare-v1.5.5-linux-amd64.tar.gz',
+      sha256: '72ab7116e861c2daecae6dbeb9912cdfe33182fdace86b5b7780671971f07bb4',
       port: 4001,
       arg: ['-db', '/app/data/store.db'],
       env: [
@@ -350,7 +344,7 @@ export const DEPLOY_PRESETS = {
   memos: {
     isRecommended: false,
     projectUrl: 'https://github.com/usememos/memos',
-    version: '26.11.0',
+    version: '26.11.1',
     markdownContent: memosPage,
     category: DeployCategory.NotesAndKnowledge,
     title: 'Memos',
@@ -358,8 +352,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'memos',
       binary:
-        'https://github.com/usememos/memos/releases/download/26.11.0/memos_26.11.0_linux_amd64.tar.gz',
-      sha256: '38b81c2bd1859555f4f7f277756541fd1ca332c94bbbee443626ace42d7b4061',
+        'https://github.com/usememos/memos/releases/download/26.11.1/memos_26.11.1_linux_amd64.tar.gz',
+      sha256: '874b80ba4b3555f5520310c45fab6c2bee593c7b97ce03ebc4503010705f87ff',
       port: 5230,
       env: [
         `MEMOS_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
@@ -434,7 +428,7 @@ export const DEPLOY_PRESETS = {
   openlist: {
     isRecommended: false,
     projectUrl: 'https://github.com/OpenListTeam/OpenList',
-    version: 'v4.2.9',
+    version: 'v4.2.10',
     markdownContent: openlistPage,
     category: DeployCategory.FilesAndSharing,
     title: 'OpenList',
@@ -442,8 +436,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'openlist',
       binary:
-        'https://github.com/OpenListTeam/OpenList/releases/download/v4.2.9/openlist-linux-amd64.tar.gz',
-      sha256: '1f41b64c61f66bc632490a0e17ee8769454fe093f03a68d22ffb4aa8a9b23187',
+        'https://github.com/OpenListTeam/OpenList/releases/download/v4.2.10/openlist-linux-amd64.tar.gz',
+      sha256: '060dee6fc8adfa79688a35760d218581a64b00cd10359edec097a8de82cef849',
       port: 5244,
       arg: ['server', '--data', '/app/data', '--log-std'],
       env: [
@@ -647,7 +641,7 @@ export const DEPLOY_PRESETS = {
   flipt: {
     isRecommended: false,
     projectUrl: 'https://github.com/flipt-io/flipt',
-    version: 'v2.14.1',
+    version: 'v2.14.2',
     markdownContent: fliptPage,
     title: 'Flipt',
     subtitle: 'Feature flags with a UI, evaluated over HTTP or gRPC.',
@@ -655,8 +649,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'flipt',
       binary:
-        'https://github.com/flipt-io/flipt/releases/download/v2.14.1/flipt_linux_x86_64.tar.gz',
-      sha256: '777437f40420332460b36639ae2b50a8874d3d3dd165edaff381e4d8a61b1626',
+        'https://github.com/flipt-io/flipt/releases/download/v2.14.2/flipt_linux_x86_64.tar.gz',
+      sha256: '5fd81c3b3139cb1865bb901e7d3613bedb5c4cb2a3fdc7183d3e8e3f0a06e5da',
       port: 8080,
       arg: ['server'],
       env: [

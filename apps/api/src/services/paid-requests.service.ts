@@ -25,6 +25,9 @@ export class PaidRequestsService extends Service {
       ...(row.request_type === 'apps'
         ? { requestedAppsAmount: row.requested_apps_amount }
         : { appId: row.app_id }),
+      ...(row.request_type === 'extra-public-port'
+        ? { requestedPortsAmount: row.requested_ports_amount }
+        : {}),
       ...(row.request_type === 'resources'
         ? {
             requestedVcpuCount: row.requested_vcpu_count,

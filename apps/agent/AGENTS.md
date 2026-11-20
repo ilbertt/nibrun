@@ -19,6 +19,14 @@ ZeroFS services. `AGENT_NIBRUNNER_STATE_DIR` defaults to `/var/lib/nibrunner`; i
 persists registration separately from the engine's state. The bridge cannot advertise `ready`
 while host routing, live queries and storage handoff remain under commissioning.
 
+The bridge's raw binary store and packed-image cache retain the digests supplied by the API for
+each app's current and immediately preceding deployment. Running and idle instances, volume seeds,
+and exports add protected references. Cache cleanup shares a permit with staging and desired-file
+publication, requires a fresh accepted report, and preserves open, mapped, hard-linked, recent,
+temporary, symlinked and unknown entries. Missing retention metadata or incomplete process visibility
+disables reclamation. Original S3 objects are not removed; evicted binaries are fetched and verified
+when requested again.
+
 Besides converging, it answers directory reads through `lib/agent/filesystem.ts` and cron
 listings through `lib/agent/cron-query.ts`, each on routes of its own.
 Directory reads wake idle apps through `AppWaker` and hold `GuestActivity` through the wake

@@ -33,11 +33,26 @@ mv -f /etc/nibrunner/cloudflared/token.next /etc/nibrunner/cloudflared/token
 install -m 0644 nibrun-nibrunner-tunnel.service /etc/systemd/system/nibrun-nibrunner-tunnel.service
 systemctl daemon-reload
 systemctl enable nibrun-nibrunner-tunnel.service
-systemctl restart nibrun-nibrunner-tunnel.service
+
+record_activation() {
+  sha256sum "$(command -v cloudflared)" \
+    /etc/nibrunner/cloudflared/token \
+    /etc/systemd/system/nibrun-nibrunner-tunnel.service
+  systemctl show nibrun-nibrunner-tunnel.service --property=InvocationID --value
+}
+
+record_activation > "$work/activation"
+if ! systemctl is-active --quiet nibrun-nibrunner-tunnel.service ||
+  ! cmp -s "$work/activation" /etc/nibrunner/cloudflared/applied; then
+  systemctl restart nibrun-nibrunner-tunnel.service
+fi
 
 for _ in $(seq 1 60); do
   if cloudflared tunnel --metrics 127.0.0.1:2000 ready; then
     systemctl is-active --quiet nibrun-nibrunner-tunnel.service
+    record_activation > "$work/activation"
+    install -m 0600 "$work/activation" /etc/nibrunner/cloudflared/applied.next
+    mv -f /etc/nibrunner/cloudflared/applied.next /etc/nibrunner/cloudflared/applied
     exit 0
   fi
   sleep 1

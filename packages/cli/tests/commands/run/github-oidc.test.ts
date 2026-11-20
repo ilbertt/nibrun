@@ -242,7 +242,6 @@ test.each([
   { flags: ['--app', 'existing-name'] },
   { flags: ['--name', 'new-name'] },
   { flags: ['--port', '8080'] },
-  { flags: ['--extra-public-port=false'] },
   { flags: ['--env', 'NAME=value'] },
   { flags: ['--unset', 'NAME'] },
   { flags: ['--data-folder', '/data'] },
@@ -254,6 +253,17 @@ test.each([
   expect(identityRequests).toHaveLength(0);
   expect(requests).toHaveLength(0);
 });
+
+test.each([true, false])(
+  'a legacy extra port flag of %s cannot change application configuration',
+  async (enabled) => {
+    const { cli } = workflowCli();
+    expect(await cli.run(trustedArguments([`--extra-public-port=${enabled}`]))).toBe(0);
+    expect(requests.filter((request) => request.url === `${API_URL}/api/apps/${APP_ID}`)).toEqual(
+      [],
+    );
+  },
+);
 
 test('trusted deployment refuses waiting for owner-only deployment status', async () => {
   const { cli } = workflowCli();

@@ -1,4 +1,4 @@
-import type { TenantArguments, TenantEnvironmentPatch } from '@repo/api-client/models';
+import type { App, TenantArguments, TenantEnvironmentPatch } from '@repo/api-client/models';
 
 /** Where a release landed and what to reach it at, whichever way it was asked for. */
 export type Deployed = {
@@ -22,19 +22,17 @@ export type DeployStep =
  * about arguments can only mean the ones already there.
  */
 export type ConfigEdit = {
+  access?: App['config']['access'] | undefined;
   args?: TenantArguments | undefined;
   port?: number | undefined;
-  // A yes or no rather than a number: which port an app is given is nibrun's to decide, because it
-  // has to be the same on every hop for a binary announcing the one it bound to be reachable.
-  extraPublicPort?: boolean | undefined;
   environment?: TenantEnvironmentPatch | undefined;
 };
 
-export function configPatch({ args, port, extraPublicPort, environment }: ConfigEdit) {
+export function configPatch({ access, args, port, environment }: ConfigEdit) {
   return {
+    ...(access !== undefined && { access }),
     ...(args !== undefined && { args }),
     ...(port !== undefined && { httpPort: port }),
-    ...(extraPublicPort !== undefined && { hasExtraPublicPort: extraPublicPort }),
     ...(environment !== undefined && { environment }),
   };
 }
@@ -44,10 +42,3 @@ export type AppEdit = ConfigEdit & {
   /** What to call the app from now on. Its hostnames stay: the slug never follows a rename. */
   name?: string | undefined;
 };
-
-export function appPatch({ name, ...edit }: AppEdit) {
-  return {
-    ...configPatch(edit),
-    ...(name !== undefined && { name }),
-  };
-}

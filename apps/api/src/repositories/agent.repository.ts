@@ -39,7 +39,10 @@ export abstract class AgentRepositoryContract {
     expiresAt: Date;
   }): Promise<void>;
   abstract hostForSession(input: { sessionToken: string }): Promise<HostId | undefined>;
-  abstract desiredState(input: { hostId: HostId }): Promise<HostDesiredState>;
+  abstract desiredState(input: {
+    hostId: HostId;
+    retainedDeploymentsPerApp: number;
+  }): Promise<HostDesiredState>;
   abstract observeReport(input: { reported: HostReportedState }): Promise<void>;
   abstract lastObservation(): Promise<HostObservation | undefined>;
 }
@@ -115,28 +118,57 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
     return Promise.resolve(this.#lastObservation);
   }
 
-  desiredState({ hostId }: { hostId: HostId }): Promise<HostDesiredState> {
+  desiredState({
+    hostId,
+    retainedDeploymentsPerApp,
+  }: {
+    hostId: HostId;
+    retainedDeploymentsPerApp: number;
+  }): Promise<HostDesiredState> {
     // A handoff must not split one desired document across two host assignments.
     return this.sql.begin('ISOLATION LEVEL REPEATABLE READ, READ ONLY', (sql) =>
-      this.selectDesiredState({ sql, hostId }),
+      this.selectDesiredState({ sql, hostId, retainedDeploymentsPerApp }),
     );
   }
 
   private async selectDesiredState({
     sql,
     hostId,
+    retainedDeploymentsPerApp,
   }: {
     sql: TypedTransactionSQL<Queries>;
     hostId: HostId;
+    retainedDeploymentsPerApp: number;
   }): Promise<HostDesiredState> {
     // An artifact still awaiting its upload cannot be deployed or exported — the deployment
     // that would name it is refused — so what reaches a host here always has its bytes.
     //
     // Together rather than one after another: none of them reads what another returns, and this
     // runs on every poll of every host.
-    const [deployments, volumes, hostnameRows, environmentRows, exports, exportEnvironmentRows] =
-      await Promise.all([
-        sql.SelectDesiredDeployments`
+    const [
+      retainedArtifacts,
+      deployments,
+      volumes,
+      hostnameRows,
+      environmentRows,
+      exports,
+      exportEnvironmentRows,
+    ] = await Promise.all([
+      sql.SelectRetainedDeploymentArtifacts`
+          /* @notNull digest */
+          SELECT DISTINCT ar.digest
+          FROM nibrun.app_hosts h
+          JOIN LATERAL (
+            SELECT d.artifact_id FROM nibrun.deployments d
+            WHERE d.app_id = h.app_id
+            ORDER BY d.id DESC
+            LIMIT ${retainedDeploymentsPerApp}
+          ) d ON true
+          JOIN nibrun.artifacts ar ON ar.id = d.artifact_id
+          WHERE h.host_id = ${hostId} AND ar.digest IS NOT NULL
+          ORDER BY ar.digest
+        `,
+      sql.SelectDesiredDeployments`
           /* @notNull digest */
           /* @notNull size_bytes */
           /* @notNull object_key */
@@ -148,11 +180,14 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
                  health_check_unhealthy_threshold,
                  restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
                  restart_backoff_factor, restart_reset_after_ms, config_id,
-                 activation, idle_timeout_ms, deployment_state
+                 activation, idle_timeout_ms, deployment_state,
+                 access_kind, access_header, access_format, access_issuer, access_audiences,
+                 access_jwks_url
           FROM nibrun.desired_deployments
           WHERE id IN (SELECT deployment_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
+          ORDER BY app_id, id
         `,
-        sql.SelectDesiredVolumes`
+      sql.SelectDesiredVolumes`
           SELECT v.app_id, v.state,
                  v.seed_digest, v.seed_size_bytes, v.seed_object_key, v.seed_original_file_name,
                  s.volume_storage_endpoint, s.volume_storage_bucket, s.volume_storage_prefix,
@@ -172,16 +207,19 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
             LIMIT 1
           ) s ON true
           WHERE v.app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
+          ORDER BY v.app_id
         `,
-        sql.SelectDesiredHostnames`
+      sql.SelectDesiredHostnames`
           SELECT app_id, hostname, kind FROM nibrun.desired_hostnames
           WHERE app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
+          ORDER BY app_id, hostname
         `,
-        sql.SelectDesiredEnvironment`
+      sql.SelectDesiredEnvironment`
           SELECT deployment_id, name, value FROM nibrun.desired_environment
           WHERE deployment_id IN (SELECT deployment_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
+          ORDER BY deployment_id, name
         `,
-        sql.SelectDesiredExports`
+      sql.SelectDesiredExports`
           /* @notNull artifact_object_key */
           /* @notNull digest */
           /* @notNull size_bytes */
@@ -189,16 +227,18 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
                  digest, size_bytes, artifact_object_key, original_file_name, config_id
           FROM nibrun.desired_exports
           WHERE app_id IN (SELECT app_id FROM nibrun.app_hosts WHERE host_id = ${hostId})
+          ORDER BY id
         `,
-        sql.SelectDesiredExportEnvironment`
+      sql.SelectDesiredExportEnvironment`
           SELECT export_id, name, value FROM nibrun.desired_export_environment
           WHERE export_id IN (
             SELECT e.id FROM nibrun.exports e
             JOIN nibrun.app_hosts h ON h.app_id = e.app_id
             WHERE h.host_id = ${hostId}
           )
+          ORDER BY export_id, name
         `,
-      ]);
+    ]);
 
     const hostnames = hostnamesByApp(hostnameRows);
     const environments = environmentByDeployment(environmentRows);
@@ -206,6 +246,7 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
 
     return {
       hostId,
+      retainedArtifactDigests: retainedArtifacts.map((row) => row.digest),
       volumes: volumes.map((row) => toDesiredVolume({ row, secretsKey: this.#secretsKey })),
       instances: deployments.map((row) =>
         toDesiredInstance({ row, hostnames, environments, secretsKey: this.#secretsKey }),

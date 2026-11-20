@@ -26,11 +26,14 @@ import type { AppSummary } from '#queries/apps.ts';
 export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
   const [open, setOpen] = useState(false);
   const run = useDeployRun();
-  const form = useEnvironmentForm(app);
-  // Saving is a release, so it is offered exactly where the deploy button is.
+  const form = useEnvironmentForm({ app, onSaved: closeAfterSave });
   const deploy = useAppActions(app.id).deploy;
   const goToApp = useGoToDeployedApp();
-  const releasing = isReleasing(run.phase);
+  const releasing = isReleasing(run.phase) || form.saving;
+
+  function closeAfterSave(): void {
+    setOpen(false);
+  }
 
   function handleOpenChange(next: boolean): void {
     if (next && !releasing) {
@@ -58,7 +61,11 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
           <DialogTitle>Environment variables</DialogTitle>
           <DialogDescription>
             {run.phase === 'idle'
-              ? describeSave({ name: app.name, withheld: greyedReason(deploy) })
+              ? describeSave({
+                  name: app.name,
+                  withheld: greyedReason(deploy),
+                  saveOnly: form.saveOnly,
+                })
               : describeRelease(run.phase)}
           </DialogDescription>
         </DialogHeader>
@@ -82,7 +89,13 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
                 size="lg"
                 disabled={!form.submittable || deploy.kind !== 'enabled'}
               >
-                <span className="truncate">Save and redeploy {app.name}</span>
+                <span className="truncate">
+                  {form.saving
+                    ? 'Saving…'
+                    : form.saveOnly
+                      ? 'Save environment variables'
+                      : `Save and redeploy ${app.name}`}
+                </span>
               </Button>
             </form>
           ) : (
@@ -94,9 +107,19 @@ export function AppEnvironmentDialogContent({ app }: { app: AppSummary }) {
   );
 }
 
-function describeSave({ name, withheld }: { name: string; withheld: string | undefined }): string {
+function describeSave({
+  name,
+  withheld,
+  saveOnly,
+}: {
+  name: string;
+  withheld: string | undefined;
+  saveOnly: boolean;
+}): string {
   return (
     withheld ??
-    `Saving releases ${name} again on the binary it already runs. Its hostnames and everything on its volume stay as they are.`
+    (saveOnly
+      ? `Save the environment variables ${name} needs before its first deployment.`
+      : `Saving releases ${name} again on the binary it already runs. Its hostnames and everything on its volume stay as they are.`)
   );
 }

@@ -1,5 +1,5 @@
 /**
- * Generated from https://raw.githubusercontent.com/ilbertt/nibrunner/v2026.11.7/crates/protocol/schema/desired.schema.json
+ * Generated from https://raw.githubusercontent.com/ilbertt/nibrunner/v2026.11.14/crates/protocol/schema/desired.schema.json
  * Run bun run --filter @repo/internal-scripts generate-nibrunner-types; do not edit.
  */
 
@@ -33,7 +33,6 @@ export type ObjectKey = string;
  * an identifier
  */
 export type HostId = string;
-export type JwtAlgorithm = 'RS256' | 'ES256' | 'EdDSA';
 export type JwtTokenFormat = 'raw' | 'bearer';
 /**
  * What puts a running microVM back to sleep. Only an `on-request` instance may carry one that
@@ -210,7 +209,6 @@ export interface DesiredInstance {
         [k: string]: unknown;
       }
     | {
-        algorithm: JwtAlgorithm;
         audiences: string[];
         issuer: string;
         kind: 'jwt';

@@ -3,13 +3,15 @@
 # by a `docker compose up` meant to run nibrun locally.
 #
 # Same image as the dev database, so CI and a developer's machine agree on the server the SQL is
-# checked against. No volume and its own port: what it holds is rebuilt from the migrations on
+# checked against. In-memory data and its own port: what it holds is rebuilt from the migrations on
 # every run, and it must never be mistaken for the one holding a developer's apps.
 
 services:
   postgres-test:
     image: postgres:18-alpine
     container_name: nibrun-postgres-test
+    tmpfs:
+      - /var/lib/postgresql
     environment:
       POSTGRES_USER: nibrun
       POSTGRES_PASSWORD: nibrun

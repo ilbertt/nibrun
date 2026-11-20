@@ -8,6 +8,7 @@ import {
 import { type Brand, type BrandedSchema, stringEnum } from '@repo/typebox-extensions';
 import { type TString, Type } from '@sinclair/typebox';
 import { DnsLabelSchema } from '#lib/api/dns-label.ts';
+import { TenantEnvironmentPatchSchema } from '#lib/api/environment.ts';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { VolumeStorageMigrationSchema } from '#lib/api/volume-storage-migration.ts';
 
@@ -61,6 +62,36 @@ export const AppNameSchema = Type.String({
   minLength: 1,
   maxLength: MAX_APP_NAME_LENGTH,
 }) as BrandedSchema<TString, AppName>;
+
+const ownedConfig = {
+  access: AppConfigSchema.properties.access,
+  args: Type.Optional(AppConfigSchema.properties.args),
+  httpPort: Type.Optional(AppConfigSchema.properties.httpPort),
+};
+
+export const NewAppConfigSchema = Type.Object(
+  { ...ownedConfig, environment: Type.Optional(AppConfigSchema.properties.environment) },
+  { additionalProperties: false },
+);
+
+export type NewAppConfig = typeof NewAppConfigSchema.static;
+
+const AppConfigPatchSchema = Type.Object(
+  { ...ownedConfig, environment: Type.Optional(TenantEnvironmentPatchSchema) },
+  { additionalProperties: false },
+);
+
+export type AppConfigPatch = typeof AppConfigPatchSchema.static;
+
+export const AppPatchSchema = Type.Object(
+  {
+    name: Type.Optional(AppNameSchema),
+    config: Type.Optional(AppConfigPatchSchema),
+  },
+  { additionalProperties: false },
+);
+
+export type AppPatch = typeof AppPatchSchema.static;
 
 export const AppSchema = Type.Object({
   id: AppIdSchema,

@@ -6,6 +6,7 @@ import type {
 } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError, unwrap } from '@repo/api-client/unwrap';
+import { DEFAULT_APP_ACCESS } from '@repo/api-constants';
 import { appUrl } from '@repo/app-ui';
 import { appFor } from '#apps.ts';
 import { type DeployableArchive, importArchive } from '#imports.ts';
@@ -115,7 +116,7 @@ export async function deploy({
   const app =
     target === null
       ? await createApp({ api, name: name ?? binaryName(binary), config: configPatch(edit) })
-      : await updateApp({ api, appId: target.app.id, ...edit });
+      : await updateApp({ api, appId: target.app.id, currentApp: target.app, ...edit });
   onStep?.({ kind: 'app', appId: app.id, name: app.name });
 
   const { artifact, reused } = await artifactFor({
@@ -173,6 +174,7 @@ async function createApp({
       name,
       config: {
         ...defaults,
+        access: defaults.access ?? DEFAULT_APP_ACCESS,
         ...(environment !== undefined && {
           environment: Object.fromEntries(
             Object.entries(environment).filter(

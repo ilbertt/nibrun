@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { namesExtraPublicPortValues } from '@repo/protocol/runtime-values';
 import { defaultParseSearch, defaultStringifySearch } from '@tanstack/react-router';
 import { deployLink, deploySuggestion } from '#link.ts';
 import { DEPLOY_PRESETS, DeployCategory, type DeployPreset, type DeploySlug } from '#presets.ts';
@@ -42,5 +43,14 @@ test('a preset can suggest initial data through a rewritten deployment link', ()
 test('every category has something in it', () => {
   for (const category of Object.values(DeployCategory)) {
     expect(SLUGS.some((slug) => DEPLOY_PRESETS[slug].category === category)).toBe(true);
+  }
+});
+
+test('presets do not request extra ports or reference their runtime values', () => {
+  for (const preset of Object.values<DeployPreset>(DEPLOY_PRESETS)) {
+    expect(preset.deployLink).not.toHaveProperty('extra-public-port');
+    for (const variable of preset.deployLink.env ?? []) {
+      expect(namesExtraPublicPortValues(variable)).toBe(false);
+    }
   }
 });

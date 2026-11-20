@@ -57,7 +57,7 @@ async function desiredVolumes() {
     sql: withTypes<Queries>(sql),
     secretsKey: TEST_SECRETS_KEY,
   });
-  return (await repository.desiredState({ hostId: HOST_ID })).volumes;
+  return (await repository.desiredState({ hostId: HOST_ID, retainedDeploymentsPerApp: 2 })).volumes;
 }
 
 function storage(auth: S3VolumeAuth) {
@@ -243,6 +243,13 @@ test.each([
         name: undefined,
         httpPort: Value.Parse(HttpPortSchema, PREVIOUS_HTTP_PORT),
         args: ['previous'],
+        access: {
+          kind: 'jwt',
+          issuer: 'previous-issuer',
+          audiences: ['old-app'],
+          token: { header: 'Authorization', format: 'bearer' },
+          publicKeys: { url: 'https://identity.example/keys' },
+        },
         environment: { set: { TOKEN: previousSecret }, removed: [] },
       },
     });
@@ -285,6 +292,10 @@ test.each([
       rollback_of_deployment_id: previous.id,
       http_port: PREVIOUS_HTTP_PORT,
       args: ['previous'],
+      access_kind: 'jwt',
+      access_issuer: 'previous-issuer',
+      access_audiences: ['old-app'],
+      access_jwks_url: 'https://identity.example/keys',
       environment_names: ['TOKEN'],
     });
     expect(rollback?.artifact_id).not.toBe(current.artifact_id);
@@ -367,7 +378,7 @@ async function insertConfig({
   const credentials = auth?.kind === 'anonymous' ? undefined : auth;
   await sql.unsafe(
     `INSERT INTO nibrun.app_configs (
-       app_id, http_port, args, vcpu_count, memory_mib,
+       access_kind, app_id, http_port, args, vcpu_count, memory_mib,
        health_check_interval_ms, health_check_timeout_ms, health_check_grace_period_ms,
        health_check_healthy_threshold, health_check_unhealthy_threshold,
        restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
@@ -375,7 +386,7 @@ async function insertConfig({
        volume_storage_endpoint, volume_storage_bucket, volume_storage_prefix,
        volume_storage_region, volume_storage_auth_kind, volume_storage_access_key_id,
        volume_storage_secret_access_key, volume_storage_session_token, volume_storage_encryption_password)
-     SELECT id, 8080, '{}'::text[], 1, 512, 1000, 1000, 1000, 1, 3, 5, 500, 5000, 2, 60000,
+     SELECT 'public', id, 8080, '{}'::text[], 1, 512, 1000, 1000, 1000, 1, 3, 5, 500, 5000, 2, 60000,
             $2, $3, $4, $5, $6, $7, $8, $9, $10
      FROM nibrun.apps WHERE slug = $1`,
     [

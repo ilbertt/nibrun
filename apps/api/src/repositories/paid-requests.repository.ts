@@ -16,12 +16,13 @@ export class PaidRequestsRepository extends Repository implements PaidRequestsRe
     const [row] = await this.sql.UpsertPaidRequest`
       INSERT INTO nibrun.paid_requests (
         owner_id, request_type, requested_apps_amount, app_id,
-        requested_vcpu_count, requested_memory_mib, requested_volume_gib
+        requested_vcpu_count, requested_memory_mib, requested_volume_gib, requested_ports_amount
       )
       SELECT ${ownerId}, ${request.requestType}, ${request.requestType === 'apps' ? request.requestedAppsAmount : null}, ${appId},
         ${request.requestType === 'resources' ? request.requestedVcpuCount : null},
         ${request.requestType === 'resources' ? request.requestedMemoryMib : null},
-        ${request.requestType === 'resources' ? request.requestedVolumeGib : null}
+        ${request.requestType === 'resources' ? request.requestedVolumeGib : null},
+        ${request.requestType === 'extra-public-port' ? request.requestedPortsAmount : null}
       WHERE ${appId}::uuid IS NULL OR EXISTS (
         SELECT 1 FROM nibrun.live_apps a WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
       )
@@ -29,10 +30,11 @@ export class PaidRequestsRepository extends Repository implements PaidRequestsRe
       DO UPDATE SET requested_apps_amount = EXCLUDED.requested_apps_amount,
         requested_vcpu_count = EXCLUDED.requested_vcpu_count,
         requested_memory_mib = EXCLUDED.requested_memory_mib,
-        requested_volume_gib = EXCLUDED.requested_volume_gib
+        requested_volume_gib = EXCLUDED.requested_volume_gib,
+        requested_ports_amount = EXCLUDED.requested_ports_amount
       WHERE nibrun.paid_requests.owner_id = ${ownerId}
       RETURNING request_type, requested_apps_amount, app_id,
-        requested_vcpu_count, requested_memory_mib, requested_volume_gib
+        requested_vcpu_count, requested_memory_mib, requested_volume_gib, requested_ports_amount
     `;
     return row ?? null;
   }

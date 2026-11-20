@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { withTypes } from '@ilbertt/bun-sqlgen';
+import type { AppAccessPolicy } from '@repo/protocol';
 import {
   type AppId,
   AppIdSchema,
@@ -21,8 +22,10 @@ import type { Queries, Tables } from '#db/queries.gen.ts';
 import { AppNameSchema, OWNED_APP_STATES } from '#lib/api/app.ts';
 import { DnsLabelSchema } from '#lib/api/dns-label.ts';
 import { type ArtifactId, type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { appAccess } from '#lib/app-access.ts';
 import { configWithDefaults, type SealedEnvironmentPatch } from '#lib/app-config.ts';
 import { openSecret, sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
+import { AppHostnamesRepository } from '#repositories/app-hostnames.repository.ts';
 import {
   type AppCreation,
   AppsRepository,
@@ -31,6 +34,7 @@ import {
 } from '#repositories/apps.repository.ts';
 import { ArtifactsRepository } from '#repositories/artifacts.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
+import { CLOUDFLARE_ACCESS } from '#tests/support/cloudflare-access.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { registerHost } from '#tests/support/hosts.ts';
 import { refusedBy } from '#tests/support/postgres.ts';
@@ -116,6 +120,136 @@ async function createApp(slug: string): Promise<AppId> {
   return created.app.id;
 }
 
+test('config versions require an explicit access kind', async () => {
+  const columns = await sql.unsafe(
+    `SELECT is_nullable, column_default FROM information_schema.columns
+     WHERE table_schema = 'nibrun' AND table_name = 'app_configs' AND column_name = 'access_kind'`,
+  );
+  expect([...columns]).toEqual([{ is_nullable: 'NO', column_default: null }]);
+});
+
+test('a new JWT-protected app stores its full access policy on creation', async () => {
+  const slug = Value.Parse(DnsLabelSchema, 'private-heron');
+  const access = {
+    kind: 'jwt',
+    token: { header: 'Authorization', format: 'bearer' },
+    issuer: 'https://issuer.example',
+    audiences: ['private-heron'],
+    publicKeys: { url: 'https://issuer.example/keys' },
+  } satisfies AppAccessPolicy;
+  const { app } = requireCreated(
+    await repo.create({
+      ownerId: OWNER_ID,
+      name: Value.Parse(AppNameSchema, slug),
+      slug,
+      hostname: Value.Parse(HostnameSchema, `${slug}.apps.example.com`),
+      config: { ...configWithDefaults(), access, environment: {} },
+      anonymousAppsAtMost: null,
+    }),
+  );
+  expect(appAccess(app)).toEqual(access);
+});
+
+test('Cloudflare Access needs a registered domain to enable or change the policy', async () => {
+  const appId = await createHostedUsageApp('access-domain');
+  const other = await createApp('other-domain');
+  const domains = new AppHostnamesRepository(withTypes<Queries>(sql));
+  const own = {
+    appId,
+    ownerId: OWNER_ID,
+    hostname: Value.Parse(HostnameSchema, 'access.example.com'),
+  };
+  await domains.addCustom({
+    ...own,
+    appId: other,
+    hostname: Value.Parse(HostnameSchema, 'other.example.com'),
+  });
+
+  function update(access: AppAccessPolicy) {
+    return repo.update({
+      appId,
+      ownerId: OWNER_ID,
+      patch: { name: undefined, access, args: ['serve'] },
+    });
+  }
+
+  await expect(update(CLOUDFLARE_ACCESS)).rejects.toThrow('Associate a custom domain');
+  await domains.addCustom(own);
+  expect(await update(CLOUDFLARE_ACCESS)).toMatchObject({ access_kind: 'jwt' });
+  const removeLast = 'Deploy Public or Custom JWT';
+  await expect(domains.removeCustom(own)).rejects.toThrow(removeLast);
+  const deployments = new DeploymentsRepository(withTypes<Queries>(sql));
+  const owner = { appId, ownerId: OWNER_ID };
+  const [seed] = await deployments.listByApp(owner);
+  if (!seed) {
+    throw new Error('Expected the initial deployment');
+  }
+  const release = { ...owner, artifactId: seed.artifact_id, initialDataFrom: null, onlyOne: false };
+  const protectedRelease = await deployments.insert(release);
+  if (protectedRelease.outcome !== 'created') {
+    throw new Error('Expected the protected deployment');
+  }
+
+  const alias = { ...own, hostname: Value.Parse(HostnameSchema, 'second.example.com') };
+  await domains.addCustom(alias);
+  const removals = await Promise.allSettled([
+    domains.removeCustom(own),
+    domains.removeCustom(alias),
+  ]);
+  expect(removals.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+  const remaining = removals[0].status === 'fulfilled' ? alias : own;
+  expect((await domains.listByApp(owner)).filter((h) => h.kind === 'custom')).toHaveLength(1);
+
+  expect(await update({ kind: 'public' })).toMatchObject({ access_kind: 'public' });
+  await expect(domains.removeCustom(remaining)).rejects.toThrow(removeLast);
+  expect((await deployments.insert(release)).outcome).toBe('created');
+  expect(await domains.removeCustom(remaining)).toEqual({ cloudflare_id: null });
+  await expect(update(CLOUDFLARE_ACCESS)).rejects.toThrow('Associate a custom domain');
+  await expect(
+    deployments.insertRollback({ ...owner, rollbackOf: protectedRelease.row.id }),
+  ).rejects.toThrow('Associate a custom domain');
+});
+
+test('switching to another JWT header allows domain removal without making the app public', async () => {
+  const appId = await createApp('jwt-header');
+  const owner = { appId, ownerId: OWNER_ID };
+  const domains = new AppHostnamesRepository(withTypes<Queries>(sql));
+  const domain = { ...owner, hostname: Value.Parse(HostnameSchema, 'jwt.example.com') };
+  await domains.addCustom(domain);
+  const custom = {
+    ...CLOUDFLARE_ACCESS,
+    token: { header: 'Authorization', format: 'bearer' },
+  } satisfies AppAccessPolicy;
+  for (const access of [CLOUDFLARE_ACCESS, custom]) {
+    await repo.update({ ...owner, patch: { name: undefined, access } });
+  }
+  expect(await domains.removeCustom(domain)).toEqual({ cloudflare_id: null });
+  expect(await repo.findById(owner)).toMatchObject({
+    access_kind: 'jwt',
+    access_header: 'Authorization',
+  });
+});
+
+test('owner configuration changes preserve an existing platform-enabled extra port', async () => {
+  const slug = Value.Parse(DnsLabelSchema, 'enabled-extra-port');
+  const created = requireCreated(
+    await repo.create({
+      anonymousAppsAtMost: null,
+      ownerId: OWNER_ID,
+      name: Value.Parse(AppNameSchema, slug),
+      slug,
+      hostname: Value.Parse(HostnameSchema, `${slug}.apps.example.com`),
+      config: { ...configWithDefaults(), hasExtraPublicPort: true, environment: {} },
+    }),
+  );
+  const updated = await repo.update({
+    appId: created.app.id,
+    ownerId: OWNER_ID,
+    patch: { name: undefined, args: ['serve'] },
+  });
+  expect(updated?.has_extra_public_port).toBe(true);
+});
+
 async function createHostedUsageApp(slug: string): Promise<AppId> {
   const appId = await createApp(slug);
   const [artifact] = await sql.unsafe(
@@ -171,6 +305,7 @@ describe('an app nobody has said anything about waits to be asked for', () => {
     const appId = await createApp('fresh-heron');
 
     expect(await repo.findById({ appId, ownerId: OWNER_ID })).toMatchObject({
+      access_kind: 'public',
       activation: 'on-request',
       idle_timeout_ms: DEFAULT_IDLE_TIMEOUT_MS,
     });

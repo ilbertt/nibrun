@@ -9,9 +9,15 @@ nibrun takes one compiled binary and gives it a microVM of its own, a persistent
 an HTTPS URL. No Dockerfile, no YAML, no cluster.
 
 Build for Linux x86_64, deploy through nibrun's MCP server or CLI, then ask the URL for something.
+
 What that path does not need is below it: [copying an app](#copying-an-app), [the guest contract](#the-guest-contract),
 [naming a runtime value](#naming-a-runtime-value), [a second public port](#a-second-public-port),
 [cron jobs](#cron-jobs), and [what nibrun does not do](#tradeoffs).
+
+Never ask users to paste credentials into chat or pass them through MCP, command arguments,
+source files, compiled binaries or archives. Users enter credentials directly in the nibrun
+dashboard or the destination app's setup page. Reuse configured credentials without reading or
+returning their values.
 
 For CI deployments, start at [GitHub Actions](#github-actions).
 
@@ -85,9 +91,16 @@ is what keeps an address across that.
 ### With MCP
 
 Choose the app: supply a `name` and optional initial `config` to create one, or an `appId` to
-redeploy an existing app. Initial configuration includes the environment, arguments and HTTP port
-needed on first boot. Existing apps reuse their saved configuration. Reuse the returned `app.id`
-as `appId` for subsequent deployments; a name creates a new app.
+redeploy an existing app. Initial configuration includes the arguments and HTTP port needed on
+first boot. Environment values are not accepted through MCP; existing apps reuse their saved
+configuration. Reuse the returned `app.id` as `appId` for subsequent deployments; a name creates
+a new app.
+
+If the app needs environment variables before its first boot, call `prepare_deploy` to create it
+without deploying. Give the user its dashboard link, `https://app.nibrun.com/apps/<appId>`,
+where they enter the values directly under **Environment variables**. Wait for their confirmation,
+then deploy using that `appId`. Native file binding can still be used for the binary; direct
+uploads use the prepared artifact as described below.
 
 Include `chatId` in `deploy_app` when your current chat ID is available; omit it rather than
 guessing. Without it, nibrun records the client's `_meta["openai/session"]` when available.
@@ -152,6 +165,35 @@ fetched and 2 GiB unpacked, and only as the app is created: this and the app wri
 are the whole of how anything gets onto the volume. A zip made anywhere but unix carries no
 permissions, so an executable bit does not survive one.
 
+### HTTP access
+
+New apps are public by default. To require a signed JWT on every HTTP hostname from the first
+deployment, set `config.access` when creating the app through MCP. With the CLI, use
+`--access jwt --jwt-issuer ISSUER --jwt-audience AUD --jwks-url PUBLIC_HTTPS_URL` on
+`nib run` or `nib apps update`. If your CLI lacks these flags, use MCP or the dashboard's
+**HTTP access** picker. Redeploying without access flags preserves the current policy.
+
+**Custom JWT** works directly on `<slug>.nibrun.app` with your issuer's public HTTPS JWKS URL
+and the app's audience. By default, clients send the JWT in `Authorization: Bearer <token>`.
+
+#### Cloudflare Access
+
+For Cloudflare sign-in, attach a custom hostname from your Cloudflare account, enable its DNS
+proxy, and protect it with a self-hosted Access application and an Allow policy. nibrun owns
+the `nibrun.app` zone, so your account can't put an Access login on `<slug>.nibrun.app`.
+The default hostname still requires a valid assertion for the app.
+
+In the nibrun deploy dialog, choose **HTTP access → Cloudflare Access** and
+enter the team domain and application audience (AUD). New apps start with only a platform hostname.
+Register the custom domain before using the Cloudflare assertion header through the dashboard or CLI.
+To remove the last custom domain, deploy Public or Custom JWT access first.
+
+With the CLI, use `https://TEAM.cloudflareaccess.com` as the issuer, the Access application's
+AUD as the audience, and `/cdn-cgi/access/certs` on that issuer as the JWKS URL. Add
+`--jwt-header Cf-Access-Jwt-Assertion --jwt-format raw`.
+If your app exposes an MCP server and Cloudflare handles sign-in, enable
+[Managed OAuth in the Access application](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/managed-oauth/).
+
 ### Try seeding first-run setup before going public
 
 Some apps let the first visitor claim the admin account. Their public URL is reachable as soon
@@ -164,7 +206,8 @@ the app supports and what can run on the local machine:
 2. If supported, seed a dedicated data folder using the app's documented initialization command,
    or run the local build bound to `127.0.0.1`, complete admin setup, and stop it cleanly.
 3. Deploy the seeded folder with `--data-folder`, using the Linux x86_64 binary. Supply any
-   encryption keys or other environment values the saved data needs on this first deploy.
+   required environment values through the dashboard before the first deploy, without sharing
+   credentials in chat.
 4. Check the public app requires the configured login and no longer offers an initial admin claim.
 
 ```sh
@@ -192,10 +235,10 @@ For a local binary, the CLI skips uploading when that app already has an artifac
 bytes and filename. It still creates a new deployment with the configuration you supplied.
 
 Environment variables are an **edit**, not a replacement — anything a deploy does not name is left
-alone, so secrets are set once:
+alone. For non-sensitive configuration:
 
 ```sh
-nib run ./my-server --app my-app --env STRIPE_SECRET_KEY=sk_live_...
+nib run ./my-server --app my-app --env LOG_LEVEL=info
 ```
 
 Arguments for the binary go inside the quotes, not after them:
@@ -272,6 +315,9 @@ Use a browser for testing only when the user asks for browser or visual testing.
 curl -fsS https://my-app.nibrun.app/
 ```
 
+For a JWT-protected app, expect the default URL to reject unsigned requests. Check the app
+through its authenticated hostname or with a valid token.
+
 Report which checks passed and which remain unverified. With MCP, use `read_logs` for recent
 output and `list_files` to inspect the app's persistent files when diagnosing failures.
 
@@ -335,7 +381,7 @@ Everything the binary can count on, and nothing else:
 | Persistent volume | `/app/data` — 8 GiB, survives every redeploy. `NIBRUN_DATA_DIR` names it. Not `noexec`: a file unpacked here can be exec'd in place |
 | Port | `NIBRUN_HTTP_PORT`, and `PORT` beside it; the app **must** listen on it, on `0.0.0.0` |
 | Own hostname | `NIBRUN_HOSTNAME` is set by the guest to the app's own `<slug>.nibrun.app` |
-| Second port | Only with `--extra-public-port`: `NIBRUN_EXTRA_PUBLIC_PORT` on `NIBRUN_PUBLIC_IPV4`, TCP and UDP, assigned rather than chosen, and reached at that number and no other |
+| Second port | Only for an app with an enabled extra port: `NIBRUN_EXTRA_PUBLIC_PORT` on `NIBRUN_PUBLIC_IPV4`, TCP and UDP, assigned rather than chosen, and reached at that number and no other |
 | Ephemeral | `TMPDIR=/tmp` is a tmpfs of **64 MiB** — a quarter of the RAM — and is lost on restart. So is everything outside `/app/data` |
 | Programs | `/bin/sh` and `crontab` are available. Ship other tools yourself; there is no `tar` or `unzip` |
 | Resources | 1 vCPU, 256 MiB RAM |
@@ -368,16 +414,23 @@ literal. A complete reference to an unknown `NIBRUN_` name is refused when you d
 
 ## A second public port
 
-An app needing a port HTTP cannot carry — WebRTC media, a game server, anything on UDP — asks for
-one with `--extra-public-port`, and is told where it landed as `NIBRUN_PUBLIC_IPV4` and
-`NIBRUN_EXTRA_PUBLIC_PORT`. Neither is discoverable from inside the guest, so an app that tells a
-peer where to reach it announces that pair: it is the same number end to end, which is what makes
-announcing it correct.
-
-Ask for the port in the same change that names it:
+Extra public ports are a paid feature. Request one from **Request extra port** in the app’s
+configuration, or with the CLI:
 
 ```sh
-nib apps update --app my-app --extra-public-port --env 'ANNOUNCED_IP=${NIBRUN_PUBLIC_IPV4}'
+nib paid-request --type extra-public-port --app my-app --requested-ports-amount 1
+```
+
+A request records interest; it does not enable the port or charge the owner. Deployment presets,
+the deploy form, CLI deploy/update flags and public API configuration cannot enable one.
+Existing enabled ports keep working and remain visible in the app’s configuration.
+
+Once enabled, the guest receives `NIBRUN_PUBLIC_IPV4` and `NIBRUN_EXTRA_PUBLIC_PORT`. A binary
+announcing its own address uses that pair, which is the same number end to end. An app that
+expects its own variable names can reference them:
+
+```sh
+nib apps update --app my-app --env 'ANNOUNCED_IP=${NIBRUN_PUBLIC_IPV4}'
 ```
 
 ## Cron jobs

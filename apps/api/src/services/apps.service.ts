@@ -1,3 +1,4 @@
+import { CLOUDFLARE_ACCESS_DOMAIN_HINT } from '@repo/app-ui';
 import type {
   AppId,
   ComputeUsage,
@@ -15,12 +16,18 @@ import {
   namesExtraPublicPortValues,
 } from '@repo/protocol/runtime-values';
 import { schema } from '#db/queries.gen.ts';
-import { type App, type AppName, OWNED_APP_STATES, type OwnedAppState } from '#lib/api/app.ts';
+import {
+  type App,
+  type AppConfigPatch,
+  type AppName,
+  type AppPatch,
+  type NewAppConfig,
+  OWNED_APP_STATES,
+  type OwnedAppState,
+} from '#lib/api/app.ts';
 import type { OwnerId } from '#lib/api/identifiers.ts';
 import {
-  type AppConfigPatch,
   configWithDefaults,
-  type NewAppConfig,
   type PublicAppConfig,
   splitEnvironmentPatch,
   toAppConfig,
@@ -39,6 +46,7 @@ import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
+import { requiresCustomDomain, validatedAppAccess } from '#lib/validate-app-access.ts';
 import { toVolumeStorageMigration } from '#lib/volume-storage-migration.ts';
 import type {
   AppHostnameRow,
@@ -66,9 +74,6 @@ export type PublicApp = Omit<App, 'config' | 'hostnames'> & {
 };
 
 type AppWithHostnames = { app: AppRow; hostnames: readonly AppHostnameRow[] };
-
-/** Everything an owner may change about an app in one request: what they call it, and how it starts. */
-export type AppPatch = AppConfigPatch & { name?: AppName | undefined };
 
 type OwnedApp = { appId: AppId; ownerId: OwnerId };
 
@@ -194,8 +199,11 @@ export class AppsService extends Service {
     name: AppName;
     config?: NewAppConfig;
   }): Promise<PublicApp> {
-    const asked = { ...configWithDefaults(config), environment: config?.environment ?? {} };
-    const { environment, ...withDefaults } = isAnonymous ? withoutExtraPort(asked) : asked;
+    const withDefaults = configWithDefaults(config);
+    if (requiresCustomDomain(withDefaults.access)) {
+      throw new BadRequestError(CLOUDFLARE_ACCESS_DOMAIN_HINT);
+    }
+    const environment = config?.environment ?? {};
     refuseRedactedValues(environment);
     refuseValuesNeedingAPort({
       environment,
@@ -203,6 +211,7 @@ export class AppsService extends Service {
     });
     const appConfig = {
       ...withDefaults,
+      access: validatedAppAccess(withDefaults.access),
       environment: sealEnvironment({ key: this.secretsKey, environment }),
     };
 
@@ -254,18 +263,7 @@ export class AppsService extends Service {
     return new AppQuotaExceededError(allowed);
   }
 
-  /**
-   * The same rule as on create, against the config the edit leaves behind rather than the one it
-   * carries: a value naming these is allowed by an app that already has the port, and refused by
-   * one whose port this very edit is taking away.
-   *
-   * Only ever a read when a value names one, which is almost never — so a patch that says nothing
-   * about them is the one write it was.
-   *
-   * The other direction is not guarded: an app that gives up its port while a variable it is not
-   * restating still names one fails its next boot, loudly, having asked for exactly that. What is
-   * worth an answer here is the value someone is typing now.
-   */
+  /** Only look up the enabled port when an edited value needs its runtime address. */
   private async refuseValuesTheEditLeavesUngiven({
     appId,
     ownerId,
@@ -278,9 +276,9 @@ export class AppsService extends Service {
       return;
     }
 
-    const hasExtraPublicPort =
-      patch.hasExtraPublicPort ??
-      requireApp(await this.appsRepo.findById({ appId, ownerId })).has_extra_public_port;
+    const hasExtraPublicPort = requireApp(
+      await this.appsRepo.findById({ appId, ownerId }),
+    ).has_extra_public_port;
 
     refuseValuesNeedingAPort({
       environment: Object.fromEntries(naming) as TenantEnvironment,
@@ -288,7 +286,12 @@ export class AppsService extends Service {
     });
   }
 
-  private sealed({ name, environment, ...rest }: AppPatch): SealedAppPatch {
+  private sealed({ name, config }: AppPatch): SealedAppPatch {
+    if (!config) {
+      return { name };
+    }
+    const { environment, access, ...runtime } = config;
+    const rest = { ...runtime, access: validatedAppAccess(access) };
     if (environment === undefined) {
       return { ...rest, name };
     }
@@ -326,16 +329,15 @@ export class AppsService extends Service {
    * The name moves and nothing else does: the slug was minted from the first name and is in
    * somebody's bookmarks by now, so the hostname stays.
    */
-  async update({
-    appId,
-    ownerId,
-    patch: { name, ...config },
-  }: OwnedApp & { patch: AppPatch }): Promise<PublicApp> {
-    await this.refuseValuesTheEditLeavesUngiven({ appId, ownerId, patch: config });
+  async update({ appId, ownerId, patch }: OwnedApp & { patch: AppPatch }): Promise<PublicApp> {
+    const { name, config } = patch;
+    if (config) {
+      await this.refuseValuesTheEditLeavesUngiven({ appId, ownerId, patch: config });
+    }
     const app = await this.appsRepo.update({
       appId,
       ownerId,
-      patch: this.sealed({ name, ...config }),
+      patch: this.sealed(patch),
     });
     const hostnames = await this.hostnamesRepo.listByApp({ appId, ownerId });
     if (name !== undefined) {
@@ -725,28 +727,9 @@ function refuseValuesNeedingAPort({
     .map(([name]) => name);
   if (naming.length > 0) {
     throw new BadRequestError(
-      `${EXTRA_PUBLIC_PORT_VALUES.map((value) => interpolableRuntimeValue(value.name)).join(' and ')} are only set for an app with a public port besides HTTP, which this one has not asked for: ${naming.join(', ')}.`,
+      `${EXTRA_PUBLIC_PORT_VALUES.map((value) => interpolableRuntimeValue(value.name)).join(' and ')} are only set for an app with a public port besides HTTP, which this app does not have: ${naming.join(', ')}.`,
     );
   }
-}
-
-type AskedAppConfig = Omit<PublicAppConfig, 'environment'> & { environment: TenantEnvironment };
-
-/**
- * A port besides HTTP is a raw listener on the public internet, and a person with no identity is
- * handed nothing that reaches past the HTTPS the platform terminates for them. Taken away rather
- * than refused, so a link written for the port — sharkord's — still deploys; and the values naming
- * it go with it, because the guest fails a boot over a reference it was not given. Only creation
- * asks: changing an app is not a stranger's to do at all.
- */
-function withoutExtraPort(config: AskedAppConfig): AskedAppConfig {
-  return {
-    ...config,
-    hasExtraPublicPort: false,
-    environment: Object.fromEntries(
-      Object.entries(config.environment).filter(([, value]) => !namesExtraPublicPortValues(value)),
-    ),
-  };
 }
 
 // An app the caller does not own is indistinguishable from one that does not exist; a 403 would

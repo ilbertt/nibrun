@@ -1,4 +1,4 @@
-import type { TenantArguments } from '@repo/api-client/models';
+import type { App, TenantArguments } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { redeploy } from '@repo/app-operations';
 import { environmentEdit } from '#lib/environment.ts';
@@ -6,13 +6,13 @@ import { announce, awaitServing, type Release } from '#lib/release.ts';
 import type { Ui } from '#lib/ui.ts';
 
 export type UpdateInput = {
+  access?: App['config']['access'] | undefined;
   api: PublicApiClient;
   ui: Ui;
   appId: string;
   name?: string | undefined;
   args?: TenantArguments | undefined;
   port?: number | undefined;
-  extraPublicPort?: boolean | undefined;
   env?: string[] | undefined;
   unset?: string[] | undefined;
   detach?: boolean | undefined;
@@ -26,24 +26,24 @@ export type UpdateInput = {
  * the app down on the way to setting a variable.
  */
 export async function updateApp({
+  access,
   api,
   ui,
   appId,
   name,
   args,
   port,
-  extraPublicPort,
   env,
   unset,
   detach,
 }: UpdateInput): Promise<Release> {
   const deployed = await redeploy({
+    access,
     api,
     appId,
     name,
     args,
     port,
-    extraPublicPort,
     environment: environmentEdit({ env, unset }),
     onStep: (step) => announce({ step, ui }),
   });

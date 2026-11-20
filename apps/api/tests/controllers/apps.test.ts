@@ -82,7 +82,11 @@ describe('a malformed request is a bad request', () => {
   });
 
   test('patching an app with a port that is not one', async () => {
-    const response = await sendJson({ method: 'PATCH', url: APP_URL, body: { httpPort: 0 } });
+    const response = await sendJson({
+      method: 'PATCH',
+      url: APP_URL,
+      body: { config: { access: { kind: 'public' }, httpPort: 0 } },
+    });
 
     expect(response.status).toBe(StatusMap['Bad Request']);
   });
@@ -101,7 +105,7 @@ describe('a malformed request is a bad request', () => {
     const response = await sendJson({
       method: 'PATCH',
       url: APP_URL,
-      body: { environment: { 'NOT-A-NAME': 'x' } },
+      body: { config: { access: { kind: 'public' }, environment: { 'NOT-A-NAME': 'x' } } },
     });
 
     expect(response.status).toBe(StatusMap['Bad Request']);
@@ -114,8 +118,10 @@ describe('a malformed request is a bad request', () => {
     const response = await sendJson({
       method: 'PATCH',
       url: APP_URL,
-      // biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being validated, not an interpolation
-      body: { environment: { URL: 'https://${NIBRUN_SLUG}/x' } },
+      body: {
+        // biome-ignore lint/suspicious/noTemplateCurlyInString: the syntax being validated, not an interpolation
+        config: { access: { kind: 'public' }, environment: { URL: 'https://${NIBRUN_SLUG}/x' } },
+      },
     });
 
     expect(response.status).toBe(StatusMap['Bad Request']);
@@ -127,7 +133,13 @@ describe('a malformed request is a bad request', () => {
     const response = await sendJson({
       method: 'PATCH',
       url: APP_URL,
-      body: { environment: { TOKEN: 'sk-must-not-come-back' }, httpPort: 0 },
+      body: {
+        config: {
+          access: { kind: 'public' },
+          environment: { TOKEN: 'sk-must-not-come-back' },
+          httpPort: 0,
+        },
+      },
     });
 
     expect(response.status).toBe(StatusMap['Bad Request']);
@@ -159,7 +171,7 @@ describe('a malformed request is a bad request', () => {
     const response = await sendJson({
       method: 'PATCH',
       url: APP_URL,
-      body: { volumeSizeBytes: 1024 },
+      body: { config: { access: { kind: 'public' }, volumeSizeBytes: 1024 } },
     });
 
     expect(response.status).toBe(StatusMap['Bad Request']);
@@ -172,7 +184,9 @@ describe('a malformed request is a bad request', () => {
     const response = await sendJson({
       method: 'PATCH',
       url: APP_URL,
-      body: { resources: { vcpuCount: 4, memoryMib: 4096 } },
+      body: {
+        config: { access: { kind: 'public' }, resources: { vcpuCount: 4, memoryMib: 4096 } },
+      },
     });
 
     expect(response.status).toBe(StatusMap['Bad Request']);
@@ -185,7 +199,12 @@ describe('a malformed request is a bad request', () => {
     const response = await sendJson({
       method: 'PATCH',
       url: APP_URL,
-      body: { healthCheck: { ...A_HEALTH_CHECK, path: '/healthz' } },
+      body: {
+        config: {
+          access: { kind: 'public' },
+          healthCheck: { ...A_HEALTH_CHECK, path: '/healthz' },
+        },
+      },
     });
 
     expect(response.status).toBe(StatusMap['Bad Request']);
@@ -197,7 +216,7 @@ describe('a malformed request is a bad request', () => {
     const response = await sendJson({
       method: 'PATCH',
       url: APP_URL,
-      body: { restartPolicy: A_RESTART_POLICY },
+      body: { config: { access: { kind: 'public' }, restartPolicy: A_RESTART_POLICY } },
     });
 
     expect(response.status).toBe(StatusMap['Bad Request']);
@@ -243,3 +262,19 @@ describe('a malformed request is a bad request', () => {
     expect(response.status).toBe(StatusMap['Bad Request']);
   });
 });
+
+test.each([true, false])(
+  'owners cannot set extra ports to %s through app writes',
+  async (hasExtraPublicPort) => {
+    for (const request of [
+      {
+        method: 'POST' as const,
+        url: APPS_URL,
+        body: { name: 'pocketbase', config: { hasExtraPublicPort } },
+      },
+      { method: 'PATCH' as const, url: APP_URL, body: { hasExtraPublicPort } },
+    ]) {
+      expect((await sendJson(request)).status).toBe(StatusMap['Bad Request']);
+    }
+  },
+);

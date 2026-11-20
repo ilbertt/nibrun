@@ -1,4 +1,6 @@
+import { isDeepStrictEqual } from 'node:util';
 import type { TypedSQL } from '@ilbertt/bun-sqlgen';
+import { CLOUDFLARE_ACCESS_DOMAIN_HINT } from '@repo/app-ui';
 import type {
   AppHostnameKind,
   AppId,
@@ -13,9 +15,12 @@ import type { Queries } from '#db/queries.gen.ts';
 import { APP_STATES, type AppHostnameState, type AppName, type AppState } from '#lib/api/app.ts';
 import type { DnsLabel } from '#lib/api/dns-label.ts';
 import type { OwnerId } from '#lib/api/identifiers.ts';
+import { accessColumns } from '#lib/app-access.ts';
 import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
-import { ConflictError } from '#lib/errors.ts';
+import { CUSTOM_KIND } from '#lib/app-hostname.ts';
+import { BadRequestError, ConflictError } from '#lib/errors.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
+import { requiresCustomDomain } from '#lib/validate-app-access.ts';
 import type { StoredVolumeStorage } from '#lib/volume-storage.ts';
 import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';
 import { Repository, TEXT_ARRAY } from '#repositories/repository.ts';
@@ -72,7 +77,9 @@ export type StateChange = OwnedApp & { state: AppState; from: readonly AppState[
  * The name is on the app row and the rest is a config version, so the two are written apart
  * and read back together.
  */
-export type SealedAppPatch = SealedConfigPatch & { name: AppName | undefined };
+export type SealedAppPatch = SealedConfigPatch & {
+  name: AppName | undefined;
+};
 
 /** Everything but `deleted`, which is a host's word for a filesystem that is gone. */
 export const LIVE_APP_STATES: readonly AppState[] = APP_STATES.filter(
@@ -180,9 +187,10 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         return { outcome: 'at-capacity' };
       }
 
+      const columns = accessColumns(config.access);
+      const audiences = columns.access_audiences && tx.array(columns.access_audiences, TEXT_ARRAY);
       const [inserted] = await tx.InsertApp`
-        INSERT INTO nibrun.apps (owner_id, name, slug)
-        VALUES (${ownerId}, ${name}, ${slug})
+        INSERT INTO nibrun.apps (owner_id, name, slug) VALUES (${ownerId}, ${name}, ${slug})
         RETURNING id
       `;
       if (!inserted) {
@@ -190,7 +198,9 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       }
 
       const [insertedConfig] = await tx.InsertAppConfig`
+        /* @notNull id */
         INSERT INTO nibrun.app_configs (
+          access_kind, access_header, access_format, access_issuer, access_audiences, access_jwks_url,
           app_id, http_port, has_extra_public_port, args, vcpu_count, memory_mib,
           health_check_path, health_check_interval_ms, health_check_timeout_ms,
           health_check_grace_period_ms, health_check_healthy_threshold,
@@ -199,6 +209,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           restart_backoff_factor, restart_reset_after_ms
         )
         VALUES (
+          ${columns.access_kind}, ${columns.access_header}, ${columns.access_format}, ${columns.access_issuer},
+          ${audiences}, ${columns.access_jwks_url},
           ${inserted.id}, ${config.httpPort}, ${config.hasExtraPublicPort},
           ${tx.array(config.args, TEXT_ARRAY)},
           ${config.resources.vcpuCount}, ${config.resources.memoryMib},
@@ -235,6 +247,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       const [app] = await tx.SelectCreatedApp`
         /* @notNull environment_names */
         SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
+               c.access_kind, c.access_header, c.access_format, c.access_issuer, c.access_audiences,
+               c.access_jwks_url,
                a.created_at, a.updated_at, a.volume_storage_migration_state,
                a.volume_storage_migration_message, a.volume_storage_migration_started_at,
                c.id AS config_id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
@@ -267,6 +281,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     return this.sql.SelectAppsByOwner`
       /* @notNull environment_names */
       SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
+             c.access_kind, c.access_header, c.access_format, c.access_issuer, c.access_audiences,
+             c.access_jwks_url,
              a.created_at, a.updated_at, a.volume_storage_migration_state,
              a.volume_storage_migration_message, a.volume_storage_migration_started_at,
              c.id AS config_id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
@@ -441,6 +457,8 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     const [app] = await this.sql.SelectAppById`
       /* @notNull environment_names */
       SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
+             c.access_kind, c.access_header, c.access_format, c.access_issuer, c.access_audiences,
+             c.access_jwks_url,
              a.created_at, a.updated_at, a.volume_storage_migration_state,
              a.volume_storage_migration_message, a.volume_storage_migration_started_at,
              c.id AS config_id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
@@ -713,9 +731,16 @@ export async function appendConfigVersion({
   patch: SealedConfigPatch;
   storage: StoredVolumeStorage | undefined;
 }): Promise<string> {
+  const needsDomain = requiresCustomDomain(patch.access);
   const [current] = await tx.SelectCurrentAppConfig`
     /* @notNull environment_names */
-    SELECT c.id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
+    SELECT EXISTS (
+             SELECT 1 FROM nibrun.app_hostnames h
+             WHERE ${needsDomain} AND h.app_id = c.app_id AND h.kind = ${CUSTOM_KIND}
+             LIMIT 1 FOR KEY SHARE
+           ) AS has_custom_domain,
+           c.access_kind, c.access_header, c.access_format, c.access_issuer, c.access_audiences, c.access_jwks_url,
+           c.id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,
            c.health_check_path, c.health_check_interval_ms, c.health_check_timeout_ms,
            c.health_check_grace_period_ms, c.health_check_healthy_threshold,
            c.health_check_unhealthy_threshold,
@@ -735,11 +760,23 @@ export async function appendConfigVersion({
     throw new Error('An app exists with no config.');
   }
 
-  const config = { ...toAppConfig(current), ...patch };
+  const previous = toAppConfig(current);
+  if (
+    needsDomain &&
+    !current.has_custom_domain &&
+    !isDeepStrictEqual(previous.access, patch.access)
+  ) {
+    throw new BadRequestError(CLOUDFLARE_ACCESS_DOMAIN_HINT);
+  }
+  const config = { ...previous, ...patch };
+  const columns = accessColumns(config.access);
+  const audiences = columns.access_audiences && tx.array(columns.access_audiences, TEXT_ARRAY);
   const volumeStorage = storage ?? current;
 
   const [inserted] = await tx.InsertPatchedAppConfig`
+    /* @notNull id */
     INSERT INTO nibrun.app_configs (
+      access_kind, access_header, access_format, access_issuer, access_audiences, access_jwks_url,
       app_id, http_port, has_extra_public_port, args, vcpu_count, memory_mib,
       health_check_path, health_check_interval_ms, health_check_timeout_ms,
       health_check_grace_period_ms, health_check_healthy_threshold,
@@ -752,6 +789,8 @@ export async function appendConfigVersion({
       volume_storage_encryption_password
     )
     VALUES (
+      ${columns.access_kind}, ${columns.access_header}, ${columns.access_format}, ${columns.access_issuer},
+      ${audiences}, ${columns.access_jwks_url},
       ${appId}, ${config.httpPort}, ${config.hasExtraPublicPort},
       ${tx.array(config.args, TEXT_ARRAY)},
       ${config.resources.vcpuCount}, ${config.resources.memoryMib},
@@ -901,6 +940,8 @@ async function appAsChanged({
   const [app] = await tx.SelectAppAsChanged`
     /* @notNull environment_names */
     SELECT a.id, a.owner_id, a.name, a.slug, a.state, a.activation, a.idle_timeout_ms,
+           c.access_kind, c.access_header, c.access_format, c.access_issuer, c.access_audiences,
+           c.access_jwks_url,
            a.created_at, a.updated_at, a.volume_storage_migration_state,
            a.volume_storage_migration_message, a.volume_storage_migration_started_at,
            c.id AS config_id, c.http_port, c.has_extra_public_port, c.args, c.vcpu_count, c.memory_mib,

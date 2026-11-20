@@ -4,12 +4,24 @@ import { APP_ID, SLUG } from '#tests/support/app.ts';
 import { updateApp } from '#update.ts';
 
 const HTTP_BAD_REQUEST = 400;
+const JWT_ACCESS = {
+  kind: 'jwt',
+  issuer: 'https://id.example',
+  audiences: ['reports'],
+  token: { header: 'Authorization', format: 'bearer' },
+  publicKeys: { url: 'https://id.example/keys' },
+} as const;
 
 type Sent = { appId: string; body: unknown };
 
 function apiRecording(sent: Sent[]) {
   return apiHolding({
     underApp: ({ appId }) => ({
+      get: answering({
+        config: {
+          access: JWT_ACCESS,
+        },
+      }),
       patch: (body: { name?: string }) => {
         sent.push({ appId, body });
         if (body.name === '') {
@@ -43,7 +55,13 @@ test('config and name travel in one patch', async () => {
 
   await updateApp({ api: apiRecording(sent), appId: APP_ID, name: 'Loud Badger', port: 8080 });
 
-  expect(sent[0]?.body).toEqual({ name: 'Loud Badger', httpPort: 8080 });
+  expect(sent[0]?.body).toEqual({
+    name: 'Loud Badger',
+    config: {
+      access: JWT_ACCESS,
+      httpPort: 8080,
+    },
+  });
 });
 
 test('the API refusal of a name is reported to the caller', async () => {
@@ -53,4 +71,10 @@ test('the API refusal of a name is reported to the caller', async () => {
     'Invalid app name.',
   );
   expect(sent).toEqual([{ appId: APP_ID, body: { name: '' } }]);
+});
+
+test('an explicit public policy can replace JWT access without editing runtime fields', async () => {
+  const sent: Sent[] = [];
+  await updateApp({ api: apiRecording(sent), appId: APP_ID, access: { kind: 'public' } });
+  expect(sent).toEqual([{ appId: APP_ID, body: { config: { access: { kind: 'public' } } } }]);
 });

@@ -11,6 +11,8 @@
 	# next to this file. Hostnames are handed out per app, so there is no moment
 	# at which issuing a certificate would be a step in creating one.
 	auto_https off
+	# Origin checks must run before the apex and fallback redirects.
+	order respond before redir
 
 	# Authenticated Origin Pulls refuses a connection during the handshake, but
 	# nothing bounds how long a caller may take to reach that point: Go derives
@@ -24,6 +26,8 @@
 	# streaming response and a body timeout a slow upload, and both are the
 	# tenant's to take as long over as their own users need.
 	servers {
+		# The site matchers below allow SNI aliases only within the app named by Host.
+		strict_sni_host insecure_off
 		timeouts {
 			read_header 10s
 		}
@@ -32,13 +36,11 @@
 
 # Authenticated Origin Pulls. The origin IP is discoverable, so the edge has to
 # prove it is the edge: without a client certificate signed by Cloudflare's
-# origin-pull CA the handshake is refused before any request is read. Turning
-# this on also makes Caddy enforce SNI == Host, which closes Host-header
-# spoofing along with it.
+# origin-pull CA the handshake is refused before any request is read.
 #
 # A snippet because every site needs it identically — including the ones the
 # agent renders, which import this by name.
-(origin_tls) {
+(origin_mutual_tls) {
 	tls /etc/caddy/tls/origin.crt /etc/caddy/tls/origin.key {
 		client_auth {
 			mode require_and_verify
@@ -47,38 +49,28 @@
 	}
 }
 
+(origin_tls) {
+	import origin_mutual_tls
+	@wrong_origin_sni not expression `{http.request.tls.server_name}.lowerAscii() == {http.request.host}.lowerAscii()`
+	respond @wrong_origin_sni "Misdirected Request" 421
+}
+
+(origin_alias_tls) {
+	import origin_mutual_tls
+	@wrong_origin_sni not expression {args[0]}
+	respond @wrong_origin_sni "Misdirected Request" 421
+}
+
 # One file, replaced whole on every routing change, and a glob so a host with no
 # app on it — or one whose agent has not converged yet — still starts.
 import /etc/caddy/rendered/*.caddy
 
-# The two names here that serve nothing: the apex, and the fallback origin the
-# edge resolves a custom hostname to. Both send their visitor to the marketing
-# site rather than forwarding to nibrunner.
-#
-# Custom-domain traffic never lands here. It reaches this host naming the brought
-# domain in both the handshake and the request, so it matches a rendered site
-# block, not the address the edge resolved to find the host.
-#
-# The apex needs two things elsewhere before it reaches this block at all: a
-# record of its own, and an origin certificate naming <app_domain> beside the
-# wildcard — the edge validates the name it asked for, and *.<app_domain> does
-# not cover the bare one.
 https://{$APP_HOST_DOMAIN}, https://fallback.{$APP_HOST_DOMAIN} {
 	import origin_tls
 	redir https://{$WWW_HOSTNAME} permanent
 }
 
-# Cached DNS may still reach this edge after an app moves. Local site blocks win;
-# every other hostname reaches its new owner, including brought domains.
 :443 {
 	import origin_tls
-	header {
-		Cache-Control no-store
-		+Via "1.1 nibrun-legacy"
-		defer
-	}
-	reverse_proxy {{NIBRUNNER_HTTP_ORIGIN}} {
-		lb_try_duration 5s
-		stream_close_delay 5m
-	}
+	respond 404
 }

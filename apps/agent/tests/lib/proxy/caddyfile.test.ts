@@ -43,7 +43,7 @@ describe('the rendered config is a projection of what is running', () => {
   test('every site authenticates the edge, so none can be reached from the origin address', () => {
     const sites = renderAppSites([route(), route({ appId: Value.Parse(AppIdSchema, 'app-b') })]);
     const blocks = sites.split('reverse_proxy').length - 1;
-    expect(sites.split('import origin_tls').length - 1).toBe(blocks);
+    expect(sites.split('import origin_alias_tls').length - 1).toBe(blocks);
   });
 
   test('nothing is routable when nothing is running', () => {
@@ -57,6 +57,23 @@ describe('the rendered config is a projection of what is running', () => {
       }),
     ]);
     expect(sites).toContain('https://a.apps.example.com, https://brought.example.dev {');
+    expect(sites).toContain(
+      'import origin_alias_tls `{http.request.tls.server_name}.lowerAscii() in ["a.apps.example.com","brought.example.dev"]`',
+    );
+  });
+
+  test('each app limits origin SNI to its own hostname aliases', () => {
+    const sites = renderAppSites([
+      route(),
+      route({
+        appId: Value.Parse(AppIdSchema, 'app-b'),
+        hostnames: [platformHostname('b.apps.example.com')],
+        hostPort: SECOND_HOST_PORT,
+      }),
+    ]);
+    expect(sites).toContain('in ["a.apps.example.com"]`');
+    expect(sites).toContain('in ["b.apps.example.com"]`');
+    expect(sites).not.toContain('in ["a.apps.example.com","b.apps.example.com"]');
   });
 
   test('rendering twice from the same routes is byte-identical, whatever order they arrive in', () => {

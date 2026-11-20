@@ -2,9 +2,10 @@ import { AppIdSchema } from '@repo/protocol';
 import { publicSchema } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
 import { Elysia, StatusMap } from 'elysia';
+import { AppPatchSchema } from '#lib/api/app.ts';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { AuthCaller } from '#lib/auth/caller.ts';
-import { AppPatchSchema, AppResponseSchema } from '#routes/api/apps/model.ts';
+import { AppResponseSchema } from '#routes/api/apps/model.ts';
 import { AppsServicePlugin, AuthPlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsAppIdController = new Elysia()

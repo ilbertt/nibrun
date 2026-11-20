@@ -17,6 +17,12 @@ export interface ISelectHostForIdentityResult {
 export interface IObserveHostReportResult {
 }
 
+/** Result of query `SelectRetainedDeploymentArtifacts`. */
+export interface ISelectRetainedDeploymentArtifactsResult {
+    /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
+    digest: NonNullable<IArtifactsColumns["digest"]>;
+}
+
 /** Result of query `SelectDesiredDeployments`. */
 export interface ISelectDesiredDeploymentsResult {
     /** The latest execution, including while its app is stopped or failed. */
@@ -54,6 +60,12 @@ export interface ISelectDesiredDeploymentsResult {
     idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
     /** The release's own state, beside the app's. A host reads it to tell a release it should run from one it is only answering for. */
     deployment_state: IDeploymentsColumns["state"];
+    access_kind: IAppConfigsColumns["access_kind"];
+    access_header: IAppConfigsColumns["access_header"];
+    access_format: IAppConfigsColumns["access_format"];
+    access_issuer: IAppConfigsColumns["access_issuer"];
+    access_audiences: IAppConfigsColumns["access_audiences"];
+    access_jwks_url: IAppConfigsColumns["access_jwks_url"];
 }
 
 /** Result of query `SelectDesiredVolumes`. */
@@ -194,6 +206,12 @@ export interface IDeleteCustomAppHostnameResult {
     cloudflare_id: IAppHostnamesColumns["cloudflare_id"];
 }
 
+/** Result of query `SelectAccessAfterLastDomainRemoval`. */
+export interface ISelectAccessAfterLastDomainRemovalResult {
+    saved_header: IAppConfigsColumns["access_header"];
+    deployed_header: IAppConfigsColumns["access_header"];
+}
+
 /** Result of query `SelectPendingCustomHostnames`. */
 export interface ISelectPendingCustomHostnamesResult {
     id: IAppHostnamesColumns["id"];
@@ -234,7 +252,7 @@ export interface IInsertAppResult {
 
 /** Result of query `InsertAppConfig`. */
 export interface IInsertAppConfigResult {
-    id: IAppConfigsColumns["id"];
+    id: string;
 }
 
 /** Result of query `InsertAppHostname`. */
@@ -260,6 +278,12 @@ export interface ISelectCreatedAppResult {
     state: IAppsColumns["state"];
     activation: IAppsColumns["activation"];
     idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
+    access_kind: IAppConfigsColumns["access_kind"];
+    access_header: IAppConfigsColumns["access_header"];
+    access_format: IAppConfigsColumns["access_format"];
+    access_issuer: IAppConfigsColumns["access_issuer"];
+    access_audiences: IAppConfigsColumns["access_audiences"];
+    access_jwks_url: IAppConfigsColumns["access_jwks_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -315,6 +339,12 @@ export interface ISelectAppsByOwnerResult {
     state: IAppsColumns["state"];
     activation: IAppsColumns["activation"];
     idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
+    access_kind: IAppConfigsColumns["access_kind"];
+    access_header: IAppConfigsColumns["access_header"];
+    access_format: IAppConfigsColumns["access_format"];
+    access_issuer: IAppConfigsColumns["access_issuer"];
+    access_audiences: IAppConfigsColumns["access_audiences"];
+    access_jwks_url: IAppConfigsColumns["access_jwks_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -370,6 +400,12 @@ export interface ISelectAppByIdResult {
     state: IAppsColumns["state"];
     activation: IAppsColumns["activation"];
     idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
+    access_kind: IAppConfigsColumns["access_kind"];
+    access_header: IAppConfigsColumns["access_header"];
+    access_format: IAppConfigsColumns["access_format"];
+    access_issuer: IAppConfigsColumns["access_issuer"];
+    access_audiences: IAppConfigsColumns["access_audiences"];
+    access_jwks_url: IAppConfigsColumns["access_jwks_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -495,6 +531,13 @@ export interface IDeleteAppUsageByAppResult {
 
 /** Result of query `SelectCurrentAppConfig`. */
 export interface ISelectCurrentAppConfigResult {
+    has_custom_domain: boolean | null;
+    access_kind: IAppConfigsColumns["access_kind"];
+    access_header: IAppConfigsColumns["access_header"];
+    access_format: IAppConfigsColumns["access_format"];
+    access_issuer: IAppConfigsColumns["access_issuer"];
+    access_audiences: IAppConfigsColumns["access_audiences"];
+    access_jwks_url: IAppConfigsColumns["access_jwks_url"];
     id: IAppConfigsColumns["id"];
     http_port: IAppConfigsColumns["http_port"];
     has_extra_public_port: IAppConfigsColumns["has_extra_public_port"];
@@ -530,7 +573,7 @@ export interface ISelectCurrentAppConfigResult {
 
 /** Result of query `InsertPatchedAppConfig`. */
 export interface IInsertPatchedAppConfigResult {
-    id: IAppConfigsColumns["id"];
+    id: string;
 }
 
 /** Result of query `SelectAppForUpdate`. */
@@ -570,6 +613,12 @@ export interface ISelectAppAsChangedResult {
     state: IAppsColumns["state"];
     activation: IAppsColumns["activation"];
     idle_timeout_ms: IAppsColumns["idle_timeout_ms"];
+    access_kind: IAppConfigsColumns["access_kind"];
+    access_header: IAppConfigsColumns["access_header"];
+    access_format: IAppConfigsColumns["access_format"];
+    access_issuer: IAppConfigsColumns["access_issuer"];
+    access_audiences: IAppConfigsColumns["access_audiences"];
+    access_jwks_url: IAppConfigsColumns["access_jwks_url"];
     /** Derived from the uuidv7 id; the moment the row was created. */
     created_at: Date;
     updated_at: IAppsColumns["updated_at"];
@@ -764,7 +813,8 @@ export interface ISelectReadyDeploymentHostResult {
 
 /** Result of query `SelectDeploymentToReplay`. */
 export interface ISelectDeploymentToReplayResult {
-    id: IDeploymentsColumns["id"];
+    access_header: IAppConfigsColumns["access_header"];
+    has_custom_domain: boolean | null;
 }
 
 /** Result of query `InsertReplayedDeployment`. */
@@ -820,6 +870,12 @@ export interface ISelectDeploymentsByAppResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
+    access_kind: IAppConfigsColumns["access_kind"];
+    access_header: IAppConfigsColumns["access_header"];
+    access_format: IAppConfigsColumns["access_format"];
+    access_issuer: IAppConfigsColumns["access_issuer"];
+    access_audiences: IAppConfigsColumns["access_audiences"];
+    access_jwks_url: IAppConfigsColumns["access_jwks_url"];
 }
 
 /** Result of query `SelectDeploymentById`. */
@@ -870,6 +926,12 @@ export interface ISelectDeploymentByIdResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
+    access_kind: IAppConfigsColumns["access_kind"];
+    access_header: IAppConfigsColumns["access_header"];
+    access_format: IAppConfigsColumns["access_format"];
+    access_issuer: IAppConfigsColumns["access_issuer"];
+    access_audiences: IAppConfigsColumns["access_audiences"];
+    access_jwks_url: IAppConfigsColumns["access_jwks_url"];
 }
 
 /** Result of query `SelectLiveDeployments`. */
@@ -943,6 +1005,12 @@ export interface ISelectInsertedDeploymentResult {
     restart_reset_after_ms: IAppConfigsColumns["restart_reset_after_ms"];
     /** Names of the variables this config version runs with, never their values. */
     environment_names: string[];
+    access_kind: IAppConfigsColumns["access_kind"];
+    access_header: IAppConfigsColumns["access_header"];
+    access_format: IAppConfigsColumns["access_format"];
+    access_issuer: IAppConfigsColumns["access_issuer"];
+    access_audiences: IAppConfigsColumns["access_audiences"];
+    access_jwks_url: IAppConfigsColumns["access_jwks_url"];
 }
 
 /** Result of query `SupersedeLiveDeployment`. */
@@ -1173,6 +1241,7 @@ export interface IUpsertPaidRequestResult {
     requested_vcpu_count: IPaidRequestsColumns["requested_vcpu_count"];
     requested_memory_mib: IPaidRequestsColumns["requested_memory_mib"];
     requested_volume_gib: IPaidRequestsColumns["requested_volume_gib"];
+    requested_ports_amount: IPaidRequestsColumns["requested_ports_amount"];
 }
 
 /** Result of query `InsertSqliteConnection`. */
@@ -1313,6 +1382,7 @@ export interface Queries {
     RegisterHost: IRegisterHostResult;
     SelectHostForIdentity: ISelectHostForIdentityResult;
     ObserveHostReport: IObserveHostReportResult;
+    SelectRetainedDeploymentArtifacts: ISelectRetainedDeploymentArtifactsResult;
     SelectDesiredDeployments: ISelectDesiredDeploymentsResult;
     SelectDesiredVolumes: ISelectDesiredVolumesResult;
     SelectDesiredHostnames: ISelectDesiredHostnamesResult;
@@ -1325,6 +1395,7 @@ export interface Queries {
     UpdateCustomAppHostnameEdge: IUpdateCustomAppHostnameEdgeResult;
     UpdateCustomAppHostnameState: IUpdateCustomAppHostnameStateResult;
     DeleteCustomAppHostname: IDeleteCustomAppHostnameResult;
+    SelectAccessAfterLastDomainRemoval: ISelectAccessAfterLastDomainRemovalResult;
     SelectPendingCustomHostnames: ISelectPendingCustomHostnamesResult;
     SelectDisposableAppHostnames: ISelectDisposableAppHostnamesResult;
     DeleteDisposableAppHostname: IDeleteDisposableAppHostnameResult;
@@ -1483,6 +1554,12 @@ export interface IAppConfigsColumns {
     volume_storage_session_token: import("#lib/tenant-secrets.ts").SealedSecret | null;
     /** Sealed with TENANT_SECRETS_KEY. */
     volume_storage_encryption_password: import("#lib/tenant-secrets.ts").SealedSecret | null;
+    access_kind: string;
+    access_header: string | null;
+    access_format: string | null;
+    access_issuer: string | null;
+    access_audiences: string[] | null;
+    access_jwks_url: string | null;
 }
 
 /** Schema of `app_configs`. */
@@ -1516,6 +1593,12 @@ export interface IAppConfigsWithEnvironmentColumns {
     has_extra_public_port: boolean | null;
     /** Names of the variables this config version runs with, never their values. */
     environment_names: string[] | null;
+    access_kind: string | null;
+    access_header: string | null;
+    access_format: string | null;
+    access_issuer: string | null;
+    access_audiences: string[] | null;
+    access_jwks_url: string | null;
 }
 
 /** Schema of `app_configs_with_environment`. */
@@ -1798,6 +1881,12 @@ export interface IDesiredDeploymentsColumns {
     idle_timeout_ms: number | null;
     /** The release's own state, beside the app's. A host reads it to tell a release it should run from one it is only answering for. */
     deployment_state: import("#lib/api/deployment.ts").DeploymentState | null;
+    access_kind: string | null;
+    access_header: string | null;
+    access_format: string | null;
+    access_issuer: string | null;
+    access_audiences: string[] | null;
+    access_jwks_url: string | null;
 }
 
 /** Schema of `desired_deployments`. */
@@ -2125,6 +2214,7 @@ export interface IPaidRequestsColumns {
     requested_vcpu_count: number | null;
     requested_memory_mib: number | null;
     requested_volume_gib: number | null;
+    requested_ports_amount: number | null;
 }
 
 /** Schema of `paid_requests`. */
@@ -2274,13 +2364,21 @@ export const schema = {
             volume_storage_access_key_id: { _columnName: "volume_storage_access_key_id", _foreignKeys: {} },
             volume_storage_secret_access_key: { _columnName: "volume_storage_secret_access_key", _foreignKeys: {} },
             volume_storage_session_token: { _columnName: "volume_storage_session_token", _foreignKeys: {} },
-            volume_storage_encryption_password: { _columnName: "volume_storage_encryption_password", _foreignKeys: {} }
+            volume_storage_encryption_password: { _columnName: "volume_storage_encryption_password", _foreignKeys: {} },
+            access_kind: { _columnName: "access_kind", _foreignKeys: {} },
+            access_header: { _columnName: "access_header", _foreignKeys: {} },
+            access_format: { _columnName: "access_format", _foreignKeys: {} },
+            access_issuer: { _columnName: "access_issuer", _foreignKeys: {} },
+            access_audiences: { _columnName: "access_audiences", _foreignKeys: {} },
+            access_jwks_url: { _columnName: "access_jwks_url", _foreignKeys: {} }
         },
         _indexes: {
             app_configs_app_id_id_idx: { _indexName: "app_configs_app_id_id_idx" },
             app_configs_pkey: { _indexName: "app_configs_pkey" }
         },
         _constraints: {
+            app_configs_access_format_check: { _constraintName: "app_configs_access_format_check" },
+            app_configs_access_policy_check: { _constraintName: "app_configs_access_policy_check" },
             app_configs_app_id_fkey: { _constraintName: "app_configs_app_id_fkey" },
             app_configs_args_check: { _constraintName: "app_configs_args_check" },
             app_configs_health_check_grace_period_ms_check: { _constraintName: "app_configs_health_check_grace_period_ms_check" },
@@ -2325,7 +2423,13 @@ export const schema = {
             restart_reset_after_ms: { _columnName: "restart_reset_after_ms", _foreignKeys: {} },
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             has_extra_public_port: { _columnName: "has_extra_public_port", _foreignKeys: {} },
-            environment_names: { _columnName: "environment_names", _foreignKeys: {} }
+            environment_names: { _columnName: "environment_names", _foreignKeys: {} },
+            access_kind: { _columnName: "access_kind", _foreignKeys: {} },
+            access_header: { _columnName: "access_header", _foreignKeys: {} },
+            access_format: { _columnName: "access_format", _foreignKeys: {} },
+            access_issuer: { _columnName: "access_issuer", _foreignKeys: {} },
+            access_audiences: { _columnName: "access_audiences", _foreignKeys: {} },
+            access_jwks_url: { _columnName: "access_jwks_url", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}
@@ -2590,7 +2694,13 @@ export const schema = {
             has_extra_public_port: { _columnName: "has_extra_public_port", _foreignKeys: {} },
             activation: { _columnName: "activation", _foreignKeys: {} },
             idle_timeout_ms: { _columnName: "idle_timeout_ms", _foreignKeys: {} },
-            deployment_state: { _columnName: "deployment_state", _foreignKeys: {} }
+            deployment_state: { _columnName: "deployment_state", _foreignKeys: {} },
+            access_kind: { _columnName: "access_kind", _foreignKeys: {} },
+            access_header: { _columnName: "access_header", _foreignKeys: {} },
+            access_format: { _columnName: "access_format", _foreignKeys: {} },
+            access_issuer: { _columnName: "access_issuer", _foreignKeys: {} },
+            access_audiences: { _columnName: "access_audiences", _foreignKeys: {} },
+            access_jwks_url: { _columnName: "access_jwks_url", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}
@@ -2860,7 +2970,8 @@ export const schema = {
             app_id: { _columnName: "app_id", _foreignKeys: { paid_requests_app_id_fkey: { _constraintName: "paid_requests_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
             requested_vcpu_count: { _columnName: "requested_vcpu_count", _foreignKeys: {} },
             requested_memory_mib: { _columnName: "requested_memory_mib", _foreignKeys: {} },
-            requested_volume_gib: { _columnName: "requested_volume_gib", _foreignKeys: {} }
+            requested_volume_gib: { _columnName: "requested_volume_gib", _foreignKeys: {} },
+            requested_ports_amount: { _columnName: "requested_ports_amount", _foreignKeys: {} }
         },
         _indexes: {
             paid_requests_app_id_idx: { _indexName: "paid_requests_app_id_idx" },
@@ -2875,6 +2986,7 @@ export const schema = {
             paid_requests_pkey: { _constraintName: "paid_requests_pkey" },
             paid_requests_requested_apps_amount_check: { _constraintName: "paid_requests_requested_apps_amount_check" },
             paid_requests_requested_memory_mib_check: { _constraintName: "paid_requests_requested_memory_mib_check" },
+            paid_requests_requested_ports_amount_check: { _constraintName: "paid_requests_requested_ports_amount_check" },
             paid_requests_requested_vcpu_count_check: { _constraintName: "paid_requests_requested_vcpu_count_check" },
             paid_requests_requested_volume_gib_check: { _constraintName: "paid_requests_requested_volume_gib_check" },
             paid_requests_type_check: { _constraintName: "paid_requests_type_check" }

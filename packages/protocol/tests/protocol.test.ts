@@ -84,6 +84,7 @@ function desiredState(): HostDesiredState {
           filename: Value.Parse(FilenameSchema, 'server'),
         },
         config: {
+          access: { kind: 'public' },
           httpPort: HTTP_PORT_FIXTURE,
           hasExtraPublicPort: true,
           args: ['serve', '--http=0.0.0.0:8090'],
@@ -101,6 +102,19 @@ function desiredState(): HostDesiredState {
     exports: [],
   };
 }
+
+test('desired instances require access in config', () => {
+  const state = desiredState();
+  expect(isValidMessage({ schema: HostDesiredStateSchema, value: state })).toBe(true);
+  const instances = state.instances.map(({ config: { access, ...config }, ...instance }) => ({
+    ...instance,
+    access,
+    config,
+  }));
+  expect(isValidMessage({ schema: HostDesiredStateSchema, value: { ...state, instances } })).toBe(
+    false,
+  );
+});
 
 function desiredExport() {
   return {

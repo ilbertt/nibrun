@@ -4,7 +4,7 @@ export const reviewCases = {
   positive: [
     {
       description:
-        'Create a webapp from a natural-language request. Requires a connected demo account with capacity for two new apps across the creation cases.',
+        'Create a webapp from a natural-language request. Requires a connected demo account with capacity for one new app.',
       prompt: 'Create an email signup page for my tennis club.',
       tools_triggered: [MCP_TOOL_NAMES.deployApp, MCP_TOOL_NAMES.getApp].join(', '),
       expected_behavior:
@@ -42,11 +42,15 @@ export const reviewCases = {
     },
     {
       description:
-        'Create a Telegram bot using a pre-created test bot whose credentials and test access are supplied privately with reviewer access. The reviewer must not need to register a bot.',
+        'Build a Telegram bot using the pre-created test bot and its existing nibrun app, where the bot token is already configured in the dashboard. App identification and bot access are supplied privately with reviewer access. The reviewer must not need to register a bot or share its token with ChatGPT.',
       prompt: 'Build a Telegram bot that saves links I send and lets me search them.',
-      tools_triggered: [MCP_TOOL_NAMES.deployApp, MCP_TOOL_NAMES.getApp].join(', '),
+      tools_triggered: [
+        MCP_TOOL_NAMES.listApps,
+        MCP_TOOL_NAMES.getApp,
+        MCP_TOOL_NAMES.deployApp,
+      ].join(', '),
       expected_behavior:
-        'Read setup-app and use its Bun Telegram bot template, then follow deploy-to-nibrun to compile and deploy with the supplied test bot credentials. Verify the deployment. A link sent to the test bot can be found through its search command and is saved on persistent storage. Keep the bot token out of the response and source archive.',
+        'Read setup-app and use its Bun Telegram bot template, then follow deploy-to-nibrun. Identify the prepared app and redeploy its app ID, reusing the bot token already configured in its environment. Do not request the token or send environment values through MCP. Verify the deployment. A link sent to the test bot can be found through its search command and is saved on persistent storage. Keep credentials out of chat, source, compiled binaries and archives.',
     },
   ],
   negative: [

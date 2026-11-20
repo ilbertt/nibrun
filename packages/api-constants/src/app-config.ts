@@ -1,3 +1,5 @@
+export const DEFAULT_APP_ACCESS = { kind: 'public' } as const;
+
 export const DEFAULT_HTTP_PORT = 3000;
 export const DEFAULT_VOLUME_SIZE_BYTES = 8_589_934_592;
 

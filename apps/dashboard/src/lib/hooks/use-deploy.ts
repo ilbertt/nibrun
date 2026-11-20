@@ -1,5 +1,5 @@
 import { analyticsIdentityState, trackEvent } from '@repo/analytics';
-import type { TenantArguments, TenantEnvironmentPatch } from '@repo/api-client/models';
+import type { App, TenantArguments, TenantEnvironmentPatch } from '@repo/api-client/models';
 import {
   awaitDeploymentSettled,
   type DeployableArchive,
@@ -21,6 +21,7 @@ import { useSessionIdentity } from '#lib/hooks/use-session-identity.ts';
 import { SessionIdentity } from '#lib/session-identity.ts';
 
 type Configured = {
+  access?: App['config']['access'];
   args: TenantArguments;
   environment?: TenantEnvironmentPatch | undefined;
   port: number;

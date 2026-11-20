@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import type { Sha256Digest, TenantArguments } from '@repo/api-client/models';
+import type { App, Sha256Digest, TenantArguments } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError } from '@repo/api-client/unwrap';
 import {
@@ -19,6 +19,7 @@ import type { Ui } from '#lib/ui.ts';
 import { describeProgress } from '#lib/upload-progress.ts';
 
 export type DeployInput = RunOptions & {
+  access?: App['config']['access'] | undefined;
   api: PublicApiClient;
   ui: Ui;
   binary: DeployableBinary;
@@ -45,6 +46,7 @@ export async function deploy({ api, ui, detach, ...release }: DeployInput): Prom
  * leaving that. One the owner handed over is left where it is.
  */
 async function startRelease({
+  access,
   api,
   ui,
   binary,
@@ -52,7 +54,6 @@ async function startRelease({
   app,
   name,
   port,
-  extraPublicPort,
   env,
   unset,
   dataFolder,
@@ -65,13 +66,13 @@ async function startRelease({
 
   try {
     return await startDeployment({
+      access,
       api,
       binary,
       args,
       appId: app?.id,
       name,
       port,
-      extraPublicPort,
       ...(environment !== undefined && { environment }),
       initialData: dataFolder?.kind === 'url' ? { url: dataFolder.url } : opened?.archive,
       onStep: (step) => announce({ step, ui }),

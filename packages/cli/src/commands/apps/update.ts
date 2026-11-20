@@ -4,6 +4,7 @@ import { SHARED_OPTIONS } from '#config.ts';
 import { selectApp } from '#lib/apps.ts';
 import { parseArguments } from '#lib/command-line.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
+import { ACCESS_OPTIONS, accessFrom } from '#lib/jwt-access.ts';
 import { createOutput } from '#lib/output.ts';
 import { RELEASE_OUTPUT } from '#lib/release.ts';
 import { updateApp } from '#lib/update.ts';
@@ -12,6 +13,7 @@ export const command = defineCommand('apps update', {
   description:
     'Change how the app starts and run it again on the binary it already has. Nothing is uploaded, and whatever no flag names is left as it is. Activation cannot currently be changed: on-request apps sleep without incoming traffic, and background jobs and timers do not run while asleep.',
   options: {
+    ...ACCESS_OPTIONS,
     args: {
       schema: z.string().optional(),
       description:
@@ -23,13 +25,13 @@ export const command = defineCommand('apps update', {
         'Call the app something else. Its hostnames stay as they are; the name is what you refer to it by, here and on the dashboard.',
     },
     [SHARED_OPTIONS.port.name]: SHARED_OPTIONS.port.option,
-    [SHARED_OPTIONS.extraPublicPort.name]: SHARED_OPTIONS.extraPublicPort.option,
     [SHARED_OPTIONS.env.name]: SHARED_OPTIONS.env.option,
     [SHARED_OPTIONS.unset.name]: SHARED_OPTIONS.unset.option,
     [SHARED_OPTIONS.detach.name]: SHARED_OPTIONS.detach.option,
   },
   beforeHandler: ({ context }) => requireSignedIn(context),
   handler: async ({ options, parents, context, print, rootOptions }) => {
+    const access = accessFrom(options);
     const { args, ...given } = options;
     const { interactive, ui, emit } = createOutput({
       output: RELEASE_OUTPUT,
@@ -46,10 +48,10 @@ export const command = defineCommand('apps update', {
         api,
         ui,
         appId: app.id,
+        access,
         name: given[SHARED_OPTIONS.name.name],
         args: args === undefined ? undefined : parseArguments(args),
         port: given[SHARED_OPTIONS.port.name],
-        extraPublicPort: given[SHARED_OPTIONS.extraPublicPort.name],
         env: given[SHARED_OPTIONS.env.name],
         unset: given[SHARED_OPTIONS.unset.name],
         detach: given[SHARED_OPTIONS.detach.name],

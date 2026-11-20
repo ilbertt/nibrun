@@ -1,4 +1,4 @@
-import { type Cause, Effect, type Schedule } from 'effect';
+import { Cause, Effect, type Schedule } from 'effect';
 
 /**
  * A loop is the agent's supervision boundary, and the loops run under one `Effect.all`, so a
@@ -17,7 +17,7 @@ export function supervised<E, R>({
 }) {
   return once.pipe(
     Effect.sandbox,
-    Effect.tapError(onFailure),
+    Effect.tapError((cause) => (Cause.isInterruptedOnly(cause) ? Effect.void : onFailure(cause))),
     Effect.retry(schedule),
     Effect.forever,
   );

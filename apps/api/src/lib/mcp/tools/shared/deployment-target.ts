@@ -9,7 +9,10 @@ export const DeploymentTargetSchema = Type.Object(
   {
     appId: Type.Optional(AppIdSchema),
     name: Type.Optional(CreateAppRequestSchema.properties.name),
-    config: CreateAppRequestSchema.properties.config,
+    config: Type.Omit(CreateAppRequestSchema.properties.config, ['environment'], {
+      additionalProperties: false,
+      description: 'Initial runtime options. Set environment variables directly in the dashboard.',
+    }),
   },
   {
     additionalProperties: false,

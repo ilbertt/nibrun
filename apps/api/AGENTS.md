@@ -11,6 +11,12 @@ It references `hosts.id`, a UUIDv7 assigned before the agent receives a session.
 `hosts.origin_id` uniquely retains the agent's persisted registration identity. Every session
 request must carry it. Legacy agents may present a saved canonical id; both resolve to the same host.
 Moving an app creates a new deployment; its volume survives the execution it belonged to.
+
+Desired host state includes the artifact digests for the current deployment and its immediate
+predecessor for each app assigned to that host. Select them in the same repeatable-read snapshot as
+the desired executions. This controls host-local cache retention and does not delete uploaded S3
+objects or deployment history. Configuration-only redeployments may retain the same digest twice;
+do not reach farther back merely to keep two distinct binaries.
 `deployments.initiated_by` is required and defaults to `owner`; platform operations use `system.*` initiators.
 GitHub and MCP provenance still represent owner deployments. Bind initiators in repository
 queries through `DeploymentInitiator` rather than embedding SQL string literals.
@@ -107,7 +113,8 @@ lets Elysia name and type `params`. That path also names the controller:
 
 MCP code belongs in `src/lib/mcp/`: one tool registration per file in `tools/`,
 shared helpers in `tools/shared/`. Derive tool schemas from existing API models.
-Register tools through `tools/shared/register-tool.ts`.
+Register tools through `tools/shared/register-tool.ts`. MCP inputs must not accept environment
+values; users configure credentials directly in the dashboard.
 Follow MCP specifications and MCP-owned extensions. Optional client file binding belongs at the
 tool boundary; keep services client-neutral.
 
@@ -137,6 +144,13 @@ and `NULL` for every other type. Apply the same rule when adding paid-request ty
 Migrations are ordered `src/db/migrations/NNNN_*.sql`, applied on startup by
 `src/db/migrate.ts`. Add one by dropping in the next-numbered file. The runner's
 ledger lives in the `api_migrations` schema — never put app tables there.
+
+Upgrade Better Auth and its plugins together with exact versions. Generate its schema with the
+matching `auth` CLI and `scripts/auth-schema.ts`, compare it with the complete migration history,
+and follow upstream cleanup instructions for obsolete constraints the generator does not remove.
+Run the real GitHub callback against migrated Postgres, covering new accounts, returning accounts
+and anonymous account linking. Memory-adapter auth tests do not establish schema compatibility.
+The legacy `auth.account.issuer` column remains nullable to preserve existing account values.
 
 **Migrations carry schema and nothing else — never `INSERT`, `UPDATE` or
 `DELETE` on app tables.** Rows to repair are found by the state they are in and

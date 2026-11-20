@@ -2,6 +2,7 @@ import { DEFAULT_INSTANCE_RESOURCES, DEFAULT_VOLUME_SIZE_BYTES } from '@repo/api
 import { AppIdSchema, DeploymentIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { ArtifactIdSchema, ImportIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { accessColumns } from '#lib/app-access.ts';
 import type { AppConfigColumns, PublicAppConfig, StoredAppConfig } from '#lib/app-config.ts';
 import {
   DEFAULT_HEALTH_CHECK,
@@ -43,6 +44,7 @@ export function deploymentLookupRepository(
 // Spelled out from the protocol's own defaults rather than built with `configWithDefaults`,
 // which is the thing under test wherever this is the expected value.
 export const DEFAULT_CONFIG: PublicAppConfig = {
+  access: { kind: 'public' },
   volumeSizeBytes: DEFAULT_VOLUME_SIZE_BYTES,
   environment: {},
   httpPort: DEFAULT_HTTP_PORT,
@@ -60,6 +62,7 @@ export const DEFAULT_STORED_CONFIG: StoredAppConfig = { ...DEFAULT_CONFIG, envir
 export function configColumns(config: StoredAppConfig | PublicAppConfig): AppConfigColumns {
   return {
     environment_names: Object.keys(config.environment),
+    ...accessColumns(config.access),
     http_port: config.httpPort,
     has_extra_public_port: config.hasExtraPublicPort,
     args: [...config.args],

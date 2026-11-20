@@ -1,16 +1,14 @@
 import { type Filename, FilenameSchema } from '@repo/protocol';
+import { httpsUrl } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
 
-// Where a file may be fetched from rather than uploaded. `https` alone: the api is what follows
-// this, and a plaintext hop is one where what the guest ends up running was chosen by whoever sat
-// between.
-//
-// The api's own, not the protocol's: a host is told a digest and a key, never where the bytes were
-// found, so this reaches nothing below the control plane.
-export const REMOTE_URL_PATTERN = '^https://[^\\s]+$';
 export const MAX_REMOTE_URL_LENGTH = 2048;
 
-const REMOTE_URL = new RegExp(REMOTE_URL_PATTERN);
+export function remoteUrlSchema(description?: string) {
+  return httpsUrl({ maxLength: MAX_REMOTE_URL_LENGTH, description });
+}
+
+const RemoteUrlSchema = remoteUrlSchema();
 
 /**
  * The rule the request body is held to, as something every later hop is held to as well: what the
@@ -18,7 +16,7 @@ const REMOTE_URL = new RegExp(REMOTE_URL_PATTERN);
  * hop the rule exists to refuse.
  */
 export function isRemoteUrl(url: string): boolean {
-  return url.length <= MAX_REMOTE_URL_LENGTH && REMOTE_URL.test(url);
+  return Value.Check(RemoteUrlSchema, url);
 }
 
 /**

@@ -4,12 +4,16 @@ import {
   ByteSizeSchema,
   ComputeUsageSchema,
   FilesystemUsageSchema,
-  TenantEnvironmentSchema,
   TimestampSchema,
 } from '@repo/protocol';
 import { t } from 'elysia';
-import { AppHostnameStateSchema, AppNameSchema, AppSchema, MIN_HOSTNAMES } from '#lib/api/app.ts';
-import { TenantEnvironmentPatchSchema } from '#lib/api/environment.ts';
+import {
+  AppHostnameStateSchema,
+  AppNameSchema,
+  AppSchema,
+  MIN_HOSTNAMES,
+  NewAppConfigSchema,
+} from '#lib/api/app.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 
 // Which variables are set, never what they hold: the values are sealed in the database and only
@@ -18,41 +22,11 @@ const RedactedEnvironmentSchema = t.Record(t.String(), t.Literal(REDACTED), {
   description: 'The variables this app runs with. Values are never returned.',
 });
 
-// Everything an app runs with, plus the filesystem the api sized for it. `environment` is written
-// and read in different shapes, so it is taken out and each half says its own.
-export const PublicAppConfigSchema = t.Composite([
-  t.Omit(AppConfigSchema, ['environment']),
-  t.Object({ volumeSizeBytes: ByteSizeSchema, environment: RedactedEnvironmentSchema }),
-]);
-
-// How the binary is started, which is the whole of what an owner chooses. The machine it starts
-// on — vCPUs, memory, filesystem, health probe, restart budget — is nibrun's, and naming the two
-// that are not is what turns a request for the rest into an answer rather than silence.
-const OwnedAppConfigSchema = t.Pick(AppConfigSchema, ['httpPort', 'hasExtraPublicPort', 'args']);
-
-// Strict: every field is optional, so without this a misspelled one is silently no request at
-// all and the caller is told 200.
-//
-// `environment` is an edit rather than a replacement, where `args` is always the whole list. They
-// differ because a caller cannot read a secret back to restate it: a variable it says nothing
-// about is one it is leaving alone, and removing one is `null`.
-//
-// `name` is the one field here that is not config: a rename changes what the owner calls the
-// app and nothing about how it starts, so the hostname minted from the first name stays.
-export const AppPatchSchema = t.Partial(
-  t.Composite([
-    OwnedAppConfigSchema,
-    t.Object({ environment: TenantEnvironmentPatchSchema, name: AppNameSchema }),
-  ]),
-  { additionalProperties: false },
-);
-
-// An app being created has nothing to leave alone and nothing to remove, so what it is given is
-// the whole environment rather than an edit to one.
-const NewAppConfigSchema = t.Partial(
-  t.Composite([OwnedAppConfigSchema, t.Object({ environment: TenantEnvironmentSchema })]),
-  { additionalProperties: false },
-);
+export const PublicAppConfigSchema = t.Object({
+  ...AppConfigSchema.properties,
+  environment: RedactedEnvironmentSchema,
+  volumeSizeBytes: ByteSizeSchema,
+});
 
 /**
  * What a host is told about a hostname, plus the two things only its owner needs: whether the
