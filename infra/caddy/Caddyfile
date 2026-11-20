@@ -96,6 +96,21 @@ http://{$UMAMI_HOSTNAME} {
 	}
 }
 
+# Only the tunnel route that validates the Umami Access audience can reach this socket.
+:0 {
+	bind unix//run/umami-mcp/caddy.sock|0222
+	handle /mcp {
+		reverse_proxy umami:3000 {
+			rewrite /mcp
+			header_up Authorization "Bearer {env.UMAMI_MCP_API_KEY}"
+			header_up X-Forwarded-Proto https
+		}
+	}
+	handle {
+		respond 404
+	}
+}
+
 http://{$VICTORIALOGS_HOSTNAME} {
 	# Nothing is served at the bare hostname — the allowlist below starts at
 	# /select — so this is what makes typing the hostname land on the dashboard

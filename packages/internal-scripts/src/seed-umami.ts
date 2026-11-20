@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { createRequire } from 'node:module';
 import { UMAMI_WEBSITE_ID } from '@repo/analytics/config';
 import { PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
@@ -8,6 +8,8 @@ const BCRYPT_ROUNDS = 10;
 const MIN_PASSWORD_LENGTH = 8;
 const MAX_PASSWORD_BYTES = 72;
 const FACTORY_ADMIN = { username: 'admin', password: 'umami' };
+const MCP_API_KEY_ID = '05920c89-fa68-43cf-a8c2-f054f62685d4';
+const UMAMI_KEY_PREFIX_LENGTH = 14;
 
 type Database = {
   connect(): Promise<void>;
@@ -81,6 +83,29 @@ async function seedWebsite(administratorId: string): Promise<void> {
   });
 }
 
+async function seedMcpApiKey(administratorId: string): Promise<void> {
+  const key = process.env.UMAMI_MCP_API_KEY;
+  if (key === undefined) {
+    return;
+  }
+  if (!/^umami_[A-Za-z0-9]{32}$/.test(key)) {
+    throw new Error('Invalid UMAMI_MCP_API_KEY format.');
+  }
+
+  // Umami 3.4.1 stores SHA-512 in hex and displays the prefix plus eight characters.
+  const hash = createHash('sha512').update(key).digest('hex');
+  await database.query({
+    text: `INSERT INTO api_key (api_key_id, user_id, name, key_hash, key_prefix)
+      VALUES ($1, $2, 'nibrun MCP', $3, $4)
+      ON CONFLICT (api_key_id) DO UPDATE SET
+        user_id = EXCLUDED.user_id, key_hash = EXCLUDED.key_hash,
+        key_prefix = EXCLUDED.key_prefix, last_used_at = NULL
+      WHERE (api_key.user_id, api_key.key_hash, api_key.key_prefix)
+        IS DISTINCT FROM (EXCLUDED.user_id, EXCLUDED.key_hash, EXCLUDED.key_prefix)`,
+    values: [MCP_API_KEY_ID, administratorId, hash, key.slice(0, UMAMI_KEY_PREFIX_LENGTH)],
+  });
+}
+
 const credentials = {
   username: requiredConfig('UMAMI_ADMIN_USERNAME').toLowerCase(),
   password: requiredConfig('UMAMI_ADMIN_PASSWORD'),
@@ -104,6 +129,7 @@ try {
   await database.query("SELECT pg_advisory_xact_lock(hashtext('nibrun:umami:bootstrap'))");
   const administratorId = await seedAdministrator();
   await seedWebsite(administratorId);
+  await seedMcpApiKey(administratorId);
   await database.query('COMMIT');
   console.info('Umami administrator and website are ready.');
 } catch (error) {

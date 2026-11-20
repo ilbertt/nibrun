@@ -67,6 +67,7 @@ UMAMI_APP_SECRET="$(secret umami_app_secret)"
 UMAMI_TWO_FACTOR_ENCRYPTION_KEY="$(secret umami_two_factor_encryption_key)"
 UMAMI_ADMIN_USERNAME="$(secret umami_admin_username)"
 UMAMI_ADMIN_PASSWORD="$(secret umami_admin_password)"
+UMAMI_MCP_API_KEY="$(secret umami_mcp_api_key)"
 
 umask 077
 
@@ -105,6 +106,7 @@ UMAMI_APP_SECRET=${UMAMI_APP_SECRET}
 UMAMI_TWO_FACTOR_ENCRYPTION_KEY=${UMAMI_TWO_FACTOR_ENCRYPTION_KEY}
 UMAMI_ADMIN_USERNAME=${UMAMI_ADMIN_USERNAME}
 UMAMI_ADMIN_PASSWORD=${UMAMI_ADMIN_PASSWORD}
+UMAMI_MCP_API_KEY=${UMAMI_MCP_API_KEY}
 
 API_S3_ENDPOINT=${API_S3_ENDPOINT}
 ARTIFACTS_BUCKET=${ARTIFACTS_BUCKET}
@@ -161,8 +163,9 @@ $compose pull
 
 log "Starting Umami before exposing its public route"
 $compose up -d --wait --wait-timeout 180 umami
-log "Ensuring Umami administrator and websites exist"
-$compose exec -T umami node --input-type=module < seed-umami.mjs
+log "Seeding Umami administrator, website and MCP key"
+UMAMI_MCP_API_KEY="$UMAMI_MCP_API_KEY" $compose exec -T -e UMAMI_MCP_API_KEY \
+  umami node --input-type=module < seed-umami.mjs
 
 log "Starting services (up -d --remove-orphans)"
 $compose up -d --remove-orphans

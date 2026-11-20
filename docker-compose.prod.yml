@@ -11,6 +11,7 @@
 
 services:
   umami:
+    ports: !reset []
     environment:
       - CLIENT_IP_HEADER=CF-Connecting-IP
 
@@ -57,6 +58,7 @@ services:
       - DOZZLE_HOSTNAME
       - VICTORIALOGS_HOSTNAME
       - UMAMI_HOSTNAME
+      - UMAMI_MCP_API_KEY=${UMAMI_MCP_API_KEY:?}
       - INTERNAL_PORT
       # Without this the Caddyfile's `:{$LOG_INGEST_PORT}` site address expands
       # to a bare `:`, which Caddy drops silently rather than refusing — the
@@ -65,6 +67,7 @@ services:
       - LOG_INGEST_PORT
     volumes:
       - ./caddy:/etc/caddy:ro
+      - umami-mcp-socket:/run/umami-mcp
     networks:
       - nibrun
 
@@ -76,9 +79,18 @@ services:
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
-    command: ["tunnel", "--metrics", "127.0.0.1:2000", "run"]
+    command:
+      [
+        "tunnel",
+        "--metrics",
+        "127.0.0.1:2000",
+        "--disable-path-normalization=false",
+        "run",
+      ]
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARED_TOKEN:?}
+    volumes:
+      - umami-mcp-socket:/run/umami-mcp:ro
     healthcheck:
       test: ["CMD", "cloudflared", "tunnel", "--metrics", "127.0.0.1:2000", "ready"]
       interval: 10s
@@ -143,6 +155,7 @@ services:
       - nibrun
 
 volumes:
+  umami-mcp-socket:
   umami-data:
     driver_opts:
       type: none

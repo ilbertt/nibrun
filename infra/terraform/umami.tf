@@ -17,6 +17,21 @@ resource "random_password" "umami_admin_password" {
   special = false
 }
 
+resource "random_password" "umami_mcp_api_key" {
+  length  = 32
+  special = false
+}
+
+resource "aws_ssm_parameter" "umami_mcp_api_key" {
+  name  = "${var.ssm_secret_prefix}/umami_mcp_api_key"
+  type  = "SecureString"
+  value = "umami_${random_password.umami_mcp_api_key.result}"
+
+  tags = {
+    Name = "${local.resource_name_prefix}-umami-mcp-api-key"
+  }
+}
+
 resource "aws_ssm_parameter" "umami_admin_username" {
   name  = "${var.ssm_secret_prefix}/umami_admin_username"
   type  = "String"
