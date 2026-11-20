@@ -3,8 +3,6 @@
 # toolchain and the target architecture live in the container, so a developer Mac
 # and an ubuntu-latest runner build the same binary.
 #
-# infra/guest-image hashes the resulting binary into its version, including any
-# changes caused by Debian toolchain updates.
 set -euo pipefail
 
 runtime_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)

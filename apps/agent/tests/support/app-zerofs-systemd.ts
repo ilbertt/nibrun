@@ -260,7 +260,7 @@ export function appZerofsSystemdHost(certificate: string) {
     });
     for (const name of templateNames) {
       const contents = yield* Effect.promise(() =>
-        Bun.file(new URL(`../../../../infra/app-host/systemd/${name}`, import.meta.url)).text(),
+        Bun.file(new URL(`./host-fixtures/systemd/${name}`, import.meta.url)).text(),
       );
       yield* fs.writeFileString(join(UNIT_DIRECTORY, name), contents, {
         flag: 'wx',

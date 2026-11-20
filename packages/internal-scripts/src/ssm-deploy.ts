@@ -33,7 +33,7 @@ const onBoxEnv: Record<string, string> = {
   SSM_SECRET_PREFIX: requiredEnv('SSM_SECRET_PREFIX'),
   DATA_VOLUME_ID: requiredEnv('DATA_VOLUME_ID'),
   AWS_REGION: requiredEnv('AWS_REGION'),
-  APP_HOST_DOMAIN: requiredEnv('APP_HOST_DOMAIN'),
+  APP_DOMAIN: requiredEnv('APP_DOMAIN'),
   API_CLOUDFLARE_ZONE_ID: requiredEnv('API_CLOUDFLARE_ZONE_ID'),
 };
 

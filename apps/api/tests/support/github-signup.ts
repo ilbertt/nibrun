@@ -29,7 +29,7 @@ Object.assign(process.env, {
   S3_ACCESS_KEY_ID: 'test',
   S3_SECRET_ACCESS_KEY: 'test',
   S3_REGION: 'test',
-  APP_HOST_DOMAIN: 'apps.test',
+  APP_DOMAIN: 'apps.test',
   TENANT_SECRETS_KEY: TEST_SECRETS_KEY_BASE64,
 });
 

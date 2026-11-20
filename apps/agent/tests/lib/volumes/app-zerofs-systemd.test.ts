@@ -20,7 +20,7 @@ describe('per-app ZeroFS systemd controls', () => {
           expect(
             yield* fs.exists(
               fileURLToPath(
-                new URL(`../../../../../infra/app-host/systemd/${template}`, import.meta.url),
+                new URL(`../../support/host-fixtures/systemd/${template}`, import.meta.url),
               ),
             ),
           ).toBe(true);
@@ -28,7 +28,7 @@ describe('per-app ZeroFS systemd controls', () => {
         const mount = yield* fs.readFileString(
           fileURLToPath(
             new URL(
-              `../../../../../infra/app-host/systemd/${units.mount.replace(APP_ID, '')}`,
+              `../../support/host-fixtures/systemd/${units.mount.replace(APP_ID, '')}`,
               import.meta.url,
             ),
           ),

@@ -4,13 +4,13 @@ import { Value } from '@sinclair/typebox/value';
 import { dcvMethodFor, isPlatformHostname, platformHostname } from '#lib/app-hostname.ts';
 import { deriveAppSlug } from '#lib/app-slug.ts';
 
-const APP_HOST_DOMAIN = 'apps.example.com';
+const APP_DOMAIN = 'apps.example.com';
 const SAMPLE_SIZE = 50;
 
 describe('an app is reachable at its slug under the app domain', () => {
   test('the label is joined to the domain', () => {
     expect(
-      platformHostname({ slug: deriveAppSlug('pocketbase'), appHostDomain: APP_HOST_DOMAIN }),
+      platformHostname({ slug: deriveAppSlug('pocketbase'), appHostDomain: APP_DOMAIN }),
     ).toMatch(/^pocketbase-[0-9a-z]{6}\.apps\.example\.com$/);
   });
 
@@ -23,7 +23,7 @@ describe('an app is reachable at its slug under the app domain', () => {
       for (let sample = 0; sample < SAMPLE_SIZE; sample++) {
         const hostname = platformHostname({
           slug: deriveAppSlug(name),
-          appHostDomain: APP_HOST_DOMAIN,
+          appHostDomain: APP_DOMAIN,
         });
         expect(isValidMessage({ schema: HostnameSchema, value: hostname })).toBe(true);
       }
@@ -35,7 +35,7 @@ describe('a hostname the platform hands out is not one an owner may bring', () =
   function brought(hostname: string): boolean {
     return !isPlatformHostname({
       hostname: hostname as Hostname,
-      appHostDomain: APP_HOST_DOMAIN,
+      appHostDomain: APP_DOMAIN,
     });
   }
 
@@ -46,13 +46,13 @@ describe('a hostname the platform hands out is not one an owner may bring', () =
   });
 
   test('and so is the app domain itself', () => {
-    expect(brought(APP_HOST_DOMAIN)).toBe(false);
+    expect(brought(APP_DOMAIN)).toBe(false);
   });
 
   // `notapps.example.com` ends with the domain as a *string* and is a different registrable
   // domain entirely, so refusing it would refuse a domain somebody legitimately owns.
   test("a domain that merely ends in the same letters is somebody else's to bring", () => {
-    expect(brought(`not${APP_HOST_DOMAIN}`)).toBe(true);
+    expect(brought(`not${APP_DOMAIN}`)).toBe(true);
   });
 
   test('an ordinary brought domain is allowed', () => {

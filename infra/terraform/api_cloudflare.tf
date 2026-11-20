@@ -1,7 +1,7 @@
-data "cloudflare_zone" "app_host" {
+data "cloudflare_zone" "apps" {
   filter = {
     account = { id = var.cloudflare_account_id }
-    name    = var.app_host_domain
+    name    = var.app_domain
   }
 }
 
@@ -22,7 +22,7 @@ resource "cloudflare_account_token" "api_custom_hostnames" {
       ]).id
     }]
     resources = jsonencode({
-      "com.cloudflare.api.account.zone.${data.cloudflare_zone.app_host.id}" = "*"
+      "com.cloudflare.api.account.zone.${data.cloudflare_zone.apps.id}" = "*"
     })
   }]
 }

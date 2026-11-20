@@ -37,7 +37,7 @@ describe('staging per-app ZeroFS credentials', () => {
         const template = yield* fs.readFileString(
           fileURLToPath(
             new URL(
-              '../../../../../infra/app-host/systemd/nibrun-app-zerofs@.service',
+              '../../support/host-fixtures/systemd/nibrun-app-zerofs@.service',
               import.meta.url,
             ),
           ),
@@ -58,7 +58,7 @@ describe('staging per-app ZeroFS credentials', () => {
         const mountTemplate = yield* fs.readFileString(
           fileURLToPath(
             new URL(
-              '../../../../../infra/app-host/systemd/nibrun-app-zerofs-mount@.service',
+              '../../support/host-fixtures/systemd/nibrun-app-zerofs-mount@.service',
               import.meta.url,
             ),
           ),

@@ -50,8 +50,8 @@ Only the tenant binary needs glibc, which is why the rootfs carries it.
 
 ## Building
 
-`bun run build` produces `dist/init`, which `infra/guest-image` copies to `/init` and hashes into
-its own version. `versions.env` pins the base image and downloaded source archives; Debian
+`infra/nibrunner-guest-image` consumes the Docker toolchain stage to compile its SQLite reader
+wrapper. `bun run build` produces the standalone `dist/init` used by the local boot suite. `versions.env` pins the base image and downloaded source archives; Debian
 packages use the base image's standard repositories so clean rebuilds can receive package
 updates. The binary is stripped and build-id-free, but package updates may change its bytes
 and therefore the guest-image version.
@@ -63,11 +63,6 @@ filesystem channel against an ordinary directory), mount (every mount against a 
 loop devices for the drives) and boot (the real `/init` as PID 1, start to finish). Boot
 deliberately avoids `--privileged`, which would hand the container the host's own `/dev`, where
 `vdb` is a real disk.
-
-Verified on Firecracker v1.16.1: the boot sequence, data persisting across boots, a spent restart
-budget ending the VM with Firecracker exiting 0, and a graceful stop over `SendCtrlAltDel` — which
-works only because the guest kernel enables the i8042 path, and that belongs to
-`infra/guest-image`.
 
 The stdout/stderr framing and non-blocking capture are exercised in Docker, and so is the control
 channel against a real ext4 loop device. A frozen filesystem cannot be asked whether it is

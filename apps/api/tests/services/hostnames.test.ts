@@ -21,7 +21,7 @@ import {
 } from '#repositories/custom-hostnames.repository.ts';
 import { ADD_GRACE_MS, HostnamesService } from '#services/hostnames.service.ts';
 
-const APP_HOST_DOMAIN = 'apps.example.com';
+const APP_DOMAIN = 'apps.example.com';
 const APP_ID = Value.Parse(AppIdSchema, 'app-1');
 const OWNER_ID = Value.Parse(OwnerIdSchema, 'owner-1');
 const BROUGHT = Value.Parse(HostnameSchema, 'app.example.dev');
@@ -178,7 +178,7 @@ function build({ withEdge = true }: { withEdge?: boolean } = {}) {
     service: new HostnamesService({
       hostnamesRepo,
       customHostnamesRepo,
-      appHostDomain: APP_HOST_DOMAIN,
+      appHostDomain: APP_DOMAIN,
     }),
   };
 }
@@ -196,7 +196,7 @@ describe('a domain the platform issues is not one an owner may claim', () => {
     const { service, appsRepo } = build();
 
     await expect(
-      service.add(owned(Value.Parse(HostnameSchema, `taken.${APP_HOST_DOMAIN}`))),
+      service.add(owned(Value.Parse(HostnameSchema, `taken.${APP_DOMAIN}`))),
     ).rejects.toBeInstanceOf(BadRequestError);
     expect(appsRepo.trace).toEqual([]);
   });

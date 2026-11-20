@@ -26,7 +26,7 @@ export function zerofsBinary() {
     }
     const directory = yield* temporaryDirectory;
     const { zerofs } = yield* Effect.promise(() =>
-      Bun.file(new URL('../../../../infra/app-host/versions.json', import.meta.url)).json(),
+      Bun.file(new URL('./host-fixtures/versions.json', import.meta.url)).json(),
     );
     const archive = join(directory, 'zerofs.tar.gz');
     yield* stdoutOf({

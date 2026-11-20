@@ -257,44 +257,6 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "filesystems" {
   }
 }
 
-# --- Guest images ---
-#
-# The kernel and rootfs app hosts boot microVMs from, pinned by version and
-# fetched once per host. Not the deploy bucket, which carries a 30-day expiry
-# and force_destroy — right for a bundle regenerated on every push, and actively
-# wrong for an image a fleet stays pinned to for months. Not a prefix inside
-# artifacts either: CI writes here, and CI must never hold write access to the
-# bucket holding users' binaries.
-resource "aws_s3_bucket" "guest_images" {
-  bucket = "${local.resource_name_prefix}-guest-images-${local.bucket_suffix}"
-
-  tags = {
-    Name = "${local.resource_name_prefix}-guest-images"
-  }
-
-  lifecycle {
-    prevent_destroy = true
-  }
-}
-
-resource "aws_s3_bucket_public_access_block" "guest_images" {
-  bucket                  = aws_s3_bucket.guest_images.id
-  block_public_acls       = true
-  block_public_policy     = true
-  ignore_public_acls      = true
-  restrict_public_buckets = true
-}
-
-resource "aws_s3_bucket_server_side_encryption_configuration" "guest_images" {
-  bucket = aws_s3_bucket.guest_images.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
-  }
-}
-
 # --- Exports ---
 #
 # The downloadable copies of an app, written by the host that owns the volume and

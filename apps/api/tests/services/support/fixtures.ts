@@ -22,7 +22,7 @@ export const ARTIFACT_ID = Value.Parse(ArtifactIdSchema, 'artifact-1');
 export const IMPORT_ID = Value.Parse(ImportIdSchema, 'import-1');
 export const DEPLOYMENT_ID = Value.Parse(DeploymentIdSchema, 'deployment-1');
 
-export const APP_HOST_DOMAIN = 'apps.test';
+export const APP_DOMAIN = 'apps.test';
 
 // A service reading a log store or a host's filesystem asks Postgres one question — may this
 // caller see this deployment — and never reads the row, so this is the whole of what it needs.

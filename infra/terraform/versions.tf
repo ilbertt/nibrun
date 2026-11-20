@@ -16,17 +16,11 @@ terraform {
   }
 
   required_providers {
-    tls = {
-      source  = "hashicorp/tls"
-      version = "~> 4.4"
-    }
     cloudflare = {
       source  = "cloudflare/cloudflare"
       version = "~> 5.28"
     }
     aws = {
-      # 6.x for cpu_options.nested_virtualization, which 5.x cannot express and
-      # without which an app host boots no microVM.
       source  = "hashicorp/aws"
       version = "~> 6.0"
     }
