@@ -100,11 +100,7 @@ export function interpreterOf(bytes: Uint8Array): string | undefined {
   return undefined;
 }
 
-/**
- * The paths the guest rootfs actually resolves, from `infra/guest-image/rootfs/build-rootfs.sh`
- * — which installs glibc's loader and symlinks `/lib` and `/lib64` at it. Nothing compares the
- * two, so a change to that image's layout is also a change here.
- */
+// Keep aligned with the glibc loader aliases in the pinned nibrunner guest image.
 const GUEST_INTERPRETERS = [
   '/lib64/ld-linux-x86-64.so.2',
   '/usr/lib64/ld-linux-x86-64.so.2',
@@ -125,8 +121,7 @@ export function isGuestInterpreter(interpreter: string): boolean {
 }
 
 /**
- * `EM_X86_64`. App hosts are x86_64 and Firecracker emulates nothing else, so a binary built for
- * any other machine is one no host in the fleet could ever exec.
+ * `EM_X86_64`. Nibrunner uses x86_64 guests without instruction-set emulation.
  */
 const GUEST_MACHINE = 62;
 
