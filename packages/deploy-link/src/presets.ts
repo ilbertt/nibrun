@@ -28,6 +28,7 @@ import shioriPage from '../content/shiori.md?raw';
 import traggoPage from '../content/traggo.md?raw';
 import webdavPage from '../content/webdav.md?raw';
 import yarrPage from '../content/yarr.md?raw';
+import zeroclawPage from '../content/zeroclaw.md?raw';
 
 /**
  * What a preset is filed under, in the order a catalog should offer them.
@@ -717,6 +718,42 @@ export const DEPLOY_PRESETS = {
         // Carried without a value, as `username:password`: yarr serves its api to anyone who
         // asks until this is set.
         'YARR_AUTH',
+      ],
+      minimal: true,
+    },
+  },
+  zeroclaw: {
+    isRecommended: false,
+    projectUrl: 'https://github.com/zeroclaw-labs/zeroclaw',
+    version: 'v0.9.0',
+    markdownContent: zeroclawPage,
+    category: DeployCategory.Productivity,
+    title: 'ZeroClaw',
+    subtitle: 'A personal AI agent with a web dashboard, chat and webhook integrations.',
+    deployLink: {
+      name: 'zeroclaw',
+      binary:
+        'https://github.com/zeroclaw-labs/zeroclaw/releases/download/v0.9.0/zeroclaw-x86_64-unknown-linux-musl.tar.gz',
+      sha256: '8b9bc6735946158a8effbaa3c130efd8d4c1c983504cf20f08bb745af3544fd0',
+      // The gateway executable and its web/dist dashboard ship in the same release archive.
+      'initial-data':
+        'https://github.com/zeroclaw-labs/zeroclaw/releases/download/v0.9.0/zeroclaw-x86_64-unknown-linux-musl.tar.gz',
+      port: 42617,
+      arg: ['daemon'],
+      env: [
+        `HOME=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}`,
+        'ZEROCLAW_gateway__host=0.0.0.0',
+        `ZEROCLAW_gateway__port=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
+        'ZEROCLAW_gateway__allow_public_bind=true',
+        'ZEROCLAW_gateway__require_pairing=true',
+        `ZEROCLAW_gateway__web_dist_dir=${interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name)}/web/dist`,
+        'ZEROCLAW_agents__default__model_provider=openrouter.default',
+        'ZEROCLAW_agents__default__risk_profile=default',
+        'ZEROCLAW_agents__default__runtime_profile=default',
+        'ZEROCLAW_risk_profiles__default__level=supervised',
+        'ZEROCLAW_runtime_profiles__default__agentic=true',
+        'ZEROCLAW_providers__models__openrouter__default__model=openrouter/free',
+        'ZEROCLAW_providers__models__openrouter__default__api_key',
       ],
       minimal: true,
     },
