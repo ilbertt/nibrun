@@ -1,5 +1,5 @@
 #include "../src/guest-sqlite.h"
-#include "../src/paths.h"
+#include "../src/identity.h"
 #include "../src/sqlite-hrana.h"
 #include "expect.h"
 #include <signal.h>

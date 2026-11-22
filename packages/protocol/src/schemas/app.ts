@@ -30,7 +30,6 @@ const TENANT_VALUE_PATTERN = [
 ].join('');
 const TenantValueSchema = secretString({ pattern: TENANT_VALUE_PATTERN });
 
-// Mirrored by CONFIG_MAX_ARGUMENTS in apps/runtime, which refuses a file exceeding it.
 const MAX_ARGUMENTS = 64;
 const MAX_ARGUMENT_LENGTH = 4096;
 

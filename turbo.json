@@ -17,7 +17,7 @@
     },
     "test": {
       "dependsOn": [],
-      "env": ["RUNTIME_TEST_PLATFORM"]
+      "env": ["GUEST_SQLITE_TEST_PLATFORM"]
     }
   }
 }

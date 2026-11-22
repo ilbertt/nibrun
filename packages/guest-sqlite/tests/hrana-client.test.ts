@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { createClient } from '@libsql/client/http';
 
-const TEST_IMAGE = 'nibrun-runtime-hrana-test';
+const TEST_IMAGE = 'nibrun-guest-sqlite-hrana-test';
 const LARGE_INTEGER = 9_223_372_036_854_775_807n;
 const FLOAT_VALUE = 1.5;
 const MAX_BYTE = 255;
@@ -39,7 +39,7 @@ beforeAll(async function startGuestServer() {
     '--detach',
     '--rm',
     '--platform',
-    process.env.RUNTIME_TEST_PLATFORM ?? 'linux/amd64',
+    process.env.GUEST_SQLITE_TEST_PLATFORM ?? 'linux/amd64',
     '--publish',
     '127.0.0.1::8080',
     TEST_IMAGE,

@@ -32,11 +32,6 @@ describe('a variable named __proto__ is not one', () => {
   });
 });
 
-/**
- * A tenant value may name a runtime value the guest sets, and apps/runtime fails the boot over a
- * name it does not offer. The schema is what turns a typo into a deploy nobody accepted, which is
- * the only end of this where whoever wrote it is still listening.
- */
 describe('a value naming a runtime value', () => {
   const OFFERED = `\${NIBRUN_HOSTNAME}`;
   const MISSPELLED = `\${NIBRUN_HSOTNAME}`;

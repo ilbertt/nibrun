@@ -1,5 +1,5 @@
 #include "../src/guest-sqlite.h"
-#include "../src/paths.h"
+#include "../src/identity.h"
 #include <arpa/inet.h>
 #include <errno.h>
 #include <sqlite3.h>
