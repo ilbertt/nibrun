@@ -142,15 +142,15 @@ export const DEPLOY_PRESETS = {
   sharkord: {
     isRecommended: false,
     projectUrl: 'https://github.com/sharkord/sharkord',
-    version: 'v0.0.31',
+    version: 'v0.0.32',
     markdownContent: sharkordPage,
     category: DeployCategory.Communication,
     title: 'Sharkord',
     subtitle: 'A self-hosted chat server with voice, video and screen sharing.',
     deployLink: {
       name: 'sharkord',
-      binary: 'https://github.com/Sharkord/sharkord/releases/download/v0.0.31/sharkord-linux-x64',
-      sha256: '9760f45cfee0a316835bd2764643ecf5b5f1e707f04f436283c996b78ea69762',
+      binary: 'https://github.com/Sharkord/sharkord/releases/download/v0.0.32/sharkord-linux-x64',
+      sha256: '6cc6d2448b5eeeb23f459d2b4d80763652ea0520ef16019c26f9474bcace5e3c',
       port: 4991,
       env: ['SHARKORD_DATA_PATH=data', 'SHARKORD_AUTOUPDATE=false'],
       minimal: true,
@@ -344,7 +344,7 @@ export const DEPLOY_PRESETS = {
   memos: {
     isRecommended: false,
     projectUrl: 'https://github.com/usememos/memos',
-    version: '26.11.1',
+    version: '26.11.2',
     markdownContent: memosPage,
     category: DeployCategory.NotesAndKnowledge,
     title: 'Memos',
@@ -352,8 +352,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'memos',
       binary:
-        'https://github.com/usememos/memos/releases/download/26.11.1/memos_26.11.1_linux_amd64.tar.gz',
-      sha256: '874b80ba4b3555f5520310c45fab6c2bee593c7b97ce03ebc4503010705f87ff',
+        'https://github.com/usememos/memos/releases/download/26.11.2/memos_26.11.2_linux_amd64.tar.gz',
+      sha256: '2ad926ccd237e516f61097316c44f856a0b667f3e0de9b388982f39900c2e7ab',
       port: 5230,
       env: [
         `MEMOS_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
@@ -385,15 +385,15 @@ export const DEPLOY_PRESETS = {
   fusion: {
     isRecommended: false,
     projectUrl: 'https://github.com/0x2E/fusion',
-    version: 'v1.3.0',
+    version: 'v1.3.1',
     markdownContent: fusionPage,
     category: DeployCategory.Feeds,
     title: 'Fusion',
     subtitle: 'An RSS reader for your own feeds, behind a password.',
     deployLink: {
       name: 'fusion',
-      binary: 'https://github.com/0x2E/fusion/releases/download/v1.3.0/fusion-linux-amd64',
-      sha256: 'fc2e52b878a1eaa7a5359bf0504feab7538be25a5a28e97292f1fcd0241e10f8',
+      binary: 'https://github.com/0x2E/fusion/releases/download/v1.3.1/fusion-linux-amd64',
+      sha256: '7a70c60fd2e6cde722eb63c943008f5c4d342f504a3fa0c5b835b94c3e0d4307',
       port: 8080,
       env: [
         `FUSION_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
