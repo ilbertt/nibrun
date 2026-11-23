@@ -7,6 +7,8 @@ import type {
   SecretString,
   Timestamp,
 } from '@repo/protocol';
+import { TimestampSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import type { Queries } from '#db/queries.gen.ts';
 import { AgentSessions } from '#lib/agent/sessions.ts';
 import {
@@ -19,11 +21,6 @@ import { environmentByExport, toDesiredExport } from '#lib/exports/desired-state
 import type { TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { Repository } from '#repositories/repository.ts';
 
-/**
- * The last thing a host said about itself, which is the whole of what this end knows about one
- * between two reports. Kept rather than the report itself: nothing here is a substitute for the
- * tables the report's contents land in, and holding those twice is how they come apart.
- */
 export type HostObservation = {
   hostId: HostId;
   reportedAt: Timestamp;
@@ -31,60 +28,57 @@ export type HostObservation = {
 };
 
 export abstract class AgentRepositoryContract {
-  abstract registerHost(input: { originId: string }): Promise<HostId>;
+  abstract registerHost(input: { originId: string }): Promise<HostId | undefined>;
   abstract hostForIdentity(input: { identity: string }): Promise<HostId | undefined>;
   abstract saveSession(input: {
     sessionToken: SecretString;
     hostId: HostId;
     expiresAt: Date;
-  }): Promise<void>;
+  }): Promise<boolean>;
   abstract hostForSession(input: { sessionToken: string }): Promise<HostId | undefined>;
   abstract desiredState(input: {
     hostId: HostId;
     retainedDeploymentsPerApp: number;
   }): Promise<HostDesiredState>;
-  abstract observeReport(input: { reported: HostReportedState }): Promise<void>;
+  abstract observeReport(input: { reported: HostReportedState }): Promise<boolean>;
   abstract lastObservation(): Promise<HostObservation | undefined>;
 }
 
 export class AgentRepository extends Repository implements AgentRepositoryContract {
   readonly #sessions = new AgentSessions();
   readonly #secretsKey: TenantSecretsKey;
-  #lastObservation: HostObservation | undefined;
 
   constructor({ sql, secretsKey }: { sql: TypedSQL<Queries>; secretsKey: TenantSecretsKey }) {
     super(sql);
     this.#secretsKey = secretsKey;
   }
 
-  async registerHost({ originId }: { originId: string }): Promise<HostId> {
+  async registerHost({ originId }: { originId: string }): Promise<HostId | undefined> {
     const existing = await this.hostForIdentity({ identity: originId });
     if (existing !== undefined) {
-      return existing;
+      return this.activeHost({ hostId: existing });
     }
     const [registered] = await this.sql.RegisterHost`
       INSERT INTO nibrun.hosts (origin_id) VALUES (${originId})
       ON CONFLICT (origin_id) DO UPDATE SET origin_id = EXCLUDED.origin_id
+      WHERE nibrun.hosts.retired_at IS NULL
       RETURNING id
     `;
-    if (registered === undefined) {
-      throw new Error('Host registration returned no identity.');
-    }
-    return registered.id;
+    return registered?.id;
   }
 
   async hostForIdentity({ identity }: { identity: string }): Promise<HostId | undefined> {
     // Existing agents persist the returned id and present it instead of their original identity.
     const [host] = await this.sql.SelectHostForIdentity`
       SELECT id FROM nibrun.hosts
-      WHERE id::text = ${identity} OR origin_id = ${identity}
-      ORDER BY (id::text = ${identity}) DESC
+      WHERE id::text = lower(${identity}) OR origin_id = ${identity}
+      ORDER BY (id::text = lower(${identity})) DESC
       LIMIT 1
     `;
     return host?.id;
   }
 
-  saveSession({
+  async saveSession({
     sessionToken,
     hostId,
     expiresAt,
@@ -92,30 +86,61 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
     sessionToken: SecretString;
     hostId: HostId;
     expiresAt: Date;
-  }): Promise<void> {
+  }): Promise<boolean> {
+    if ((await this.activeHost({ hostId })) === undefined) {
+      return false;
+    }
     this.#sessions.open({ sessionToken, hostId, expiresAt });
-    return Promise.resolve();
+    return true;
   }
 
-  hostForSession({ sessionToken }: { sessionToken: string }): Promise<HostId | undefined> {
-    return Promise.resolve(this.#sessions.hostFor({ sessionToken, now: new Date() }));
+  async hostForSession({ sessionToken }: { sessionToken: string }): Promise<HostId | undefined> {
+    const hostId = this.#sessions.hostFor({ sessionToken, now: new Date() });
+    if (hostId === undefined) {
+      return undefined;
+    }
+    const active = await this.activeHost({ hostId });
+    if (active === undefined) {
+      this.#sessions.close({ sessionToken });
+    }
+    return active;
   }
 
-  async observeReport({ reported }: { reported: HostReportedState }): Promise<void> {
-    this.#lastObservation = {
-      hostId: reported.hostId,
-      reportedAt: reported.reportedAt,
-      state: reported.state,
-    };
-    await this.sql.ObserveHostReport`
+  async observeReport({ reported }: { reported: HostReportedState }): Promise<boolean> {
+    const [host] = await this.sql.ObserveHostReport`
       UPDATE nibrun.hosts
       SET reported_state = ${reported.state}, last_seen_at = now()
-      WHERE id = ${reported.hostId}
+      WHERE id = ${reported.hostId} AND retired_at IS NULL
+      RETURNING id
     `;
+    if (host === undefined) {
+      return false;
+    }
+    return true;
   }
 
-  lastObservation(): Promise<HostObservation | undefined> {
-    return Promise.resolve(this.#lastObservation);
+  async lastObservation(): Promise<HostObservation | undefined> {
+    const [host] = await this.sql.SelectLastHostObservation`
+      /* @notNull last_seen_at */
+      SELECT id, reported_state, last_seen_at FROM nibrun.hosts
+      WHERE retired_at IS NULL AND last_seen_at IS NOT NULL
+      ORDER BY last_seen_at DESC, id DESC
+      LIMIT 1
+    `;
+    return host === undefined
+      ? undefined
+      : {
+          hostId: host.id,
+          reportedAt: Value.Parse(TimestampSchema, host.last_seen_at.toISOString()),
+          state: host.reported_state,
+        };
+  }
+
+  private async activeHost({ hostId }: { hostId: HostId }): Promise<HostId | undefined> {
+    const [host] = await this.sql.SelectActiveSessionHost`
+      SELECT id FROM nibrun.hosts WHERE id = ${hostId} AND retired_at IS NULL
+    `;
+    return host?.id;
   }
 
   desiredState({

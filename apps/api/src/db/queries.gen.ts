@@ -15,6 +15,23 @@ export interface ISelectHostForIdentityResult {
 
 /** Result of query `ObserveHostReport`. */
 export interface IObserveHostReportResult {
+    /** The canonical identity assigned by the control plane. */
+    id: IHostsColumns["id"];
+}
+
+/** Result of query `SelectLastHostObservation`. */
+export interface ISelectLastHostObservationResult {
+    /** The canonical identity assigned by the control plane. */
+    id: IHostsColumns["id"];
+    reported_state: IHostsColumns["reported_state"];
+    /** When the control plane last received a report from this host. */
+    last_seen_at: NonNullable<IHostsColumns["last_seen_at"]>;
+}
+
+/** Result of query `SelectActiveSessionHost`. */
+export interface ISelectActiveSessionHostResult {
+    /** The canonical identity assigned by the control plane. */
+    id: IHostsColumns["id"];
 }
 
 /** Result of query `SelectRetainedDeploymentArtifacts`. */
@@ -803,6 +820,8 @@ export interface IInsertDeploymentResult {
 export interface ISelectPreviousDeploymentHostResult {
     /** The immutable execution host assigned when this deployment is created. */
     host_id: IDeploymentsColumns["host_id"];
+    /** Operator-owned retirement timestamp. Agent reports cannot clear it. */
+    retired_at: IHostsColumns["retired_at"];
 }
 
 /** Result of query `SelectReadyDeploymentHost`. */
@@ -1382,6 +1401,8 @@ export interface Queries {
     RegisterHost: IRegisterHostResult;
     SelectHostForIdentity: ISelectHostForIdentityResult;
     ObserveHostReport: IObserveHostReportResult;
+    SelectLastHostObservation: ISelectLastHostObservationResult;
+    SelectActiveSessionHost: ISelectActiveSessionHostResult;
     SelectRetainedDeploymentArtifacts: ISelectRetainedDeploymentArtifactsResult;
     SelectDesiredDeployments: ISelectDesiredDeploymentsResult;
     SelectDesiredVolumes: ISelectDesiredVolumesResult;
@@ -2119,6 +2140,8 @@ export interface IHostsColumns {
     reported_state: import("@repo/protocol").HostState;
     /** When the control plane last received a report from this host. */
     last_seen_at: Date | null;
+    /** Operator-owned retirement timestamp. Agent reports cannot clear it. */
+    retired_at: Date | null;
 }
 
 /** Schema of `hosts`. */
@@ -2889,7 +2912,8 @@ export const schema = {
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
             reported_state: { _columnName: "reported_state", _foreignKeys: {} },
-            last_seen_at: { _columnName: "last_seen_at", _foreignKeys: {} }
+            last_seen_at: { _columnName: "last_seen_at", _foreignKeys: {} },
+            retired_at: { _columnName: "retired_at", _foreignKeys: {} }
         },
         _indexes: {
             hosts_origin_id_key: { _indexName: "hosts_origin_id_key" },
@@ -2899,7 +2923,8 @@ export const schema = {
             hosts_origin_id_check: { _constraintName: "hosts_origin_id_check" },
             hosts_origin_id_key: { _constraintName: "hosts_origin_id_key" },
             hosts_pkey: { _constraintName: "hosts_pkey" },
-            hosts_reported_state_check: { _constraintName: "hosts_reported_state_check" }
+            hosts_reported_state_check: { _constraintName: "hosts_reported_state_check" },
+            hosts_retired_at_finite: { _constraintName: "hosts_retired_at_finite" }
         }
     },
     imports: {

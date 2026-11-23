@@ -12,6 +12,13 @@ It references `hosts.id`, a UUIDv7 assigned before the agent receives a session.
 request must carry it. Legacy agents may present a saved canonical id; both resolve to the same host.
 Moving an app creates a new deployment; its volume survives the execution it belonged to.
 
+Host retirement is operator-owned through `hosts.retired_at`, separate from the agent-reported
+health state. Status checks select the latest non-retired host report. Retired identities cannot
+register or use sessions, submit reports, or receive new deployments, including sticky redeploys
+and rollbacks. Retirement never moves an app's existing execution or volume to another host.
+Deployment inserts lock the host row and reject retired assignments even when repository admission is bypassed.
+A retirement timestamp is terminal and cannot be changed or cleared.
+
 Desired host state includes the artifact digests for the current deployment and its immediate
 predecessor for each app assigned to that host. Select them in the same repeatable-read snapshot as
 the desired executions. This controls host-local cache retention and does not delete uploaded S3

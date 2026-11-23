@@ -271,17 +271,19 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     ownerId,
   }: OwnedApp & { tx: Transaction }): Promise<HostId | undefined> {
     const [previous] = await tx.SelectPreviousDeploymentHost`
-      SELECT d.host_id FROM nibrun.deployments d
+      SELECT d.host_id, h.retired_at FROM nibrun.deployments d
+      JOIN nibrun.hosts h ON h.id = d.host_id
       JOIN nibrun.live_apps a ON a.id = d.app_id
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
       ORDER BY d.id DESC LIMIT 1
+      FOR SHARE OF h
     `;
     if (previous !== undefined) {
-      return previous.host_id;
+      return previous.retired_at === null ? previous.host_id : undefined;
     }
     const [host] = await tx.SelectReadyDeploymentHost`
       SELECT id FROM nibrun.hosts
-      WHERE reported_state = 'ready'
+      WHERE reported_state = 'ready' AND retired_at IS NULL
         AND last_seen_at >= now() - ${HOST_REPORT_MAX_AGE_MS} * interval '1 millisecond'
       ORDER BY last_seen_at DESC, id
       LIMIT 1
@@ -320,6 +322,9 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       }
       if (isCloudflareAccessHeader(replayable.access_header) && !replayable.has_custom_domain) {
         throw new ConflictError(CLOUDFLARE_ACCESS_DOMAIN_HINT);
+      }
+      if ((await this.hostForDeployment({ tx, appId, ownerId })) === undefined) {
+        return null;
       }
       await supersedeLiveDeployment({ tx, appId, ownerId });
 

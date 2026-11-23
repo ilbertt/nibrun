@@ -167,3 +167,24 @@ describe('HealthService', () => {
     });
   });
 });
+
+test('an unavailable retirement lookup degrades health without exposing database errors', async () => {
+  const health = await new HealthService({
+    healthRepo: new FakeHealthRepository({}),
+    agentRepo: { lastObservation: () => Promise.reject(new Error('private-database-credential')) },
+  }).check();
+  expect(health.status).toBe('degraded');
+  expect(health.components.appHost.status).toBe('unknown');
+  expect(JSON.stringify(health)).not.toContain('private-database-credential');
+});
+
+test('a retirement lookup that never answers does not hang the health endpoint', async () => {
+  const health = await new HealthService({
+    healthRepo: new FakeHealthRepository({}),
+    agentRepo: {
+      lastObservation: () => new Promise<HostObservation | undefined>(function neverAnswer() {}),
+    },
+  }).check();
+  expect(health.status).toBe('degraded');
+  expect(health.components.appHost.status).toBe('unknown');
+});

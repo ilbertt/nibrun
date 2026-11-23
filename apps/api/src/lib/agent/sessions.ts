@@ -27,6 +27,10 @@ export class AgentSessions {
     this.#byToken.set(sessionToken, { hostId, expiresAt });
   }
 
+  close({ sessionToken }: { sessionToken: string }): void {
+    this.#byToken.delete(sessionToken);
+  }
+
   /**
    * Expiry is settled on the way in rather than by a sweep: a token nobody presents again costs
    * one entry, and one presented after it lapsed is the only case that has to be right.

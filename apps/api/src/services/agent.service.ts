@@ -78,21 +78,19 @@ export class AgentService extends Service {
     this.volumeStorageMigrationsService = volumeStorageMigrationsService;
   }
 
-  /**
-   * Anything that reaches this endpoint gets a session.
-   *
-   * The reachability is the control: the internal port answers inside the VPC only, and a
-   * tenant is dropped by its host's ruleset before it can route to it. The shared secret this
-   * used to check was readable on every host, so it could not distinguish the callers it was
-   * defending against from the ones it was admitting.
-   */
+  /** VPC ingress permits enrollment; retirement remains an independent admission check. */
   async openSession(request: AgentSessionRequest): Promise<AgentSession> {
     const hostId = await this.agentRepo.registerHost({
       originId: request.hostId,
     });
+    if (hostId === undefined) {
+      throw new ForbiddenError('This host has been retired.');
+    }
     const sessionToken = Value.Parse(SecretStringSchema, crypto.randomUUID());
     const expiresAt = new Date(Date.now() + SESSION_LIFETIME_MS);
-    await this.agentRepo.saveSession({ sessionToken, hostId, expiresAt });
+    if (!(await this.agentRepo.saveSession({ sessionToken, hostId, expiresAt }))) {
+      throw new ForbiddenError('This host has been retired.');
+    }
 
     this.logger.info('agent session opened', {
       hostId,
@@ -148,10 +146,10 @@ export class AgentService extends Service {
       instances: reported.instances.length,
       volumes: reported.volumes.length,
     });
-    // First, and unconditionally: what a report says about the host itself is the only thing
-    // this end learns from one that nothing below records, and a report that goes on to fail
-    // still arrived — which is the whole of what liveness asks.
-    await this.agentRepo.observeReport({ reported });
+    // A failed app update must not erase an accepted heartbeat.
+    if (!(await this.agentRepo.observeReport({ reported }))) {
+      throw new ForbiddenError('This host has been retired.');
+    }
     await this.deploymentsService.applyHostReport({ reported });
     await this.appsService.recordVolumeUsage({ volumes: reported.volumes, hostId });
     // Before the deletions below, which read the same list for `deleted`: a filesystem that is

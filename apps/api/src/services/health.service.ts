@@ -67,7 +67,7 @@ export class HealthService extends Service {
       this.probe({ component: 'database', run: () => this.healthRepo.pingDatabase() }),
       this.probe({ component: 'logStore', run: () => this.healthRepo.pingLogStore() }),
       this.probe({ component: 'objectStore', run: () => this.healthRepo.pingObjectStore() }),
-      this.agentRepo.lastObservation(),
+      this.hostObservation(),
     ]);
 
     const silence = silenceSince(observation);
@@ -86,6 +86,15 @@ export class HealthService extends Service {
       uptime: process.uptime(),
       components,
     };
+  }
+
+  private async hostObservation(): Promise<HostObservation | undefined> {
+    try {
+      return await withTimeout(this.agentRepo.lastObservation());
+    } catch (failure) {
+      this.logger.warn('host health lookup failed', { failure });
+      return undefined;
+    }
   }
 
   /**
@@ -125,7 +134,7 @@ class ProbeTimeout extends Error {
  * event loop open for the rest of the budget, which is what a bare `setTimeout` race does — and
  * this runs three of them on every poll of every open dashboard.
  */
-function withTimeout(work: Promise<void>): Promise<void> {
+function withTimeout<A>(work: Promise<A>): Promise<A> {
   const expiry = Promise.withResolvers<never>();
   const timer = setTimeout(() => expiry.reject(new ProbeTimeout()), PROBE_TIMEOUT_MS);
   return Promise.race([work, expiry.promise]).finally(() => clearTimeout(timer));
