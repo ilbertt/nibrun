@@ -3,12 +3,16 @@ import { WWW_DEPLOY_PATH } from '@repo/global-constants';
 
 export type CatalogApp = DeployPreset & { slug: DeploySlug };
 
+function cardPath(path: string): string {
+  return `${path}.png`;
+}
+
 /** What the catalog says about itself, on its page and on the card it unfurls as. */
 export const CATALOG = {
   heading: 'One-click deploys',
   description:
     'Self-hosted apps that already ship a single binary, deployed straight from their release assets. No infra needed.',
-  cardPath: '/apps.png',
+  cardPath: cardPath('/apps'),
   markdownPath: '/apps.md',
 };
 
@@ -26,7 +30,7 @@ export function findApp(slug: string): CatalogApp | undefined {
 }
 
 export function appCardPath(app: CatalogApp): string {
-  return `/apps/${app.slug}.png`;
+  return cardPath(`/apps/${app.slug}`);
 }
 
 export function appMarkdownPath(app: CatalogApp): string {
