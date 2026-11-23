@@ -1,4 +1,4 @@
-import type { HostState } from '@repo/protocol';
+import type { HostState } from '#lib/api/host.ts';
 import { HOST_REPORT_MAX_AGE_MS } from '#lib/host-readiness.ts';
 import type { AgentRepositoryContract, HostObservation } from '#repositories/agent.repository.ts';
 import type { HealthRepositoryContract } from '#repositories/health.repository.ts';
@@ -31,6 +31,7 @@ const HOST_STATE_STATUS: Record<HostState, ComponentStatus> = {
   ready: 'up',
   draining: 'unknown',
   unreachable: 'down',
+  retired: 'down',
 };
 
 export type SystemHealth = {
@@ -67,7 +68,7 @@ export class HealthService extends Service {
       this.probe({ component: 'database', run: () => this.healthRepo.pingDatabase() }),
       this.probe({ component: 'logStore', run: () => this.healthRepo.pingLogStore() }),
       this.probe({ component: 'objectStore', run: () => this.healthRepo.pingObjectStore() }),
-      this.agentRepo.lastObservation(),
+      this.hostObservation(),
     ]);
 
     const silence = silenceSince(observation);
@@ -86,6 +87,15 @@ export class HealthService extends Service {
       uptime: process.uptime(),
       components,
     };
+  }
+
+  private async hostObservation(): Promise<HostObservation | undefined> {
+    try {
+      return await withTimeout(this.agentRepo.lastObservation());
+    } catch (failure) {
+      this.logger.warn('host health lookup failed', { failure });
+      return undefined;
+    }
   }
 
   /**
@@ -125,7 +135,7 @@ class ProbeTimeout extends Error {
  * event loop open for the rest of the budget, which is what a bare `setTimeout` race does — and
  * this runs three of them on every poll of every open dashboard.
  */
-function withTimeout(work: Promise<void>): Promise<void> {
+function withTimeout<A>(work: Promise<A>): Promise<A> {
   const expiry = Promise.withResolvers<never>();
   const timer = setTimeout(() => expiry.reject(new ProbeTimeout()), PROBE_TIMEOUT_MS);
   return Promise.race([work, expiry.promise]).finally(() => clearTimeout(timer));
@@ -154,6 +164,9 @@ function appHostComponent({
 }): Component {
   if (observation === undefined || silence === undefined) {
     return { status: 'unknown', detail: 'nothing has reported a host' };
+  }
+  if (observation.state === 'retired') {
+    return { status: 'down', detail: 'the host has been retired' };
   }
   if (silence > HOST_REPORT_MAX_AGE_MS) {
     return { status: 'unknown', detail: 'the agent has stopped reporting it' };

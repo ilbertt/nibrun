@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, beforeEach, expect, test } from 'bun:test';
 import { withTypes } from '@ilbertt/bun-sqlgen';
-import { HOST_STATES, type HostId, HostReportedStateSchema, type HostState } from '@repo/protocol';
-import { Value } from '@sinclair/typebox/value';
+import { HOST_STATES } from '@repo/protocol';
 import type { SQL } from 'bun';
 import { type Queries, schema } from '#db/queries.gen.ts';
 import { HOST_REPORT_MAX_AGE_MS } from '#lib/host-readiness.ts';
@@ -9,7 +8,7 @@ import { AgentRepository } from '#repositories/agent.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { createDeployedApp } from '#tests/support/deployed-app.ts';
-import { registerHost, TEST_HOST_ID } from '#tests/support/hosts.ts';
+import { registerHost, hostReport as report, TEST_HOST_ID } from '#tests/support/hosts.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
 const DATABASE_START_TIMEOUT_MS = 180_000;
@@ -27,22 +26,6 @@ beforeEach(async () => {
 
 function repository() {
   return new DeploymentsRepository(withTypes<Queries>(sql));
-}
-
-function report({ hostId, state }: { hostId: HostId; state: HostState }) {
-  const capacity = { vcpuCount: 2, memoryMib: 8192, cacheBytes: 100 };
-  return Value.Parse(HostReportedStateSchema, {
-    hostId,
-    state,
-    reportedAt: new Date().toISOString(),
-    capacity,
-    allocatable: capacity,
-    versions: { agent: 'a', guestImage: 'b', zerofs: 'c', firecracker: 'd' },
-    instances: [],
-    volumes: [],
-    checkpoints: [],
-    exports: [],
-  });
 }
 
 async function availableHost() {

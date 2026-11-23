@@ -20,6 +20,7 @@ import {
 import type { AppsService } from '#services/apps.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
 import type { ExportsService } from '#services/exports.service.ts';
+import { hostReport } from '#tests/support/hosts.ts';
 
 const SESSION_REQUEST = Value.Parse(AgentSessionRequestSchema, {
   hostId: 'agent-origin',
@@ -34,7 +35,7 @@ class FakeAgentRepository implements AgentRepositoryContract {
   observed: HostObservation | undefined;
   sessionExpiresAt: Date | undefined;
 
-  registerHost({ originId }: { originId: string }): Promise<HostId> {
+  registerHost({ originId }: { originId: string }): Promise<HostId | undefined> {
     this.registeredOrigins.push(originId);
     const hostId = this.hosts.get(originId) ?? Value.Parse(HostIdSchema, Bun.randomUUIDv7());
     this.hosts.set(originId, hostId);
@@ -54,10 +55,10 @@ class FakeAgentRepository implements AgentRepositoryContract {
     sessionToken: SecretString;
     hostId: HostId;
     expiresAt: Date;
-  }): Promise<void> {
+  }): Promise<boolean> {
     this.sessionExpiresAt = expiresAt;
     this.#sessions.open({ sessionToken, hostId, expiresAt });
-    return Promise.resolve();
+    return Promise.resolve(true);
   }
 
   hostForSession({ sessionToken }: { sessionToken: string }): Promise<HostId | undefined> {
@@ -74,13 +75,13 @@ class FakeAgentRepository implements AgentRepositoryContract {
     });
   }
 
-  observeReport({ reported }: { reported: HostReportedState }): Promise<void> {
+  observeReport({ reported }: { reported: HostReportedState }): Promise<boolean> {
     this.observed = {
       hostId: reported.hostId,
       reportedAt: reported.reportedAt,
       state: reported.state,
     };
-    return Promise.resolve();
+    return Promise.resolve(true);
   }
 
   lastObservation(): Promise<HostObservation | undefined> {
@@ -348,5 +349,34 @@ describe('a report is read by whatever owns what it talks about', () => {
     expect(imports.sweptSpent).toBe(1);
     expect(hostnames.reconciled).toBe(1);
     expect(volumeStorageMigrations.swept).toBe(1);
+  });
+});
+
+describe('retired host admission', () => {
+  test('refuses retired registration before issuing a token', async () => {
+    const { service, agentRepo } = build();
+    spyOn(agentRepo, 'registerHost').mockResolvedValue(undefined);
+    const save = spyOn(agentRepo, 'saveSession');
+    await expect(service.openSession(SESSION_REQUEST)).rejects.toBeInstanceOf(ForbiddenError);
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  test('refuses a host retired between registration and session admission', async () => {
+    const { service, agentRepo } = build();
+    spyOn(agentRepo, 'saveSession').mockResolvedValue(false);
+    await expect(service.openSession(SESSION_REQUEST)).rejects.toBeInstanceOf(ForbiddenError);
+    expect(agentRepo.sessionExpiresAt).toBeUndefined();
+  });
+
+  test('a report rejected after retirement cannot mutate app or deployment state', async () => {
+    const { service, agentRepo, apps, deployments, exports } = build();
+    spyOn(agentRepo, 'observeReport').mockResolvedValue(false);
+    const hostId = Value.Parse(HostIdSchema, 'retired-host');
+    await expect(
+      service.acceptReport({ hostId, reported: hostReport({ hostId, state: 'ready' }) }),
+    ).rejects.toBeInstanceOf(ForbiddenError);
+    expect(apps.trace).toEqual([]);
+    expect(deployments.reports).toEqual([]);
+    expect(exports.reports).toEqual([]);
   });
 });

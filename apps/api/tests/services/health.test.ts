@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
-import { HostIdSchema, type HostState, type Timestamp, TimestampSchema } from '@repo/protocol';
+import { HostIdSchema, type Timestamp, TimestampSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { DEFAULT_AGENT_POLL_SETTINGS } from '#lib/agent-poll-settings.ts';
+import type { HostState } from '#lib/api/host.ts';
 import type { HostObservation } from '#repositories/agent.repository.ts';
 import type { HealthRepositoryContract } from '#repositories/health.repository.ts';
 import { HealthService, type SystemHealth } from '#services/health.service.ts';
@@ -166,4 +167,34 @@ describe('HealthService', () => {
       expect(health.components.appHost.detail).toContain('draining');
     });
   });
+});
+
+test('retirement remains visible even when the last ready report is stale', async () => {
+  const health = await check({ observed: observation({ state: 'retired', silentFor: SILENT_MS }) });
+  expect(health.status).toBe('degraded');
+  expect(health.components.appHost).toEqual({
+    status: 'down',
+    detail: 'the host has been retired',
+  });
+});
+
+test('an unavailable retirement lookup degrades health without exposing database errors', async () => {
+  const health = await new HealthService({
+    healthRepo: new FakeHealthRepository({}),
+    agentRepo: { lastObservation: () => Promise.reject(new Error('private-database-credential')) },
+  }).check();
+  expect(health.status).toBe('degraded');
+  expect(health.components.appHost.status).toBe('unknown');
+  expect(JSON.stringify(health)).not.toContain('private-database-credential');
+});
+
+test('a retirement lookup that never answers does not hang the health endpoint', async () => {
+  const health = await new HealthService({
+    healthRepo: new FakeHealthRepository({}),
+    agentRepo: {
+      lastObservation: () => new Promise<HostObservation | undefined>(function neverAnswer() {}),
+    },
+  }).check();
+  expect(health.status).toBe('degraded');
+  expect(health.components.appHost.status).toBe('unknown');
 });
