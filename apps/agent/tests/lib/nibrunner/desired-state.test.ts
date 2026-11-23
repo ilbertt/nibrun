@@ -14,7 +14,7 @@ import {
 } from '#tests/support/fixtures.ts';
 import { s3Storage } from '#tests/support/s3-storage.ts';
 
-test('an empty initialization archive creates data under the legacy path without wrapping argv', async () => {
+test('an empty initialization archive creates data under /app/data without wrapping argv', async () => {
   const desired = desiredState({ volumes: [desiredVolume()], instances: [desiredInstance()] });
   const converted = nibrunnerDesiredState({ desired, revision: 'revision-1' });
   const archive = emptyDataArchive();

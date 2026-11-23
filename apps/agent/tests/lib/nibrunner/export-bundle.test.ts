@@ -1,10 +1,13 @@
 import { expect, test } from 'bun:test';
+import { execFileSync } from 'node:child_process';
+import { lstatSync, mkdtempSync, readdirSync, readFileSync, readlinkSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { FileSystem } from '@effect/platform';
 import { FilenameSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { Effect, Layer } from 'effect';
 import { writeNibrunnerExportBundle } from '#lib/nibrunner/export-bundle.ts';
-import { tarEntries } from '#lib/volumes/tar.ts';
 import { CommandRunner } from '#services/command-runner.service.ts';
 import { ARTIFACT_BYTES, artifactStore } from '#tests/support/artifacts.ts';
 import { artifact } from '#tests/support/fixtures.ts';
@@ -35,23 +38,37 @@ const fixture = Effect.gen(function* () {
   };
 });
 
-async function contents(file: string) {
+function archiveEntry(path: string) {
+  const stat = lstatSync(path);
+  return {
+    kind: stat.isSymbolicLink() ? 'symlink' : stat.isDirectory() ? 'directory' : 'file',
+    mode: stat.mode & 0o777,
+    link: stat.isSymbolicLink() ? readlinkSync(path) : '',
+    body: stat.isFile() ? readFileSync(path) : new Uint8Array(),
+  };
+}
+
+function contents(file: string) {
+  const directory = mkdtempSync(join(tmpdir(), 'nibrun-export-test-'));
   const entries = new Map<string, { kind: string; mode: number; link: string; body: Uint8Array }>();
-  for await (const entry of tarEntries(
-    Bun.file(file).stream().pipeThrough(new DecompressionStream('gzip')),
-  )) {
-    const chunks: Uint8Array[] = [];
-    for await (const chunk of entry.content()) {
-      chunks.push(chunk);
+  function collect(parent: string) {
+    for (const name of readdirSync(join(directory, parent))) {
+      const relative = join(parent, name);
+      const path = join(directory, relative);
+      const entry = archiveEntry(path);
+      entries.set(relative, entry);
+      if (entry.kind === 'directory') {
+        collect(relative);
+      }
     }
-    entries.set(entry.path.replace(/\/+$/, ''), {
-      kind: entry.kind,
-      mode: entry.mode,
-      link: entry.linkTarget,
-      body: Buffer.concat(chunks),
-    });
   }
-  return entries;
+  try {
+    execFileSync('tar', ['-xzf', file, '-C', directory]);
+    collect('');
+    return entries;
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 }
 
 test('a prepared directory produces one nibrun archive containing only app data and verified executable', async () => {
@@ -67,7 +84,7 @@ test('a prepared directory produces one nibrun archive containing only app data 
         mode: 0o600,
       });
       const bundle = yield* writeNibrunnerExportBundle(input);
-      const entries = yield* Effect.promise(() => contents(bundle.path));
+      const entries = yield* Effect.sync(() => contents(bundle.path));
       expect([...entries.keys()].sort()).toEqual(
         ['.env', 'crontab', 'data', 'data/app.db', input.artifact.filename].sort(),
       );
@@ -89,7 +106,7 @@ test('guest symlinks stay links without reading their host targets', async () =>
       yield* fs.writeFileString(outside, 'host-only content');
       yield* fs.symlink(outside, `${data}/link`);
       const bundle = yield* writeNibrunnerExportBundle(input);
-      const entries = yield* Effect.promise(() => contents(bundle.path));
+      const entries = yield* Effect.sync(() => contents(bundle.path));
       expect(entries.get('data/link')).toMatchObject({ kind: 'symlink', link: outside });
       expect(new TextDecoder().decode(entries.get('data/link')?.body)).not.toContain(
         'host-only content',
@@ -127,7 +144,7 @@ test.each(['data', 'bundle.tar.gz', 'crontab'])(
           ...input,
           artifact: artifact({ filename: Value.Parse(FilenameSchema, filename) }),
         });
-        const entries = yield* Effect.promise(() => contents(bundle.path));
+        const entries = yield* Effect.sync(() => contents(bundle.path));
         expect(entries.get(`${filename}.binary`)?.body).toEqual(ARTIFACT_BYTES);
         expect(new TextDecoder().decode(entries.get('crontab')?.body)).toBe('@hourly app\n');
       }),

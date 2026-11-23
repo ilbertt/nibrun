@@ -1,5 +1,4 @@
 import type { HostId, TenantLogRecord, TenantLogStream, Timestamp } from '@repo/protocol';
-import type { TenantLogSource } from '#lib/logs/vsock.ts';
 
 /**
  * What the receiver hands the buffer, before a host id exists to stamp it with.
@@ -9,12 +8,14 @@ import type { TenantLogSource } from '#lib/logs/vsock.ts';
  * rather than being dropped for want of a label — and it is why this shape is the agent's own
  * rather than the record the store keeps.
  */
-export type TenantLogEvent = TenantLogSource &
-  Pick<TenantLogRecord, 'cronJobId' | 'cronRunId'> & {
-    readonly sourceId: string;
-    readonly sequence: number;
-    readonly observedAt: Timestamp;
-  } & (
+export type TenantLogEvent = Pick<
+  TenantLogRecord,
+  'appId' | 'deploymentId' | 'cronJobId' | 'cronRunId'
+> & {
+  readonly sourceId: string;
+  readonly sequence: number;
+  readonly observedAt: Timestamp;
+} & (
     | { readonly kind: 'data'; readonly stream: TenantLogStream; readonly text: string }
     | { readonly kind: 'gap'; readonly droppedBytes: number }
   );

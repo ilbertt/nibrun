@@ -1,15 +1,5 @@
 import type { DesiredInstance, SqliteOutcome, SqliteQuery, SqliteSessionId } from '@repo/protocol';
-import {
-  Clock,
-  Deferred,
-  Duration,
-  Effect,
-  Exit,
-  Fiber,
-  Option,
-  Scope,
-  SynchronizedRef,
-} from 'effect';
+import { Clock, Deferred, Duration, Effect, Exit, Fiber, Scope, SynchronizedRef } from 'effect';
 import {
   SQLITE_MAX_GUEST_SESSIONS,
   SQLITE_MAX_HOST_SESSIONS,
@@ -234,5 +224,4 @@ export class SqliteSessions extends Effect.Service<SqliteSessions>()('SqliteSess
     );
     return { request, syncDeployments };
   }),
-  dependencies: [SqliteGuest.Default],
 }) {}

@@ -178,8 +178,8 @@ export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
   const sqliteGuest = yield* makeNibrunnerSqliteGuest({ deployments: sqliteDeployments });
   const sqlite = Context.get(
     yield* Layer.build(
-      SqliteSessions.DefaultWithoutDependencies.pipe(
-        Layer.provide(Layer.succeed(SqliteGuest, sqliteGuest)),
+      SqliteSessions.Default.pipe(
+        Layer.provide(Layer.succeed(SqliteGuest, SqliteGuest.make(sqliteGuest))),
       ),
     ),
     SqliteSessions,
