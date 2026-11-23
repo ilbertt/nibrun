@@ -3,12 +3,14 @@ import type {
   HostDesiredState,
   HostId,
   HostReportedState,
+  HostState,
   SecretString,
   Timestamp,
 } from '@repo/protocol';
+import { TimestampSchema } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import type { Queries } from '#db/queries.gen.ts';
 import { AgentSessions } from '#lib/agent/sessions.ts';
-import type { HostState } from '#lib/api/host.ts';
 import {
   environmentByDeployment,
   hostnamesByApp,
@@ -45,7 +47,6 @@ export abstract class AgentRepositoryContract {
 export class AgentRepository extends Repository implements AgentRepositoryContract {
   readonly #sessions = new AgentSessions();
   readonly #secretsKey: TenantSecretsKey;
-  #lastObservation: Pick<HostObservation, 'hostId' | 'reportedAt'> | undefined;
 
   constructor({ sql, secretsKey }: { sql: TypedSQL<Queries>; secretsKey: TenantSecretsKey }) {
     super(sql);
@@ -115,22 +116,24 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
     if (host === undefined) {
       return false;
     }
-    this.#lastObservation = {
-      hostId: reported.hostId,
-      reportedAt: reported.reportedAt,
-    };
     return true;
   }
 
   async lastObservation(): Promise<HostObservation | undefined> {
-    const observation = this.#lastObservation;
-    if (observation === undefined) {
-      return undefined;
-    }
-    const [host] = await this.sql.SelectObservedHostState`
-      SELECT state FROM nibrun.hosts WHERE id = ${observation.hostId}
+    const [host] = await this.sql.SelectLastHostObservation`
+      /* @notNull last_seen_at */
+      SELECT id, reported_state, last_seen_at FROM nibrun.hosts
+      WHERE retired_at IS NULL AND last_seen_at IS NOT NULL
+      ORDER BY last_seen_at DESC, id DESC
+      LIMIT 1
     `;
-    return host === undefined ? undefined : { ...observation, state: host.state };
+    return host === undefined
+      ? undefined
+      : {
+          hostId: host.id,
+          reportedAt: Value.Parse(TimestampSchema, host.last_seen_at.toISOString()),
+          state: host.reported_state,
+        };
   }
 
   private async activeHost({ hostId }: { hostId: HostId }): Promise<HostId | undefined> {

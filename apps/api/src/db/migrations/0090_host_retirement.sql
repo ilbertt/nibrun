@@ -1,15 +1,10 @@
 ALTER TABLE nibrun.hosts
   ADD COLUMN retired_at timestamptz,
   ADD CONSTRAINT hosts_retired_at_finite
-    CHECK (retired_at IS NULL OR isfinite(retired_at)),
-  ADD COLUMN state text GENERATED ALWAYS AS (
-    CASE WHEN retired_at IS NOT NULL THEN 'retired' ELSE reported_state END
-  ) VIRTUAL;
+    CHECK (retired_at IS NULL OR isfinite(retired_at));
 
 COMMENT ON COLUMN nibrun.hosts.retired_at IS
   'Operator-owned retirement timestamp. Agent reports cannot clear it.';
-COMMENT ON COLUMN nibrun.hosts.state IS
-  $c$The effective host state, including operator retirement. @notNull @type import('#lib/api/host.ts').HostState$c$;
 
 CREATE FUNCTION nibrun.require_active_deployment_host() RETURNS trigger
 LANGUAGE plpgsql AS $$

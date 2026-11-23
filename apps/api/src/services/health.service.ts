@@ -1,4 +1,4 @@
-import type { HostState } from '#lib/api/host.ts';
+import type { HostState } from '@repo/protocol';
 import { HOST_REPORT_MAX_AGE_MS } from '#lib/host-readiness.ts';
 import type { AgentRepositoryContract, HostObservation } from '#repositories/agent.repository.ts';
 import type { HealthRepositoryContract } from '#repositories/health.repository.ts';
@@ -31,7 +31,6 @@ const HOST_STATE_STATUS: Record<HostState, ComponentStatus> = {
   ready: 'up',
   draining: 'unknown',
   unreachable: 'down',
-  retired: 'down',
 };
 
 export type SystemHealth = {
@@ -164,9 +163,6 @@ function appHostComponent({
 }): Component {
   if (observation === undefined || silence === undefined) {
     return { status: 'unknown', detail: 'nothing has reported a host' };
-  }
-  if (observation.state === 'retired') {
-    return { status: 'down', detail: 'the host has been retired' };
   }
   if (silence > HOST_REPORT_MAX_AGE_MS) {
     return { status: 'unknown', detail: 'the agent has stopped reporting it' };

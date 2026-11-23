@@ -19,10 +19,13 @@ export interface IObserveHostReportResult {
     id: IHostsColumns["id"];
 }
 
-/** Result of query `SelectObservedHostState`. */
-export interface ISelectObservedHostStateResult {
-    /** The effective host state, including operator retirement. */
-    state: import("#lib/api/host.ts").HostState;
+/** Result of query `SelectLastHostObservation`. */
+export interface ISelectLastHostObservationResult {
+    /** The canonical identity assigned by the control plane. */
+    id: IHostsColumns["id"];
+    reported_state: IHostsColumns["reported_state"];
+    /** When the control plane last received a report from this host. */
+    last_seen_at: NonNullable<IHostsColumns["last_seen_at"]>;
 }
 
 /** Result of query `SelectActiveSessionHost`. */
@@ -817,8 +820,8 @@ export interface IInsertDeploymentResult {
 export interface ISelectPreviousDeploymentHostResult {
     /** The immutable execution host assigned when this deployment is created. */
     host_id: IDeploymentsColumns["host_id"];
-    /** The effective host state, including operator retirement. */
-    state: import("#lib/api/host.ts").HostState;
+    /** Operator-owned retirement timestamp. Agent reports cannot clear it. */
+    retired_at: IHostsColumns["retired_at"];
 }
 
 /** Result of query `SelectReadyDeploymentHost`. */
@@ -1398,7 +1401,7 @@ export interface Queries {
     RegisterHost: IRegisterHostResult;
     SelectHostForIdentity: ISelectHostForIdentityResult;
     ObserveHostReport: IObserveHostReportResult;
-    SelectObservedHostState: ISelectObservedHostStateResult;
+    SelectLastHostObservation: ISelectLastHostObservationResult;
     SelectActiveSessionHost: ISelectActiveSessionHostResult;
     SelectRetainedDeploymentArtifacts: ISelectRetainedDeploymentArtifactsResult;
     SelectDesiredDeployments: ISelectDesiredDeploymentsResult;
@@ -2139,8 +2142,6 @@ export interface IHostsColumns {
     last_seen_at: Date | null;
     /** Operator-owned retirement timestamp. Agent reports cannot clear it. */
     retired_at: Date | null;
-    /** The effective host state, including operator retirement. */
-    state: import("#lib/api/host.ts").HostState;
 }
 
 /** Schema of `hosts`. */
@@ -2912,8 +2913,7 @@ export const schema = {
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
             reported_state: { _columnName: "reported_state", _foreignKeys: {} },
             last_seen_at: { _columnName: "last_seen_at", _foreignKeys: {} },
-            retired_at: { _columnName: "retired_at", _foreignKeys: {} },
-            state: { _columnName: "state", _foreignKeys: {} }
+            retired_at: { _columnName: "retired_at", _foreignKeys: {} }
         },
         _indexes: {
             hosts_origin_id_key: { _indexName: "hosts_origin_id_key" },

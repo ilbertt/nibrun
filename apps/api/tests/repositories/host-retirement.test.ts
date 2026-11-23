@@ -9,9 +9,9 @@ import {
 import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import { type Queries, schema } from '#db/queries.gen.ts';
-import { HostStateSchema } from '#lib/api/host.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
+import { HealthService } from '#services/health.service.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { createDeployedApp } from '#tests/support/deployed-app.ts';
 import { hostReport, registerHost, TEST_HOST_ID } from '#tests/support/hosts.ts';
@@ -79,8 +79,7 @@ async function insertAssignedDeployment({
   );
 }
 
-test('retirement is an API lifecycle state that agents cannot report', () => {
-  expect(Value.Check(HostStateSchema, 'retired')).toBe(true);
+test('agents cannot report retirement as a health state', () => {
   expect(
     Value.Check(HostReportedStateSchema, {
       ...hostReport({ hostId: TEST_HOST_ID, state: 'ready' }),
@@ -89,29 +88,25 @@ test('retirement is an API lifecycle state that agents cannot report', () => {
   ).toBe(false);
 });
 
-test('retirement derives the effective state and freezes the last accepted report', async () => {
+test('retirement preserves reported health and excludes the host from status checks', async () => {
   const hostId = await readyHost();
   const agent = agentRepository();
   const reported = hostReport({ hostId, state: 'ready' });
   expect(await agent.observeReport({ reported })).toBe(true);
   await retire(hostId);
   const [retired] = await sql.unsafe(
-    'SELECT state, reported_state, retired_at, last_seen_at FROM nibrun.hosts WHERE id = $1',
+    'SELECT reported_state, retired_at, last_seen_at FROM nibrun.hosts WHERE id = $1',
     [hostId],
   );
-  expect(retired).toMatchObject({ state: 'retired', reported_state: 'ready' });
+  expect(retired).toMatchObject({ reported_state: 'ready' });
   expect(retired.retired_at).toBeInstanceOf(Date);
   expect(await agent.observeReport({ reported: { ...reported, state: 'draining' } })).toBe(false);
   const [unchanged] = await sql.unsafe(
-    'SELECT state, reported_state, retired_at, last_seen_at FROM nibrun.hosts WHERE id = $1',
+    'SELECT reported_state, retired_at, last_seen_at FROM nibrun.hosts WHERE id = $1',
     [hostId],
   );
   expect(unchanged).toEqual(retired);
-  expect(await agent.lastObservation()).toEqual({
-    hostId,
-    reportedAt: reported.reportedAt,
-    state: 'retired',
-  });
+  expect(await agent.lastObservation()).toBeUndefined();
 });
 
 test('retirement timestamps are finite and cannot be changed or cleared', async () => {
@@ -219,4 +214,33 @@ test('database admission serializes with retirement and refuses direct assignmen
   await expect(
     insertAssignedDeployment({ connection: sql, deploymentId: app.deploymentId, hostId }),
   ).rejects.toMatchObject({ errno: '23514' });
+});
+
+test('dashboard status ignores the latest retired reporter and uses the remaining active host', async () => {
+  const active = await readyHost();
+  const retiring = await readyHost();
+  const agent = agentRepository();
+  const health = new HealthService({
+    agentRepo: agent,
+    healthRepo: {
+      pingDatabase() {
+        return Promise.resolve();
+      },
+      pingLogStore() {
+        return Promise.resolve();
+      },
+      pingObjectStore() {
+        return Promise.resolve();
+      },
+    },
+  });
+  expect((await agent.lastObservation())?.hostId).toBe(retiring);
+  await retire(retiring);
+  expect(await agent.lastObservation()).toMatchObject({ hostId: active, state: 'ready' });
+  expect((await health.check()).components.appHost).toEqual({ status: 'up' });
+  await retire(active);
+  expect(await agent.lastObservation()).toBeUndefined();
+  const status = await health.check();
+  expect(status.components.agent.status).toBe('down');
+  expect(status.components.appHost.status).toBe('unknown');
 });
