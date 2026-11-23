@@ -19,11 +19,6 @@ import { environmentByExport, toDesiredExport } from '#lib/exports/desired-state
 import type { TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { Repository } from '#repositories/repository.ts';
 
-/**
- * The last thing a host said about itself, which is the whole of what this end knows about one
- * between two reports. Kept rather than the report itself: nothing here is a substitute for the
- * tables the report's contents land in, and holding those twice is how they come apart.
- */
 export type HostObservation = {
   hostId: HostId;
   reportedAt: Timestamp;
@@ -50,7 +45,7 @@ export abstract class AgentRepositoryContract {
 export class AgentRepository extends Repository implements AgentRepositoryContract {
   readonly #sessions = new AgentSessions();
   readonly #secretsKey: TenantSecretsKey;
-  #lastObservation: HostObservation | undefined;
+  #lastObservation: Pick<HostObservation, 'hostId' | 'reportedAt'> | undefined;
 
   constructor({ sql, secretsKey }: { sql: TypedSQL<Queries>; secretsKey: TenantSecretsKey }) {
     super(sql);
@@ -123,7 +118,6 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
     this.#lastObservation = {
       hostId: reported.hostId,
       reportedAt: reported.reportedAt,
-      state: reported.state,
     };
     return true;
   }
