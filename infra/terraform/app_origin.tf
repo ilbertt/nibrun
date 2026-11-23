@@ -19,3 +19,11 @@ resource "cloudflare_custom_hostname_fallback_origin" "app_host" {
   zone_id = data.cloudflare_zone.app_host.id
   origin  = cloudflare_dns_record.app_origin[var.app_host_domain].name
 }
+
+output "nibrunner_fallback_origin_host" {
+  value = var.app_host_domain
+}
+
+output "nibrunner_fallback_redirect" {
+  value = "https://${var.www_hostname}"
+}
