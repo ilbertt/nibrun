@@ -204,48 +204,6 @@ Linux CI exercises the packaged NBD client's attach, repair, ownership rejection
 against an in-memory server and a real kernel device. The existing checks job installs its
 packages and runs this test directly with `NIBRUN_TEST_NBD=1`; only the fixture's privileged
 commands use sudo.
-Linux CI also checks VM dependency isolation with real systemd and disposable sleep processes;
-the fixture runs as root and refuses to replace any existing host units.
-With `NIBRUN_TEST_ZEROFS_SYSTEMD=1`, Linux CI installs the unchanged per-app unit templates,
-the pinned binary and a disposable `zerofs` account. A bind-mounted test directory stands in for
-the data disk, with a fixture unit satisfying its dependency and a drop-in trusting the test CA.
-Production activation and flush/stop helpers verify credential loading, unprivileged execution,
-idempotent activation, unmount/runtime-directory cleanup and cache-free restart recovery. The
-fixture refuses existing host paths, units or accounts and removes its own resources on exit.
-The same test file also closes one agent topology scope and builds a fresh registry while the
-real writer and mount keep running. Staged configuration rejects an omitted storage field,
-and reactivation registers the existing filesystem without changing either PID or its data.
-An unrelated unconfigured app still selects the shared filesystem.
-This checks registry reconstruction, not a restart of the full agent binary or its layer graph.
-Two real per-app systemd instances also write the same filename under distinct S3 prefixes.
-Stopping one writer and recovering it without its cache leaves the other's writer/mount PIDs
-unchanged and its filesystem writable; both apps retain their own contents. This does not boot
-guests or exercise their VM dependency units.
-Real retirement coverage also joins the production lifecycle, slot allocator and NBD client:
-it detaches an attached image, stops the app units, and verifies deletion through a separate
-cache-free writer after the retired writer has stopped. A small fixture tmpfs satisfies shared
-mount safety checks. Reclamation waits for acknowledgement, releases cache reservations and
-retains the retirement record; fresh service scopes retry deletion and reject stale starts with
-S3 stopped and local config/cache gone. The shared-mount marker remains untouched.
-With `NIBRUN_TEST_ZEROFS=1`, Linux CI also runs the pinned ZeroFS release against a disposable
-RustFS bucket over TLS and a real FUSE mount. It stages the production app configuration, creates
-the image through the volume file helpers, and writes through a real NBD attachment using the
-production client service. After flushing and detaching, it removes the local cache and checks
-the restored bytes through a fresh NBD attachment with direct I/O. The test requires a free
-`/dev/nbd0`. Downloads use the checksum in
-`infra/app-host/versions.json`; `NIBRUN_TEST_ZEROFS_BINARY` permits a preinstalled test binary.
-The same fixture formats a seeded ext4 image through the production formatter, mounts it and
-appends to a seeded file as an unprivileged owner. After unmounting, flushing and recovering
-without the cache, it checks filesystem consistency, label, file contents, ownership and mode,
-and verifies that the formatter does not format it again. These mounts contain only fixture data
-on the disposable CI host; production never mounts a tenant ext4 filesystem on the host.
-Configured checkpoint reconciliation also runs against real per-app and shared ZeroFS writers
-on separate prefixes. It retries creation and deletion, verifies both survive cache-free writer
-restarts, and checks that a same-named shared checkpoint remains intact.
-The NBD persistence test opens a real read-only `--checkpoint` server with its own listeners
-and cache, checks its bytes and write rejection, and keeps writing through the live NBD device
-while that reader is open. After stopping both and clearing the writer cache, it reopens the
-checkpoint with a fresh cache to verify the original bytes, then recovers the newer live bytes.
 
 The gaps below still need a hypervisor, ZeroFS or real cloud storage; source inspection and
 mocked tests do not establish those guarantees.
