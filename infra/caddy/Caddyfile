@@ -49,7 +49,7 @@ http://{$API_HOSTNAME} {
 	}
 }
 
-# Log ingest from the fleet. Admitted from the app hosts' security group only,
+# Log ingest from the fleet. Admitted from the nibrunner host's security group only,
 # exactly as the control channel above, and plain HTTP for the same reason.
 #
 # A listener of its own rather than another matcher on the internal port: the two
@@ -58,7 +58,7 @@ http://{$API_HOSTNAME} {
 # port was meant to answer for the other.
 #
 # Only /insert. Reads go through the api, which is what decides whether a caller
-# may see the app it is asking about; nothing on an app host reads logs back, so
+# may see the app it is asking about; nibrunner never reads logs back, so
 # exposing /select here would only widen what a compromised host can do.
 :{$LOG_INGEST_PORT} {
 	@insert path /insert/*

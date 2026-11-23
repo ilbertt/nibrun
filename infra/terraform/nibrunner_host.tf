@@ -11,8 +11,6 @@ locals {
   nibrunner_http_proxy_port    = 8080
 }
 
-# Keep this engine separate: the legacy deploy starts the shared ZeroFS writer,
-# and a second writer against that prefix fences the machine serving existing apps.
 resource "aws_instance" "nibrunner_host" {
   ami                    = data.aws_ssm_parameter.ubuntu_2604_ami.value
   instance_type          = data.aws_ec2_instance_type.nibrunner_host.instance_type

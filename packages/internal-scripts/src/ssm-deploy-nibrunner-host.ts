@@ -51,7 +51,7 @@ const tunnelUnit = await Bun.file(
 ).text();
 const bridgeInstaller = await Bun.file(join(hostDirectory, 'deploy/install_bridge.sh')).text();
 const agentVersionPruner = await Bun.file(
-  join(repoRoot, 'infra/app-host/deploy/prune_agent_versions.sh'),
+  join(hostDirectory, 'deploy/prune_agent_versions.sh'),
 ).text();
 const bridgeUnit = await Bun.file(join(hostDirectory, 'systemd/nibrun-nibrunner-bridge.service'))
   .text()

@@ -9,10 +9,6 @@ flock -w 300 9
 [[ "$AGENT_VERSION" =~ ^[0-9a-f]{40}$ ]]
 [[ "$AGENT_SHA256" =~ ^[0-9a-f]{64}$ ]]
 
-if [ -e /var/lib/nibrun/host-id ]; then
-  echo "refusing to install the nibrunner bridge over a registered legacy host" >&2
-  exit 1
-fi
 if [ ! -e /var/lib/nibrunner/bridge/host-id ] && [ -e /var/lib/nibrunner/desired.json ]; then
   echo "refusing to register a bridge over existing unmanaged engine state" >&2
   exit 1
@@ -47,4 +43,4 @@ systemctl daemon-reload
 systemctl enable nibrun-nibrunner-bridge.service
 systemctl restart nibrun-nibrunner-bridge.service
 systemctl is-active --quiet nibrun-nibrunner-bridge.service
-bash prune_agent_versions.sh "$base" /proc bridge
+bash prune_agent_versions.sh "$base" /proc

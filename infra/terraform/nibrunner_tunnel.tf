@@ -9,7 +9,7 @@ variable "nibrunner_domain" {
 
   validation {
     condition     = var.nibrunner_domain != var.app_host_domain
-    error_message = "nibrunner_domain must use a separate zone from the legacy app-host domain."
+    error_message = "nibrunner_domain must use a separate zone from the application domain."
   }
 }
 

@@ -83,41 +83,26 @@ output "log_ingest_port" {
   value = var.log_ingest_port
 }
 
-# Private for the same reason control_plane_internal_url is: a shipper on an app
-# host writes across the VPC, and log traffic never leaves it.
 output "log_ingest_url" {
-  description = "What a log shipper on an app host writes to."
+  description = "Where nibrunner ships logs inside the VPC."
   value       = "http://${aws_instance.app.private_ip}:${var.log_ingest_port}"
 }
 
-# The agent drops guest traffic to this by name, rather than leaving the control
-# plane to the blanket private-address rule that happens to contain it.
 output "vpc_ipv4_cidr_block" {
   description = "Denied to tenant microVMs."
   value       = aws_vpc.app.cidr_block
 }
 
-# The v6 half has no blanket rule behind it: AWS allocates VPC IPv6 from global
-# unicast space, so `fc00::/7` does not contain it and a ruleset that only knows
-# the documented private ranges reads the control plane as ordinary internet.
-# Naming it here is the only thing that denies it.
 output "vpc_ipv6_cidr_block" {
   description = "Denied to tenant microVMs. Unlike the v4 block, nothing else covers it."
   value       = aws_vpc.app.ipv6_cidr_block
 }
 
-output "app_host_deploy_group" {
-  description = "SSM targeting tag for app hosts. Distinct from deploy_group so a deploy reaches one machine class without touching the other."
-  value       = local.app_host_deploy_group
-}
 
-output "app_host_public_ips" {
-  description = "A record targets for legacy app-host routes."
-  value       = aws_eip.app_host[*].public_ip
-}
+
 
 output "exports_bucket" {
-  description = "Downloadable app exports. Written by app hosts, read by the api only to sign a download URL."
+  description = "Downloadable app exports. Written by nibrunner, read by the api only to sign a download URL."
   value       = aws_s3_bucket.exports.bucket
 }
 
@@ -130,28 +115,13 @@ output "export_retention_days" {
 }
 
 output "imports_bucket" {
-  description = "Archives an owner uploads to seed an app's data. Written and signed by the api, read once by the app host that formats the volume."
+  description = "Archives an owner uploads to seed an app's data. Written and signed by the api, read once by nibrunner."
   value       = aws_s3_bucket.imports.bucket
 }
 
-output "filesystems_bucket" {
-  description = "ZeroFS's backing store. Read-write from app hosts, read-only from the control plane."
-  value       = aws_s3_bucket.filesystems.bucket
-}
 
-output "guest_images_bucket" {
-  description = "Where CI publishes the pinned guest image and app hosts fetch it from."
-  value       = aws_s3_bucket.guest_images.bucket
-}
 
 output "github_deploy_role_arn" {
   description = "Assumed by the deploy steps, after Terraform has run."
   value       = var.enable_github_deploy ? aws_iam_role.github_deploy[0].arn : null
-}
-
-# What the agent has to put on an instance's config drive: a guest cannot discover
-# it, and it is not the address of the machine it runs on anyway.
-output "port_relay_public_ipv4" {
-  description = "The address a tenant's own ports are reached at. Stable across replacing the relay, which is what makes moving it later invisible to the clients already using it."
-  value       = aws_eip.port_relay.public_ip
 }

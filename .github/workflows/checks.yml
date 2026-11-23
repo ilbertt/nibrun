@@ -44,7 +44,7 @@ jobs:
       - name: Install native test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y nbd-client nbdkit fuse3 openssl curl e2fsprogs util-linux
+          sudo apt-get install -y nbd-client nbdkit
 
       - name: Run Tests
         run: bun run test
@@ -56,14 +56,6 @@ jobs:
           sudo modprobe nbd nbds_max=1
           bun run --filter @repo/agent test tests/lib/volumes/nbd-stock.test.ts
 
-      - name: Test VM storage dependencies
-        run: sudo env "PATH=$PATH" NIBRUN_TEST_VM_SYSTEMD=1 "$(command -v bun)" run --filter @repo/agent test tests/lib/vm/app-storage-unit-linux.test.ts
-
-      - name: Test configured ZeroFS integration
-        run: |
-          sudo modprobe fuse
-          sudo env "PATH=$PATH" NIBRUN_TEST_ZEROFS_SYSTEMD=1 "$(command -v bun)" run --filter @repo/agent test tests/lib/volumes/app-zerofs-systemd-linux.test.ts tests/lib/volumes/app-zerofs-retirement-linux.test.ts
-          sudo env "PATH=$PATH" NIBRUN_TEST_ZEROFS=1 "$(command -v bun)" run --filter @repo/agent test tests/lib/volumes/zerofs-persistence.test.ts tests/lib/reconcile/checkpoints-linux.test.ts
 
   security:
     if: github.event_name != 'pull_request' || github.event.pull_request.draft == false

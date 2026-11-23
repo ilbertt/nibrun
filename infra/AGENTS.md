@@ -1,16 +1,20 @@
 # infra
 
-One AWS stack: the control plane runs Compose, app hosts and the nibrunner host run tenant
-microVMs, and the port relay forwards non-HTTP tenant traffic. `deploy/` is shell rather than
-TypeScript because those scripts run *on* a box and an instance has no Bun; everything CI runs
-lives in `@repo/internal-scripts`.
+One AWS stack: the control plane runs Compose and the nibrunner host runs tenant microVMs.
+`deploy/` is shell because those scripts run on a box with no Bun; everything CI runs lives
+in `@repo/internal-scripts`.
+
+The filesystem bucket, artifacts, backups and encryption keys survive compute retirement.
+Nibrunner uses its own prefix and key in the shared filesystem bucket. Keep the key for existing
+archived prefixes so their contents remain recoverable. Published guest artifacts are retained
+privately through Terraform's state-removal migration; no deployment reads or writes them.
 
 The Terraform explains itself — read it rather than a description of it here.
 
 The isolated nibrunner host uses an outbound Cloudflare Tunnel and has no security-group
 ingress rules. Its HTTP proxy listens on `127.0.0.1:8080`; `cloudflared` preserves the requested
 hostname so nibrunner can route each app. Public instance addresses support outbound traffic
-only. The separate legacy app-host fleet still uses its existing origin proxy and port relay.
+only.
 
 Nibrunner requires inactive host SMT and KSM with no retained shared pages. Its EC2 CPU options
 use one thread per core; changing these options stops and starts the instance before deployment.
@@ -35,7 +39,7 @@ Host headers continue to select their app.
 Cloudflare for SaaS activation and its billing setup are account prerequisites, completed in
 the dashboard before applying. Terraform does not create customer-owned hostnames. Those must
 be registered in the nibrunner zone by the application; the shared production API currently
-uses the separate legacy app-host zone, whose custom-domain configuration remains separate.
+uses the application domain zone, whose custom-domain configuration remains separate.
 
 The host fetches its Tunnel token directly from SSM. systemd passes it through `LoadCredential`
 to an unprivileged `cloudflared` process; CI and RunCommand receive only the parameter name.
@@ -50,7 +54,7 @@ transit, so nothing can drift.
 
 ## First run
 
-AWS account bootstrap and the app-host DNS settings below are manual. Terraform provisions
+AWS account bootstrap is manual. Terraform provisions
 both Tunnels and their DNS records.
 
 ```sh
@@ -72,17 +76,6 @@ DNS, every record **proxied** (orange cloud):
 - Terraform manages `<app_domain>` and `*.<app_domain>` as CNAMEs to the nibrunner Tunnel.
   A fresh setup creates these records; existing deployments keep their Terraform state so the
   same resources remain managed after the migration imports are removed.
-
-App-host origins use A records only. Cloudflare serves visitors over IPv6 from its own edge;
-the Tunnel needs no public origin address. App-host addresses outlive a replacement.
-
-Then, **in the legacy app-host zone**: SSL/TLS **Full (strict)** and **Authenticated Origin Pulls → Global** on.
-Turn AOP on *before* the first deploy carrying a proxy — Caddy requires its client certificate,
-and without it every visitor gets a `525`. Terraform issues an ECC origin
-certificate and key for legacy app hosts, covering the domain and wildcard, into
-the existing SSM parameters. The key remains in encrypted Terraform state like the existing
-SSM-managed secrets. Certificate rotation requires deploying a second certificate before
-revoking the first; `prevent_destroy` blocks revocation during an ordinary apply.
 
 The control plane and nibrunner use Tunnels and need no origin certificates or Authenticated
 Origin Pulls. The control plane publishes only its VPC control and log-ingest listeners.
@@ -156,10 +149,8 @@ domain arrives whenever an owner adds one — which is what the token is for.
 triggers `on_box_deploy.sh` over SSM RunCommand.
 
 Bridge installation prunes obsolete SHA-named builds after its service health gate, under the
-deployment lock. It shares the legacy agent's retention implementation: keep the active build,
-the two newest other complete builds, and every executable still running. Bridge builds contain
-only `nibrun-agent`; legacy builds additionally require their `.installed` marker. Artifact caches,
-guest images, and tenant data are outside this cleanup.
+deployment lock. It keeps the active build, the two newest other complete builds and every
+executable still running. Artifact caches, guest images and tenant data are outside this cleanup.
 
 **No secret may pass through the workflow's own environment.** RunCommand keeps its parameters in
 command history, in the clear, for 30 days — so Terraform writes secrets into SSM parameters the

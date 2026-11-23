@@ -187,47 +187,6 @@ jobs:
         id: agent_binary
         run: bun run --filter @repo/internal-scripts publish-agent-binary
 
-  deploy-app-hosts:
-    needs: [terraform, publish-agent]
-    runs-on: ubuntu-latest
-    env:
-      DEPLOY_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).deploy_bucket }}
-      APP_HOST_DEPLOY_GROUP: ${{ fromJSON(needs.terraform.outputs.values).app_host_deploy_group }}
-      SSM_SECRET_PREFIX: ${{ fromJSON(needs.terraform.outputs.values).ssm_secret_prefix }}
-      GUEST_IMAGES_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).guest_images_bucket }}
-      FILESYSTEMS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).filesystems_bucket }}
-      ARTIFACTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).artifacts_bucket }}
-      EXPORTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).exports_bucket }}
-      IMPORTS_BUCKET: ${{ fromJSON(needs.terraform.outputs.values).imports_bucket }}
-      API_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).api_hostname }}
-      APP_HOST_DOMAIN: ${{ fromJSON(needs.terraform.outputs.values).app_host_domain }}
-      WWW_HOSTNAME: ${{ fromJSON(needs.terraform.outputs.values).www_hostname }}
-      CONTROL_PLANE_INTERNAL_URL: ${{ fromJSON(needs.terraform.outputs.values).control_plane_internal_url }}
-      LOG_INGEST_URL: ${{ fromJSON(needs.terraform.outputs.values).log_ingest_url }}
-      PORT_RELAY_PUBLIC_IPV4: ${{ fromJSON(needs.terraform.outputs.values).port_relay_public_ipv4 }}
-      VPC_IPV4_CIDR_BLOCK: ${{ fromJSON(needs.terraform.outputs.values).vpc_ipv4_cidr_block }}
-      VPC_IPV6_CIDR_BLOCK: ${{ fromJSON(needs.terraform.outputs.values).vpc_ipv6_cidr_block }}
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-
-      - uses: ./.github/actions/prepare
-
-      - uses: ./.github/actions/aws-credentials
-        with:
-          role-to-assume: ${{ fromJSON(needs.terraform.outputs.values).github_deploy_role_arn }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - name: Publish the app host bundle
-        id: bundle
-        run: bun run --filter @repo/internal-scripts publish-app-host-bundle
-
-      - name: Deploy the app hosts via SSM
-        timeout-minutes: 20
-        env:
-          BUNDLE_URL: ${{ steps.bundle.outputs.url }}
-          AGENT_URL: ${{ needs.publish-agent.outputs.url }}
-        run: bun run --filter @repo/internal-scripts ssm-deploy-app-hosts
-
   publish-nibrunner-guest-image:
     needs: terraform
     runs-on: ubuntu-latest
