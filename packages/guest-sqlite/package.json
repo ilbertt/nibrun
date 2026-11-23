@@ -1,5 +1,5 @@
 {
-  "name": "@repo/runtime",
+  "name": "@repo/guest-sqlite",
   "private": true,
   "type": "module",
   "scripts": {

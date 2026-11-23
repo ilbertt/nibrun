@@ -13,7 +13,7 @@
 #include <unistd.h>
 #include "clock.h"
 #include "log.h"
-#include "paths.h"
+#include "identity.h"
 #include "vsock.h"
 
 #define SQLITE_MAX_WORKERS 4
@@ -117,10 +117,3 @@ void guest_sqlite_start(struct guest_sqlite *channel) {
   channel->process = process;
 }
 
-void guest_sqlite_stop(const struct guest_sqlite *channel) {
-  if (channel->process <= 0)
-    return;
-  kill(-channel->process, SIGTERM);
-  while (waitpid(channel->process, NULL, 0) < 0 && errno == EINTR) {
-  }
-}

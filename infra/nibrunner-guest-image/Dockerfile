@@ -1,9 +1,9 @@
 # syntax=docker/dockerfile:1
-ARG RUNTIME_TOOLCHAIN=nibrun-guest-runtime:build
-FROM ${RUNTIME_TOOLCHAIN} AS build
+ARG GUEST_SQLITE_BUILDER=nibrun-guest-sqlite:build
+FROM ${GUEST_SQLITE_BUILDER} AS build
 RUN apt-get install -y --no-install-recommends e2fsprogs
 COPY init.c /image-init.c
-RUN musl-gcc ${CFLAGS} -s -I/build/src -o /image-init /image-init.c ${RUNTIME_SOURCES} ${SQLITE_LINK}; \
+RUN musl-gcc ${CFLAGS} -s -I/build/src -o /image-init /image-init.c /libnibrun-guest-sqlite.a ${SQLITE_LINK}; \
     if readelf -l /image-init | grep -q INTERP; then exit 1; fi
 
 COPY --from=stock rootfs.ext4 /stock/rootfs.ext4

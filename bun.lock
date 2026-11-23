@@ -106,12 +106,6 @@
         "vite": "catalog:",
       },
     },
-    "apps/runtime": {
-      "name": "@repo/runtime",
-      "devDependencies": {
-        "@libsql/client": "catalog:",
-      },
-    },
     "apps/www": {
       "name": "@repo/www",
       "dependencies": {
@@ -260,6 +254,12 @@
       "devDependencies": {
         "@repo/typescript-config": "workspace:*",
         "typescript": "catalog:",
+      },
+    },
+    "packages/guest-sqlite": {
+      "name": "@repo/guest-sqlite",
+      "devDependencies": {
+        "@libsql/client": "catalog:",
       },
     },
     "packages/internal-scripts": {
@@ -1258,13 +1258,13 @@
 
     "@repo/global-constants": ["@repo/global-constants@workspace:packages/global-constants"],
 
+    "@repo/guest-sqlite": ["@repo/guest-sqlite@workspace:packages/guest-sqlite"],
+
     "@repo/internal-scripts": ["@repo/internal-scripts@workspace:packages/internal-scripts"],
 
     "@repo/pack-utils": ["@repo/pack-utils@workspace:packages/pack-utils"],
 
     "@repo/protocol": ["@repo/protocol@workspace:packages/protocol"],
-
-    "@repo/runtime": ["@repo/runtime@workspace:apps/runtime"],
 
     "@repo/sqlite": ["@repo/sqlite@workspace:packages/sqlite"],
 

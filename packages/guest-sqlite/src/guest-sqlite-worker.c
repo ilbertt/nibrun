@@ -1,7 +1,7 @@
 #include "clock.h"
 #include "guest-sqlite.h"
 #include "log.h"
-#include "paths.h"
+#include "identity.h"
 #include "sqlite-hrana.h"
 #include "sqlite-values.h"
 #include "vsock.h"

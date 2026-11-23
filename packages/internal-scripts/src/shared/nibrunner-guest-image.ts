@@ -75,14 +75,14 @@ export async function buildNibrunnerGuestImage() {
   const stockDirectory = join(imageOutputDirectory, 'stock');
   await $`mkdir -p ${stockDirectory}`;
   const stock = await stockImage(stockDirectory);
-  const runtimeDirectory = join(repoRoot, 'apps/runtime');
-  const variables = await Bun.file(join(runtimeDirectory, 'versions.env')).text();
+  const readerDirectory = join(repoRoot, 'packages/guest-sqlite');
+  const variables = await Bun.file(join(readerDirectory, 'versions.env')).text();
   const buildArguments = Array.from(variables.matchAll(/^([A-Z][A-Z0-9_]+)=(.+)$/gm)).flatMap(
     (match) => ['--build-arg', `${match[1]}=${match[2]}`],
   );
-  const toolchain = 'nibrun-guest-runtime:build';
-  await $`docker build --platform=linux/amd64 --target=toolchain --tag ${toolchain} ${buildArguments} ${runtimeDirectory}`;
-  await $`docker build --platform=linux/amd64 --build-arg RUNTIME_TOOLCHAIN=${toolchain} --build-context stock=${stockDirectory} --target=image --output type=local,dest=${imageOutputDirectory} ${imageSourceDirectory}`;
+  const toolchain = 'nibrun-guest-sqlite:build';
+  await $`docker build --platform=linux/amd64 --target=build --tag ${toolchain} ${buildArguments} ${readerDirectory}`;
+  await $`docker build --platform=linux/amd64 --build-arg GUEST_SQLITE_BUILDER=${toolchain} --build-context stock=${stockDirectory} --target=image --output type=local,dest=${imageOutputDirectory} ${imageSourceDirectory}`;
 
   const initSha256 = await digestFile(join(imageOutputDirectory, 'image-init'));
   const recipe = await digestFile(join(imageSourceDirectory, 'patch-image.sh'));
