@@ -36,7 +36,7 @@ export const Route = createFileRoute('/apps/')({
       path: '/apps',
       title: pageTitle(CATALOG.heading),
       description: CATALOG.description,
-      image: CATALOG.cardPath,
+      image: CATALOG.cardUrl,
       markdown: { path: CATALOG.markdownPath, title: 'This catalog in Markdown' },
     }),
   component: RouteComponent,

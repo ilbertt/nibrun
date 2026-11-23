@@ -3,37 +3,18 @@
  * that name them: those are prerendered, and a card the worker drew on request would wake it for
  * every link unfurled. Run after `vite build`, which empties the directory first.
  */
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { BASE_DOMAIN, PRODUCT_NAME, WWW_SITE } from '@repo/global-constants';
 import { GithubMark } from '@repo/ui/custom/github-mark';
 import { Resvg } from '@resvg/resvg-js';
 import type { ReactElement, ReactNode } from 'react';
 import satori from 'satori';
-import { APPS, appCardPath, CATALOG, type CatalogApp, projectLink } from '#lib/apps.ts';
+import { APPS, appCardUrl, CATALOG, type CatalogApp, projectLink } from '#lib/apps.ts';
 import markSvg from '../../../brand/logo.svg?raw';
+import { loadShareCardFonts, MONO, SANS } from './share-card-fonts.ts';
 
 const CLIENT_DIST_DIR = join(import.meta.dirname, '..', 'dist', 'client');
-
-// Static cuts rather than the variable faces the site loads: satori reads neither a variable
-// font nor woff2, which are the only two things the site's own packages ship.
-const FONT_FILES = [
-  {
-    name: 'Space Grotesk',
-    weight: 400,
-    file: '@fontsource/space-grotesk/files/space-grotesk-latin-400-normal.woff',
-  },
-  {
-    name: 'Space Grotesk',
-    weight: 600,
-    file: '@fontsource/space-grotesk/files/space-grotesk-latin-600-normal.woff',
-  },
-  {
-    name: 'Space Mono',
-    weight: 400,
-    file: '@fontsource/space-mono/files/space-mono-latin-400-normal.woff',
-  },
-] as const;
 
 // The site's dark palette, written out: satori reads no stylesheet and no `oklch()`, so the
 // tokens cannot be referenced — only copied, and the dark scheme is the one a card is seen in.
@@ -46,9 +27,6 @@ const COLOR = {
   primary: '#16a34a',
   primaryForeground: '#fcfcf7',
 };
-
-const SANS = 'Space Grotesk';
-const MONO = 'Space Mono';
 
 const MARK_SIZE = 44;
 const DOT_SPACING = 28;
@@ -247,27 +225,20 @@ function CatalogCard() {
   );
 }
 
-const CARDS: readonly { path: string; card: ReactElement }[] = [
-  { path: CATALOG.cardPath, card: <CatalogCard /> },
-  ...APPS.map((app) => ({ path: appCardPath(app), card: <AppCard app={app} /> })),
+const CARDS: readonly { url: string; card: ReactElement }[] = [
+  { url: CATALOG.cardUrl, card: <CatalogCard /> },
+  ...APPS.map((app) => ({ url: appCardUrl(app), card: <AppCard app={app} /> })),
 ];
 
-const fonts = await Promise.all(
-  FONT_FILES.map(async ({ name, weight, file }) => ({
-    name,
-    weight,
-    style: 'normal' as const,
-    data: await readFile(new URL(import.meta.resolve(file))),
-  })),
-);
+const fonts = await loadShareCardFonts();
 
-for (const { path, card } of CARDS) {
+for (const { url, card } of CARDS) {
   const svg = await satori(card, {
     width: WWW_SITE.ogImage.width,
     height: WWW_SITE.ogImage.height,
     fonts,
   });
-  const target = join(CLIENT_DIST_DIR, path);
+  const target = join(CLIENT_DIST_DIR, new URL(url, WWW_SITE.url).pathname);
   await mkdir(dirname(target), { recursive: true });
   await writeFile(target, new Resvg(svg).render().asPng());
 }
