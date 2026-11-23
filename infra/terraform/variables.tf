@@ -101,13 +101,13 @@ variable "victorialogs_hostname" {
 # No default for the same reason api_hostname has none, and read the validation
 # below before choosing a value: user apps must not share a registrable domain
 # with the dashboard.
-variable "app_domain" {
+variable "app_host_domain" {
   type        = string
-  description = "Registrable domain user apps are served under, as <slug>.<app_domain>. Its wildcard routes to the nibrunner Tunnel."
+  description = "Registrable domain user apps are served under, as <slug>.<app_host_domain>. Its wildcard routes to the nibrunner Tunnel."
 
   validation {
-    condition     = trimspace(var.app_domain) != ""
-    error_message = "app_domain must not be empty."
+    condition     = trimspace(var.app_host_domain) != ""
+    error_message = "app_host_domain must not be empty."
   }
 
   # A user app is somebody else's code on a hostname we hand out. On a subdomain
@@ -116,8 +116,8 @@ variable "app_domain" {
   # A separate registrable domain is what puts them either side of the public
   # suffix boundary, so this is a security bound rather than a preference.
   validation {
-    condition     = var.api_hostname != var.app_domain && !endswith(var.api_hostname, ".${var.app_domain}")
-    error_message = "app_domain must be a different registrable domain from api_hostname."
+    condition     = var.api_hostname != var.app_host_domain && !endswith(var.api_hostname, ".${var.app_host_domain}")
+    error_message = "app_host_domain must be a different registrable domain from api_hostname."
   }
 }
 

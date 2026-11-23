@@ -16,7 +16,7 @@ interface CustomProcessEnv {
   readonly S3_ACCESS_KEY_ID: string;
   readonly S3_SECRET_ACCESS_KEY: string;
   readonly S3_REGION: string;
-  readonly APP_DOMAIN: string;
+  readonly APP_HOST_DOMAIN: string;
   readonly CLOUDFLARE_API_TOKEN?: string;
   readonly CLOUDFLARE_ZONE_ID?: string;
 }
@@ -64,7 +64,7 @@ type Env = {
   S3_ACCESS_KEY_ID: string;
   S3_SECRET_ACCESS_KEY: string;
   S3_REGION: string;
-  APP_DOMAIN: string;
+  APP_HOST_DOMAIN: string;
   CLOUDFLARE_API_TOKEN: string;
   CLOUDFLARE_ZONE_ID: string;
 };
@@ -89,7 +89,7 @@ function loadEnv(): Env {
     S3_ACCESS_KEY_ID: required('S3_ACCESS_KEY_ID'),
     S3_SECRET_ACCESS_KEY: required('S3_SECRET_ACCESS_KEY'),
     S3_REGION: required('S3_REGION'),
-    APP_DOMAIN: required('APP_DOMAIN'),
+    APP_HOST_DOMAIN: required('APP_HOST_DOMAIN'),
     CLOUDFLARE_API_TOKEN: optional({ name: 'CLOUDFLARE_API_TOKEN', defaultValue: '' }),
     CLOUDFLARE_ZONE_ID: optional({ name: 'CLOUDFLARE_ZONE_ID', defaultValue: '' }),
   };

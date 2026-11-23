@@ -128,7 +128,7 @@ const appsService = new AppsService({
   artifactStorageRepo: artifactStorageRepository,
   exportStorageRepo: exportStorageRepository,
   importStorageRepo: importStorageRepository,
-  appHostDomain: env.APP_DOMAIN,
+  appHostDomain: env.APP_HOST_DOMAIN,
   secretsKey,
 });
 
@@ -155,7 +155,7 @@ const paidRequestsService = new PaidRequestsService({
 const hostnamesService = new HostnamesService({
   hostnamesRepo: appHostnamesRepository,
   customHostnamesRepo: customHostnamesRepository,
-  appHostDomain: env.APP_DOMAIN,
+  appHostDomain: env.APP_HOST_DOMAIN,
 });
 const domainDnsService = new DomainDnsService({
   hostnamesRepo: appHostnamesRepository,

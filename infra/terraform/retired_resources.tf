@@ -1,8 +1,3 @@
-moved {
-  from = cloudflare_custom_hostname_fallback_origin.app_host
-  to   = cloudflare_custom_hostname_fallback_origin.apps
-}
-
 # Keep the published artifacts private and encrypted while removing their obsolete management.
 removed {
   from = aws_s3_bucket.guest_images

@@ -135,7 +135,7 @@ Custom domains, in the `app_domain` zone only:
 - Terraform's apex CNAME routes `<app_domain>` through the nibrunner Tunnel. Nibrunner redirects
   the apex to the marketing site.
 
-Terraform looks up the existing `app_domain` zone and provisions the API's account-owned
+Terraform looks up the existing `app_host_domain` zone and provisions the API's account-owned
 token with *Zone → SSL and Certificates → Edit* on that zone only. The token goes to SSM and
 the zone ID to the existing deploy output; the zone and its manually configured settings are
 not managed by Terraform.

@@ -21,9 +21,9 @@ output "www_hostname" {
   value = var.www_hostname
 }
 
-output "app_domain" {
+output "app_host_domain" {
   description = "User apps are served under this. One wildcard record covers the fleet, so there is nothing per-app in DNS."
-  value       = var.app_domain
+  value       = var.app_host_domain
 }
 
 output "api_github_client_id" {
@@ -33,7 +33,7 @@ output "api_github_client_id" {
 
 output "api_cloudflare_zone_id" {
   description = "Zone custom hostnames are registered in; the token used against it is read from SSM on the box."
-  value       = data.cloudflare_zone.apps.id
+  value       = data.cloudflare_zone.app_host.id
 }
 
 output "artifacts_bucket" {

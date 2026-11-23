@@ -64,7 +64,7 @@ import {
   type ObjectRemovalRepositoryContract,
 } from '#services/apps.service.ts';
 import {
-  APP_DOMAIN,
+  APP_HOST_DOMAIN,
   APP_ID,
   configColumns,
   DEFAULT_CONFIG,
@@ -491,7 +491,7 @@ function serviceWith({
     artifactStorageRepo,
     exportStorageRepo,
     importStorageRepo,
-    appHostDomain: APP_DOMAIN,
+    appHostDomain: APP_HOST_DOMAIN,
     secretsKey: TEST_SECRETS_KEY,
   });
 }
@@ -543,7 +543,7 @@ describe('a taken hostname is a re-roll, not something the owner sees', () => {
     expect(distinct(appsRepo.offeredSlugs)).toBe(appsRepo.offeredSlugs.length);
     expect(app.hostnames).toEqual([
       {
-        hostname: Value.Parse(HostnameSchema, `${app.slug}.${APP_DOMAIN}`),
+        hostname: Value.Parse(HostnameSchema, `${app.slug}.${APP_HOST_DOMAIN}`),
         kind: 'platform',
         state: 'active',
         dcvTarget: null,
@@ -1299,7 +1299,7 @@ describe('an app keeps its hostnames until it is deleted rather than deleting', 
   function appHostnames(): DisposableAppHostnameRow[] {
     return [
       {
-        hostname: Value.Parse(HostnameSchema, `${APP_NAME}.${APP_DOMAIN}`),
+        hostname: Value.Parse(HostnameSchema, `${APP_NAME}.${APP_HOST_DOMAIN}`),
         kind: 'platform',
         cloudflare_id: null,
       },
@@ -1342,7 +1342,7 @@ describe('an app keeps its hostnames until it is deleted rather than deleting', 
     await apps.purgeDeleted();
 
     expect(hostnamesRepo.removed).toEqual([
-      Value.Parse(HostnameSchema, `${APP_NAME}.${APP_DOMAIN}`),
+      Value.Parse(HostnameSchema, `${APP_NAME}.${APP_HOST_DOMAIN}`),
       BROUGHT_HOSTNAME,
     ]);
     expect(edge.removed).toEqual([CLOUDFLARE_ID]);
