@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
-import { makeNibrunnerSqliteGuest } from '#lib/nibrunner/sqlite-guest.ts';
 import { NibrunnerGuestConnections } from '#services/nibrunner-guest-connections.service.ts';
+import { makeNibrunnerSqliteGuest } from '#sqlite-guest.ts';
 
 export class SqliteGuest extends Effect.Service<SqliteGuest>()('SqliteGuest', {
   effect: makeNibrunnerSqliteGuest,

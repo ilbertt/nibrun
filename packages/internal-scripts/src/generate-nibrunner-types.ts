@@ -28,7 +28,7 @@ function filesystemSchema(value: unknown) {
 
 async function generate(schemaName: keyof typeof SCHEMAS) {
   const source = `https://raw.githubusercontent.com/ilbertt/nibrunner/${versions.version}/${SCHEMAS[schemaName]}`;
-  const output = join(repoRoot, `apps/agent/src/lib/nibrunner/${schemaName}.gen.ts`);
+  const output = join(repoRoot, `apps/agent/src/${schemaName}.gen.ts`);
   const response = await fetch(source, { signal: AbortSignal.timeout(SCHEMA_TIMEOUT_MS) });
   if (!response.ok) {
     throw new Error(`Nibrunner schema fetch failed: ${response.status} ${source}`);

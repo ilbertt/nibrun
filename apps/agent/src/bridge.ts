@@ -1,0 +1,334 @@
+import type { HostDesiredState } from '@repo/protocol';
+import { Clock, Context, Effect, Fiber, Layer, Option, Ref } from 'effect';
+import { sweepNibrunnerArtifactCache } from '#artifact-cache.ts';
+import { nibrunnerCronListings, pollNibrunnerCron } from '#cron-query.ts';
+import { pollNibrunnerFilesystem } from '#filesystem-query.ts';
+import { CONTROL_PLANE_BACKOFF } from '#lib/agent/backoff.ts';
+import { supervised } from '#lib/agent/loop.ts';
+import type { ControlPlaneClient } from '#lib/control/client.ts';
+import { makeSessionHolder } from '#lib/control/session.ts';
+import { decode } from '#lib/protocol.ts';
+import { makeSqliteQueryPoll } from '#lib/sqlite/query-poll.ts';
+import { nibrunnerQueryDeployments } from '#query-deployments.ts';
+import { makeNibrunnerReportLoop } from '#report-loop.ts';
+import { nibrunnerReportedState } from '#reported-state.ts';
+import { ArtifactStore } from '#services/artifact-store.service.ts';
+import type { NibrunnerBridgeConfig } from '#services/nibrunner-bridge-config.service.ts';
+import { NibrunnerExports } from '#services/nibrunner-exports.service.ts';
+import { NibrunnerFilesystem } from '#services/nibrunner-filesystem.service.ts';
+import { NibrunnerLogs } from '#services/nibrunner-logs.service.ts';
+import { SqliteGuest } from '#services/sqlite-guest.service.ts';
+import { SqliteSessions } from '#services/sqlite-sessions.service.ts';
+import { makeNibrunnerSqliteGuest } from '#sqlite-guest.ts';
+import { stageNibrunnerArtifacts } from '#stage-artifacts.ts';
+import {
+  ForeignNibrunnerDocument,
+  nibrunnerDocument,
+  readNibrunnerDesired,
+  readNibrunnerDesiredDocument,
+  readNibrunnerReport,
+  writeNibrunnerDocument,
+} from '#state-files.ts';
+import { nibrunnerWithdrawals } from '#withdrawals.ts';
+
+const REPORT_MAX_AGE_MS = 30_000;
+const LOG_IDLE_POLL = '500 millis';
+const EXPORT_IDLE_POLL = '500 millis';
+const CACHE_IDLE_POLL = '1 minute';
+
+export const makeNibrunnerBridge = Effect.fn('makeNibrunnerBridge')(function* ({
+  control,
+  config,
+}: {
+  control: ControlPlaneClient;
+  config: NibrunnerBridgeConfig;
+}) {
+  const store = yield* ArtifactStore;
+  const filesystem = yield* NibrunnerFilesystem;
+  const logs = yield* NibrunnerLogs;
+  const exports = yield* NibrunnerExports;
+  const initial = yield* readNibrunnerReport(config.reportedStateFile);
+  const sessions = yield* makeSessionHolder({
+    control,
+    hostIdFile: config.hostIdFile,
+    versions: initial.report.versions,
+    capacity: readNibrunnerReport(config.reportedStateFile).pipe(
+      Effect.map(({ report }) => report.capacity),
+    ),
+  });
+  const latest = yield* Ref.make(Option.none<HostDesiredState>());
+  const preparing = yield* Ref.make(Option.none<Fiber.RuntimeFiber<unknown, unknown>>());
+  const artifactLease = yield* Effect.makeSemaphore(1);
+
+  const pollOnce = Effect.gen(function* () {
+    const session = yield* sessions.current;
+    const desired = yield* control.fetchDesiredState({
+      sessionToken: session.sessionToken,
+      request: {},
+    });
+    if (desired.hostId !== session.hostId) {
+      return yield* new ForeignNibrunnerDocument({ path: config.desiredStateFile });
+    }
+    const previous = yield* Ref.get(latest);
+    if (Option.isSome(previous) && Bun.deepEquals(previous.value, desired)) {
+      return session.poll;
+    }
+    const wanted = yield* decode(() => nibrunnerDocument(desired));
+    yield* sqlite.syncDeployments(desired);
+    const worker = yield* Ref.get(preparing);
+    if (Option.isSome(worker)) {
+      yield* Fiber.interrupt(worker.value);
+    }
+    const held = yield* readNibrunnerDesired({
+      path: config.desiredStateFile,
+      hostId: session.hostId,
+    }).pipe(
+      Effect.map(Option.some),
+      Effect.catchTag('MissingNibrunnerFile', () => Effect.succeedNone),
+    );
+    if (Option.isSome(held)) {
+      yield* artifactLease.withPermits(1)(
+        writeNibrunnerDocument({
+          path: config.desiredStateFile,
+          desired: nibrunnerWithdrawals({ held: held.value, wanted }),
+        }),
+      );
+    }
+    const prepare = Effect.gen(function* () {
+      yield* stageNibrunnerArtifacts({
+        desired,
+        directory: config.artifactStoreDir,
+        artifactBucket: config.artifactBucket,
+        importBucket: config.importBucket,
+      });
+      yield* writeNibrunnerDocument({ path: config.desiredStateFile, desired: wanted });
+    }).pipe(
+      artifactLease.withPermits(1),
+      Effect.provideService(ArtifactStore, store),
+      Effect.sandbox,
+      Effect.tapError((cause) => Effect.logWarning('nibrunner preparation failed', cause)),
+      Effect.retry(CONTROL_PLANE_BACKOFF),
+    );
+    yield* Ref.set(preparing, Option.some(yield* Effect.forkScoped(prepare)));
+    yield* Ref.set(latest, Option.some(desired));
+    return session.poll;
+  }).pipe(Effect.tapErrorTag('ControlPlaneError', sessions.onExpired));
+
+  const currentState = Effect.gen(function* () {
+    const session = yield* sessions.current;
+    const { desired, digest } = yield* readNibrunnerDesiredDocument({
+      path: config.desiredStateFile,
+      hostId: session.hostId,
+    });
+    const { value } = yield* readNibrunnerReport(config.reportedStateFile);
+    const report = yield* nibrunnerReportedState({
+      value,
+      hostId: session.hostId,
+      desiredDigest: digest,
+      nowMs: yield* Clock.currentTimeMillis,
+      maxAgeMs: REPORT_MAX_AGE_MS,
+      admissionState: 'ready',
+    });
+    return { session, report, desired, value };
+  });
+
+  const sqliteDeployments = Effect.gen(function* () {
+    const wanted = Option.getOrUndefined(yield* Ref.get(latest));
+    if (wanted === undefined) {
+      return [];
+    }
+    const { desired, report } = yield* currentState;
+    return nibrunnerQueryDeployments({ desired, report }).filter(
+      (instance) =>
+        instance.desiredState !== 'stopped' &&
+        wanted.instances.some(
+          (candidate) =>
+            candidate.appId === instance.appId &&
+            candidate.deploymentId === instance.deploymentId &&
+            candidate.desiredState !== 'stopped',
+        ) &&
+        report.instances.some(
+          (candidate) =>
+            candidate.appId === instance.appId &&
+            candidate.deploymentId === instance.deploymentId &&
+            ['starting', 'running', 'idle', 'unhealthy'].includes(candidate.state),
+        ),
+    );
+  });
+
+  const cacheOnce = artifactLease.withPermits(1)(
+    Effect.gen(function* () {
+      const wanted = Option.getOrUndefined(yield* Ref.get(latest));
+      if (wanted?.retainedArtifactDigests === undefined) {
+        return;
+      }
+      const state = yield* currentState;
+      if (state.desired.revision !== nibrunnerDocument(wanted).revision) {
+        return;
+      }
+      yield* sweepNibrunnerArtifactCache({
+        desired: wanted,
+        reported: state.report,
+        artifactStoreDir: config.artifactStoreDir,
+        artifactCacheDir: config.artifactCacheDir,
+        procDir: config.procDir,
+      });
+    }),
+  );
+  const sqliteGuest = yield* makeNibrunnerSqliteGuest({ deployments: sqliteDeployments });
+  const sqlite = Context.get(
+    yield* Layer.build(
+      SqliteSessions.Default.pipe(
+        Layer.provide(Layer.succeed(SqliteGuest, SqliteGuest.make(sqliteGuest))),
+      ),
+    ),
+    SqliteSessions,
+  );
+  const sqliteOnce = yield* makeSqliteQueryPoll({
+    control,
+    currentSession: sessions.current,
+    servedDeployments: sqliteDeployments.pipe(
+      Effect.map((instances) =>
+        instances.map(({ appId, deploymentId }) => ({ appId, deploymentId })),
+      ),
+    ),
+    onExpired: sessions.onExpired,
+    sessions: sqlite,
+  });
+
+  const reportOnce = Effect.gen(function* () {
+    const { session, report } = yield* currentState;
+    const desired = Option.getOrUndefined(yield* Ref.get(latest));
+    const published = yield* exports.reports({
+      desired: desired?.exports ?? [],
+      reported: report.exports,
+    });
+    yield* control.sendReportedState({
+      sessionToken: session.sessionToken,
+      report: { ...report, exports: published },
+    });
+    return report.state === 'registering'
+      ? { ...session.poll, reportIntervalMs: session.poll.minIntervalMs }
+      : session.poll;
+  }).pipe(Effect.tapErrorTag('ControlPlaneError', sessions.onExpired));
+
+  const exportsOnce = Effect.gen(function* () {
+    const desired = Option.getOrUndefined(yield* Ref.get(latest));
+    if (desired === undefined) {
+      return;
+    }
+    const { report } = yield* currentState;
+    yield* exports.sync({ desired, reported: report.exports });
+  }).pipe(Effect.tapErrorTag('ControlPlaneError', sessions.onExpired));
+
+  const servedAppIds = Effect.gen(function* () {
+    const { desired, report } = yield* currentState;
+    return nibrunnerQueryDeployments({ desired, report })
+      .filter((instance) => instance.desiredState !== 'stopped')
+      .map((instance) => instance.appId);
+  });
+
+  const cronListings = Effect.gen(function* () {
+    const { value, desired, report } = yield* currentState;
+    const deployments = nibrunnerQueryDeployments({ desired, report });
+    const listings = yield* nibrunnerCronListings(value);
+    return listings.filter((listing) =>
+      deployments.some(
+        (deployment) =>
+          deployment.appId === listing.appId && deployment.deploymentId === listing.deploymentId,
+      ),
+    );
+  });
+
+  const cronOnce = Effect.gen(function* () {
+    return yield* pollNibrunnerCron({
+      control,
+      session: yield* sessions.current,
+      listings: cronListings,
+    });
+  }).pipe(Effect.tapErrorTag('ControlPlaneError', sessions.onExpired));
+
+  const filesystemOnce = Effect.gen(function* () {
+    return yield* pollNibrunnerFilesystem({
+      control,
+      session: yield* sessions.current,
+      servedAppIds,
+    });
+  }).pipe(
+    Effect.provideService(NibrunnerFilesystem, filesystem),
+    Effect.tapErrorTag('ControlPlaneError', sessions.onExpired),
+  );
+
+  const logOnce = Effect.gen(function* () {
+    const desired = Option.getOrUndefined(yield* Ref.get(latest));
+    if (desired === undefined) {
+      return false;
+    }
+    const session = yield* sessions.current;
+    return yield* logs.send({
+      hostId: session.hostId,
+      appIds: [...desired.instances, ...desired.volumes].map((app) => app.appId),
+    });
+  }).pipe(Effect.tapErrorTag('ControlPlaneError', sessions.onExpired));
+
+  const reportLoop = yield* makeNibrunnerReportLoop({
+    reportedStateFile: config.reportedStateFile,
+    reportOnce,
+  });
+
+  return {
+    pollOnce,
+    reportOnce,
+    filesystemOnce,
+    cronOnce,
+    logOnce,
+    exportsOnce,
+    sqliteOnce,
+    cacheOnce,
+    run: Effect.all(
+      [
+        supervised({
+          once: pollOnce.pipe(
+            Effect.flatMap((poll) => Effect.sleep(`${poll.minIntervalMs} millis`)),
+          ),
+          onFailure: (cause) => Effect.logWarning('nibrunner desired poll failed', cause),
+          schedule: CONTROL_PLANE_BACKOFF,
+        }),
+        reportLoop,
+        supervised({
+          once: cacheOnce.pipe(Effect.andThen(Effect.sleep(CACHE_IDLE_POLL))),
+          onFailure: (cause) => Effect.logWarning('nibrunner artifact cache cleanup failed', cause),
+          schedule: CONTROL_PLANE_BACKOFF,
+        }),
+        supervised({
+          once: filesystemOnce,
+          onFailure: (cause) => Effect.logWarning('nibrunner filesystem query failed', cause),
+          schedule: CONTROL_PLANE_BACKOFF,
+        }),
+        supervised({
+          once: cronOnce,
+          onFailure: (cause) => Effect.logWarning('nibrunner cron query failed', cause),
+          schedule: CONTROL_PLANE_BACKOFF,
+        }),
+        supervised({
+          once: sqliteOnce,
+          onFailure: (cause) => Effect.logWarning('nibrunner SQLite query failed', cause),
+          schedule: CONTROL_PLANE_BACKOFF,
+        }),
+        supervised({
+          once: exportsOnce.pipe(Effect.andThen(Effect.sleep(EXPORT_IDLE_POLL))),
+          onFailure: (cause) => Effect.logWarning('nibrunner export publication failed', cause),
+          schedule: CONTROL_PLANE_BACKOFF,
+        }),
+        supervised({
+          once: logOnce.pipe(
+            Effect.flatMap((sent) => (sent ? Effect.void : Effect.sleep(LOG_IDLE_POLL))),
+          ),
+          onFailure: (cause) => Effect.logWarning('nibrunner tenant log delivery failed', cause),
+          schedule: CONTROL_PLANE_BACKOFF,
+        }),
+      ],
+      { concurrency: 'unbounded', discard: true },
+    ),
+  };
+});

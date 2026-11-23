@@ -1,6 +1,6 @@
 import { NIBRUNNER_GUEST_CONNECTIONS_SOCKET } from '@repo/global-constants';
 import { Effect } from 'effect';
-import { connectNibrunnerGuest } from '#lib/nibrunner/guest-connection.ts';
+import { connectNibrunnerGuest } from '#guest-connection.ts';
 
 export class NibrunnerGuestConnections extends Effect.Service<NibrunnerGuestConnections>()(
   'NibrunnerGuestConnections',

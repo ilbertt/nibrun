@@ -1,6 +1,6 @@
 import { Effect } from 'effect';
 import { makeLogStoreClient } from '#lib/logs/store-client.ts';
-import { makeNibrunnerLogDelivery } from '#lib/nibrunner/log-delivery.ts';
+import { makeNibrunnerLogDelivery } from '#log-delivery.ts';
 import { NibrunnerBridgeConfig } from '#services/nibrunner-bridge-config.service.ts';
 import { NibrunnerLogCursors } from '#services/nibrunner-log-cursors.service.ts';
 
