@@ -19,27 +19,22 @@ only.
 Nibrunner requires inactive host SMT and KSM with no retained shared pages. Its EC2 CPU options
 use one thread per core; changing these options stops and starts the instance before deployment.
 
-Terraform creates proxied CNAME records for `nibrunner_domain` and its wildcard, both pointing
-to the Tunnel. CI supplies the domain through `NIBRUNNER_ORIGIN_DOMAIN`. The Terraform token
-needs Zone Read and DNS Edit on this zone as well as Cloudflare Tunnel Edit.
-
-For custom domains in the nibrunner zone, Terraform creates `fallback.<nibrunner_domain>` as
-a proxied Tunnel CNAME and registers it as the Cloudflare for SaaS fallback origin. It manages
-Full (strict) SSL and disables Authenticated Origin Pulls on that zone. The Terraform token
-also needs Zone Settings Edit and SSL and Certificates Edit there.
+Terraform routes `app_host_domain` and its wildcard through the nibrunner Tunnel and uses the
+application apex as the Cloudflare for SaaS fallback origin. The application zone uses Full
+(strict) SSL with Authenticated Origin Pulls disabled; those existing zone settings remain
+account prerequisites. No separate engine domain is required.
 
 The Tunnel forwards every hostname to nibrunner's loopback HTTP proxy, preserving the Host
 header. Nibrunner forwards only app hostnames in its desired state. A custom-domain SSL exception
 rule is unnecessary because the local origin uses HTTP inside the encrypted Tunnel.
 
-Direct requests for the configured fallback hostname receive a temporary redirect to
+Direct requests for the application apex receive a temporary redirect to
 `https://<www_hostname>`. Terraform supplies both values to `[proxy.http.fallback]`; customer
 Host headers continue to select their app.
 
 Cloudflare for SaaS activation and its billing setup are account prerequisites, completed in
-the dashboard before applying. Terraform does not create customer-owned hostnames. Those must
-be registered in the nibrunner zone by the application; the shared production API currently
-uses the application domain zone, whose custom-domain configuration remains separate.
+the dashboard before applying. Terraform does not create customer-owned hostnames. The API
+registers them in the application domain zone.
 
 The host fetches its Tunnel token directly from SSM. systemd passes it through `LoadCredential`
 to an unprivileged `cloudflared` process; CI and RunCommand receive only the parameter name.

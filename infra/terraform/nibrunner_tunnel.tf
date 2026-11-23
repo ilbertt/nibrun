@@ -1,20 +1,4 @@
-variable "nibrunner_domain" {
-  type        = string
-  description = "Domain routed to the nibrunner host. CI supplies NIBRUNNER_ORIGIN_DOMAIN."
-
-  validation {
-    condition     = can(regex("^[a-z0-9][a-z0-9.-]*\\.[a-z]{2,}$", var.nibrunner_domain))
-    error_message = "nibrunner_domain must be a domain name without a wildcard or URL scheme."
-  }
-
-  validation {
-    condition     = var.nibrunner_domain != var.app_host_domain
-    error_message = "nibrunner_domain must use a separate zone from the application domain."
-  }
-}
-
 locals {
-  nibrunner_hostnames       = toset([var.nibrunner_domain, "*.${var.nibrunner_domain}"])
   nibrunner_tunnel_hostname = "${cloudflare_zero_trust_tunnel_cloudflared.nibrunner.id}.cfargotunnel.com"
 }
 
@@ -29,14 +13,6 @@ resource "cloudflare_zero_trust_tunnel_cloudflared_config" "nibrunner" {
   tunnel_id  = cloudflare_zero_trust_tunnel_cloudflared.nibrunner.id
   config = {
     ingress = [
-      {
-        hostname = var.app_host_domain
-        service  = "http://127.0.0.1:8080"
-        origin_request = {
-          http_host_header = local.nibrunner_fallback_hostname
-        }
-      },
-      # Customer hostnames must reach nibrunner unchanged so it can select their app.
       { service = "http://127.0.0.1:8080" },
     ]
   }
