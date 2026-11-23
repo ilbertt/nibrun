@@ -58,7 +58,7 @@ export async function findUpdate(options: UpdateOptions): Promise<PresetUpdate |
 
 function updateArtifact(previous: PresetPin): UpdateArtifact | undefined {
   const binary: UpdateArtifact = { url: new URL(previous.binary), field: 'binary' };
-  if (previous['initial-data'] !== undefined) {
+  if (previous['initial-data'] !== undefined && previous['initial-data'] !== previous.binary) {
     const url = new URL(previous['initial-data']);
     if (githubReleaseTag(url) === previous.version) {
       return { url, field: 'initial-data' };
@@ -132,6 +132,10 @@ async function nextGithubPin(options: {
     ...previous,
     version: latest.tag_name,
     binary: asset.browser_download_url,
+    'initial-data':
+      previous['initial-data'] === previous.binary
+        ? asset.browser_download_url
+        : previous['initial-data'],
     sha256: digest ?? (await downloadChecksum({ request, url: asset.browser_download_url })),
   };
 }

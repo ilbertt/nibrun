@@ -102,6 +102,24 @@ test('an application archive updates without changing its pinned runtime', async
   await writtenUpdate({ preset, update: update! });
 });
 
+test('a shared executable and dashboard archive updates both URLs and the checksum', async () => {
+  const preset = DEPLOY_PRESETS.zeroclaw;
+  const release = releaseRequest({
+    preset,
+    version: 'v99.0.0',
+    assetName: 'zeroclaw-x86_64-unknown-linux-musl.tar.gz',
+  });
+  const update = await findUpdate({ slug: 'zeroclaw', preset, request: release.request });
+
+  expect(update!.next).toEqual({
+    version: 'v99.0.0',
+    binary: release.binary,
+    'initial-data': release.binary,
+    sha256: release.checksum,
+  });
+  await writtenUpdate({ preset, update: update! });
+});
+
 test('binary-only presets still update their executable and checksum', async () => {
   const preset = DEPLOY_PRESETS.pocketbase;
   const release = releaseRequest({
