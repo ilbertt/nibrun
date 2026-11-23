@@ -10,7 +10,7 @@ import { GithubMark } from '@repo/ui/custom/github-mark';
 import { Resvg } from '@resvg/resvg-js';
 import type { ReactElement, ReactNode } from 'react';
 import satori from 'satori';
-import { APPS, appCardUrl, CATALOG, type CatalogApp, projectLink } from '#lib/apps.ts';
+import { APPS, appCardPath, CATALOG, type CatalogApp, projectLink } from '#lib/apps.ts';
 import markSvg from '../../../brand/logo.svg?raw';
 import { loadShareCardFonts, MONO, SANS } from './share-card-fonts.ts';
 
@@ -225,20 +225,20 @@ function CatalogCard() {
   );
 }
 
-const CARDS: readonly { url: string; card: ReactElement }[] = [
-  { url: CATALOG.cardUrl, card: <CatalogCard /> },
-  ...APPS.map((app) => ({ url: appCardUrl(app), card: <AppCard app={app} /> })),
+const CARDS: readonly { path: string; card: ReactElement }[] = [
+  { path: CATALOG.cardPath, card: <CatalogCard /> },
+  ...APPS.map((app) => ({ path: appCardPath(app), card: <AppCard app={app} /> })),
 ];
 
 const fonts = await loadShareCardFonts();
 
-for (const { url, card } of CARDS) {
+for (const { path, card } of CARDS) {
   const svg = await satori(card, {
     width: WWW_SITE.ogImage.width,
     height: WWW_SITE.ogImage.height,
     fonts,
   });
-  const target = join(CLIENT_DIST_DIR, new URL(url, WWW_SITE.url).pathname);
+  const target = join(CLIENT_DIST_DIR, path);
   await mkdir(dirname(target), { recursive: true });
   await writeFile(target, new Resvg(svg).render().asPng());
 }

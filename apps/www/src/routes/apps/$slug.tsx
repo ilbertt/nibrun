@@ -9,7 +9,7 @@ import { PageBackdrop } from '#components/page-backdrop.tsx';
 import { RecommendedBadge } from '#components/recommended-badge.tsx';
 import { RelatedApps } from '#components/related-apps.tsx';
 import { SiteHeader } from '#components/site-header.tsx';
-import { appCardUrl, appDeployPath, appMarkdownPath, findApp } from '#lib/apps.ts';
+import { appCardPath, appDeployPath, appMarkdownPath, findApp } from '#lib/apps.ts';
 import { pageHead } from '#lib/page-head.ts';
 import { pageTitle } from '#lib/page-title.ts';
 import '#styles/prose.css';
@@ -33,7 +33,7 @@ export const Route = createFileRoute('/apps/$slug')({
       // somewhere — not the catalog's name for itself.
       title: pageTitle(`Deploy ${app.title}`),
       description: `${app.subtitle} Deployed in one click on nibrun.`,
-      image: appCardUrl(app),
+      image: appCardPath(app),
       markdown: { path: appMarkdownPath(app), title: `${app.title} in Markdown` },
     });
   },
