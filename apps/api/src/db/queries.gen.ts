@@ -2231,8 +2231,6 @@ export interface IOperationsColumns {
     created_at: Date;
     action: string;
     client: string;
-    /** The verified workflow grant is identified by its app and GitHub token identifier. */
-    github_token_jti: string | null;
     app_id: import("@repo/protocol").AppId | null;
     /** The deployment created by the request, including a rollback. Retained after the app's deployments are purged. */
     deployment_id: import("@repo/protocol").DeploymentId | null;
@@ -3013,8 +3011,7 @@ export const schema = {
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             action: { _columnName: "action", _foreignKeys: {} },
             client: { _columnName: "client", _foreignKeys: {} },
-            github_token_jti: { _columnName: "github_token_jti", _foreignKeys: { operations_github_grant_fkey: { _constraintName: "operations_github_grant_fkey", _references: { _relationName: "github_deployment_grants", _columnName: "github_token_jti" } } } },
-            app_id: { _columnName: "app_id", _foreignKeys: { operations_app_id_fkey: { _constraintName: "operations_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } }, operations_github_grant_fkey: { _constraintName: "operations_github_grant_fkey", _references: { _relationName: "github_deployment_grants", _columnName: "app_id" } } } },
+            app_id: { _columnName: "app_id", _foreignKeys: { operations_app_id_fkey: { _constraintName: "operations_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
             deployment_id: { _columnName: "deployment_id", _foreignKeys: {} },
             host_id: { _columnName: "host_id", _foreignKeys: { operations_host_id_fkey: { _constraintName: "operations_host_id_fkey", _references: { _relationName: "hosts", _columnName: "id" } } } }
         },
@@ -3029,10 +3026,8 @@ export const schema = {
             operations_app_id_fkey: { _constraintName: "operations_app_id_fkey" },
             operations_client_check: { _constraintName: "operations_client_check" },
             operations_deployment_target_check: { _constraintName: "operations_deployment_target_check" },
-            operations_github_grant_fkey: { _constraintName: "operations_github_grant_fkey" },
             operations_host_id_fkey: { _constraintName: "operations_host_id_fkey" },
             operations_pkey: { _constraintName: "operations_pkey" },
-            operations_system_grant_check: { _constraintName: "operations_system_grant_check" },
             operations_target_check: { _constraintName: "operations_target_check" }
         }
     },
