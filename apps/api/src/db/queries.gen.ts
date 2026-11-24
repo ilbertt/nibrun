@@ -2232,7 +2232,7 @@ export interface IOperationsColumns {
     action: string;
     client: string;
     app_id: import("@repo/protocol").AppId | null;
-    /** The deployment created by the request, including a rollback. Cleared when the deployment is purged. */
+    /** The deployment created by the request, including a rollback. Retained after the app's deployments are purged. */
     deployment_id: import("@repo/protocol").DeploymentId | null;
     host_id: import("@repo/protocol").HostId | null;
 }
@@ -3012,7 +3012,7 @@ export const schema = {
             action: { _columnName: "action", _foreignKeys: {} },
             client: { _columnName: "client", _foreignKeys: {} },
             app_id: { _columnName: "app_id", _foreignKeys: { operations_app_id_fkey: { _constraintName: "operations_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
-            deployment_id: { _columnName: "deployment_id", _foreignKeys: { operations_deployment_id_fkey: { _constraintName: "operations_deployment_id_fkey", _references: { _relationName: "deployments", _columnName: "id" } } } },
+            deployment_id: { _columnName: "deployment_id", _foreignKeys: {} },
             host_id: { _columnName: "host_id", _foreignKeys: { operations_host_id_fkey: { _constraintName: "operations_host_id_fkey", _references: { _relationName: "hosts", _columnName: "id" } } } }
         },
         _indexes: {
@@ -3025,7 +3025,6 @@ export const schema = {
             operations_action_check: { _constraintName: "operations_action_check" },
             operations_app_id_fkey: { _constraintName: "operations_app_id_fkey" },
             operations_client_check: { _constraintName: "operations_client_check" },
-            operations_deployment_id_fkey: { _constraintName: "operations_deployment_id_fkey" },
             operations_deployment_target_check: { _constraintName: "operations_deployment_target_check" },
             operations_host_id_fkey: { _constraintName: "operations_host_id_fkey" },
             operations_pkey: { _constraintName: "operations_pkey" },
