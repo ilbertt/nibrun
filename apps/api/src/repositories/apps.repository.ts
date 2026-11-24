@@ -11,7 +11,7 @@ import type {
   Hostname,
   ObjectKey,
 } from '@repo/protocol';
-import { setOperationContext } from '#db/operation-context.ts';
+import { type AppConfigAction, setOperationContext } from '#db/operation-context.ts';
 import type { Queries } from '#db/queries.gen.ts';
 import { APP_STATES, type AppHostnameState, type AppName, type AppState } from '#lib/api/app.ts';
 import type { DnsLabel } from '#lib/api/dns-label.ts';
@@ -109,7 +109,9 @@ export abstract class AppsRepositoryContract {
     deploymentIds: readonly DeploymentId[];
     hostId: HostId;
   }): Promise<void>;
-  abstract update(input: OwnedApp & { patch: SealedAppPatch }): Promise<AppRow | null>;
+  abstract update(
+    input: OwnedApp & OperationAttribution & { patch: SealedAppPatch },
+  ): Promise<AppRow | null>;
   abstract updateState(input: StateChange): Promise<AppRow | null>;
   abstract stampDataInitialized(input: { appIds: readonly AppId[]; hostId: HostId }): Promise<void>;
   abstract finishDeletingVolume(input: { appId: AppId; hostId: HostId }): Promise<boolean>;
@@ -507,17 +509,23 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    * index is the rule. Written whether or not the name moved, because reconfiguring an app changes
    * the app and the new version lands in another table, so nothing else would move `updated_at`.
    */
-  update({ appId, ownerId, patch: { name, ...config } }: OwnedApp & { patch: SealedAppPatch }) {
+  update({
+    appId,
+    ownerId,
+    client,
+    patch: { name, ...config },
+  }: OwnedApp & OperationAttribution & { patch: SealedAppPatch }) {
     return this.sql.begin(async (tx) => {
       const locked = await lockAppForMutation({ tx, appId, ownerId });
       if (!locked) {
         return null;
       }
 
-      if (Object.keys(config).length > 0) {
-        await appendConfigVersion({ tx, appId, patch: config, storage: undefined });
-      }
-
+      const configAction =
+        Object.keys(config).length > 0
+          ? await appendConfigVersion({ tx, appId, patch: config, storage: undefined })
+          : undefined;
+      await setOperationContext({ tx, client, configAction });
       await tx.TouchApp`
         UPDATE nibrun.live_apps a
         SET name = COALESCE(${name ?? null}, a.name)
@@ -742,7 +750,7 @@ export async function appendConfigVersion({
   appId: AppId;
   patch: SealedConfigPatch;
   storage: StoredVolumeStorage | undefined;
-}): Promise<string> {
+}): Promise<AppConfigAction | undefined> {
   const needsDomain = requiresCustomDomain(patch.access);
   const [current] = await tx.SelectCurrentAppConfig`
     /* @notNull environment_names */
@@ -780,7 +788,8 @@ export async function appendConfigVersion({
   ) {
     throw new BadRequestError(CLOUDFLARE_ACCESS_DOMAIN_HINT);
   }
-  const config = { ...previous, ...patch };
+  const { environment: environmentPatch, ...runtimePatch } = patch;
+  const config = { ...previous, ...runtimePatch };
   const columns = accessColumns(config.access);
   const audiences = columns.access_audiences && tx.array(columns.access_audiences, TEXT_ARRAY);
   const volumeStorage = storage ?? current;
@@ -826,7 +835,7 @@ export async function appendConfigVersion({
   // Everything the patch said nothing about, which is every variable there is when it said
   // nothing at all. A name it sets or removes is left out of the copy: one row per name per
   // version, and for a name it sets that row is the one inserted below.
-  const environment = patch.environment ?? { set: {}, removed: [] };
+  const environment = environmentPatch ?? { set: {}, removed: [] };
   const edited = new Set([...Object.keys(environment.set), ...environment.removed]);
   await carryEnvironmentForward({
     tx,
@@ -835,7 +844,16 @@ export async function appendConfigVersion({
     names: current.environment_names.filter((name) => !edited.has(name)),
   });
   await insertEnvironment({ tx, configId: inserted.id, environment: environment.set });
-  return inserted.id;
+  if (!isDeepStrictEqual(previous, config)) {
+    return 'app.updated';
+  }
+  if (
+    Object.keys(environment.set).length > 0 ||
+    environment.removed.some((name) => current.environment_names.includes(name))
+  ) {
+    return 'app.environment.updated';
+  }
+  return undefined;
 }
 
 export async function lockApp({

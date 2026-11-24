@@ -338,12 +338,18 @@ export class AppsService extends Service {
    * The name moves and nothing else does: the slug was minted from the first name and is in
    * somebody's bookmarks by now, so the hostname stays.
    */
-  async update({ appId, ownerId, patch }: OwnedApp & { patch: AppPatch }): Promise<PublicApp> {
+  async update({
+    appId,
+    ownerId,
+    client,
+    patch,
+  }: OwnedApp & OperationAttribution & { patch: AppPatch }): Promise<PublicApp> {
     const { name, config } = patch;
     if (config) {
       await this.refuseValuesTheEditLeavesUngiven({ appId, ownerId, patch: config });
     }
     const app = await this.appsRepo.update({
+      client,
       appId,
       ownerId,
       patch: this.sealed(patch),

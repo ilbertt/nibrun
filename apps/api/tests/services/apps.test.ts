@@ -659,6 +659,7 @@ test('app creation and edits accept the policy through config, and the owner rea
   expect(created).not.toHaveProperty('access');
   appsRepo.owns = true;
   await serviceWith({ appsRepo }).update({
+    client: OperationClient.Cli,
     appId: APP_ID,
     ownerId: OWNER_ID,
     patch: { config: { access } },
@@ -672,6 +673,7 @@ test('owner edits retain a platform-enabled extra port', async () => {
   appsRepo.current = { ...DEFAULT_CONFIG, hasExtraPublicPort: true };
 
   const app = await serviceWith({ appsRepo }).update({
+    client: OperationClient.Cli,
     appId: APP_ID,
     ownerId: OWNER_ID,
     patch: { config: { access: { kind: 'public' }, args: ['serve'] } },
@@ -713,6 +715,7 @@ describe('a value may name the port an app has, and not one it has not', () => {
     appsRepo.current = { ...DEFAULT_CONFIG, hasExtraPublicPort: true };
 
     await serviceWith({ appsRepo }).update({
+      client: OperationClient.Cli,
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: {
@@ -729,6 +732,7 @@ describe('a value may name the port an app has, and not one it has not', () => {
 
     await expect(
       serviceWith({ appsRepo }).update({
+        client: OperationClient.Cli,
         appId: APP_ID,
         ownerId: OWNER_ID,
         patch: {
@@ -744,6 +748,7 @@ describe('a value may name the port an app has, and not one it has not', () => {
     appsRepo.owns = true;
 
     await serviceWith({ appsRepo }).update({
+      client: OperationClient.Cli,
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: { config: { access: { kind: 'public' }, environment: asPatch({ TOKEN: SECRET }) } },
@@ -760,6 +765,7 @@ describe('a config patch edits the environment rather than replacing it', () => 
     const service = serviceWith({ appsRepo });
 
     await service.update({
+      client: OperationClient.Cli,
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: { config: { access: { kind: 'public' }, args: ['serve'] } },
@@ -776,6 +782,7 @@ describe('a config patch edits the environment rather than replacing it', () => 
     const service = serviceWith({ appsRepo });
 
     await service.update({
+      client: OperationClient.Cli,
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: { config: { access: { kind: 'public' }, environment: asPatch({ TOKEN: SECRET }) } },
@@ -796,6 +803,7 @@ describe('a config patch edits the environment rather than replacing it', () => 
     const service = serviceWith({ appsRepo });
 
     await service.update({
+      client: OperationClient.Cli,
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: { config: { access: { kind: 'public' }, environment: asPatch({ TOKEN: null }) } },
@@ -810,6 +818,7 @@ describe('a config patch edits the environment rather than replacing it', () => 
     const service = serviceWith({ appsRepo });
 
     await service.update({
+      client: OperationClient.Cli,
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: {
@@ -836,6 +845,7 @@ describe('the placeholder a read returns cannot be set as a value', () => {
 
     await expect(
       service.update({
+        client: OperationClient.Cli,
         appId: APP_ID,
         ownerId: OWNER_ID,
         patch: {
@@ -938,7 +948,9 @@ describe('an app the caller does not own is one that does not exist', () => {
     const owned = { appId: APP_ID, ownerId: OWNER_ID };
 
     await expect(service.get(owned)).rejects.toBeInstanceOf(NotFoundError);
-    await expect(service.update({ ...owned, patch: {} })).rejects.toBeInstanceOf(NotFoundError);
+    await expect(
+      service.update({ client: OperationClient.Cli, ...owned, patch: {} }),
+    ).rejects.toBeInstanceOf(NotFoundError);
     await expect(service.delete({ ...owned, client: OperationClient.Cli })).rejects.toBeInstanceOf(
       NotFoundError,
     );
@@ -956,7 +968,11 @@ describe('an app is renamed by patching its name, and stays where it is served',
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.owns = true;
 
-    const app = await serviceWith({ appsRepo }).update({ ...owned, patch: { name: NEW_NAME } });
+    const app = await serviceWith({ appsRepo }).update({
+      client: OperationClient.Cli,
+      ...owned,
+      patch: { name: NEW_NAME },
+    });
 
     expect(appsRepo.offeredPatches).toEqual([{ name: NEW_NAME }]);
     expect(app.name).toBe(NEW_NAME);
@@ -968,6 +984,7 @@ describe('an app is renamed by patching its name, and stays where it is served',
     appsRepo.owns = true;
 
     await serviceWith({ appsRepo }).update({
+      client: OperationClient.Cli,
       ...owned,
       patch: { config: { access: { kind: 'public' }, args: ['serve'] } },
     });

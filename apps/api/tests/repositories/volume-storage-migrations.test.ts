@@ -105,6 +105,7 @@ test.each([
     const appId = await createApp({ name: auth.kind, deployed: true, configured: false });
     const environment = { TOKEN: sealed('original-environment') };
     await new AppsRepository(withTypes<Queries>(sql)).update({
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       patch: { name: undefined, args: ['serve'], environment: { set: environment, removed: [] } },
@@ -237,6 +238,7 @@ test('pending migration blocks config edits, deployments, rollbacks and deletion
   const attempts = [
     function edit() {
       return apps.update({
+        client: OperationClient.Cli,
         appId,
         ownerId: OWNER_ID,
         patch: { name: undefined, args: ['edited'] },
@@ -299,6 +301,7 @@ test('pending migration blocks config edits, deployments, rollbacks and deletion
   expect(
     (
       await apps.update({
+        client: OperationClient.Cli,
         appId,
         ownerId: OWNER_ID,
         patch: { name: undefined, args: ['after-cancel'] },
@@ -461,6 +464,7 @@ test('only the owning host can complete a deployed destination, unlocking edits 
   expect((await repository().findByApp(attempt))?.state).toBe('pending');
   const apps = new AppsRepository(withTypes<Queries>(sql));
   const edit = {
+    client: OperationClient.Cli,
     appId,
     ownerId: OWNER_ID,
     patch: { name: undefined, args: ['after-migration'] },
@@ -615,6 +619,7 @@ test('timeout recovery leaves fresh requests and started work blocked', async ()
   expect(await repository().abortUnstarted({ ...recovery, createdBefore })).toBe(false);
   await expect(
     new AppsRepository(withTypes<Queries>(sql)).update({
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       patch: { name: undefined, args: ['unsafe'] },
@@ -677,6 +682,7 @@ test('started recovery requires the owning host and attempt, including after a r
   );
   await expect(
     new AppsRepository(withTypes<Queries>(sql)).update({
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       patch: { name: undefined, args: ['still-blocked'] },

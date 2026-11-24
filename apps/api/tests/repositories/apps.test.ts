@@ -170,6 +170,7 @@ test('Cloudflare Access needs a registered domain to enable or change the policy
 
   function update(access: AppAccessPolicy) {
     return repo.update({
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       patch: { name: undefined, access, args: ['serve'] },
@@ -234,7 +235,11 @@ test('switching to another JWT header allows domain removal without making the a
     token: { header: 'Authorization', format: 'bearer' },
   } satisfies AppAccessPolicy;
   for (const access of [CLOUDFLARE_ACCESS, custom]) {
-    await repo.update({ ...owner, patch: { name: undefined, access } });
+    await repo.update({
+      client: OperationClient.Cli,
+      ...owner,
+      patch: { name: undefined, access },
+    });
   }
   expect(await domains.removeCustom(domain)).toEqual({ cloudflare_id: null });
   expect(await repo.findById(owner)).toMatchObject({
@@ -257,6 +262,7 @@ test('owner configuration changes preserve an existing platform-enabled extra po
     }),
   );
   const updated = await repo.update({
+    client: OperationClient.Cli,
     appId: created.app.id,
     ownerId: OWNER_ID,
     patch: { name: undefined, args: ['serve'] },
@@ -369,7 +375,12 @@ describe('a config patch carries forward every variable it says nothing about', 
   }
 
   function patchEnvironment(environment: SealedEnvironmentPatch) {
-    return repo.update({ appId, ownerId, patch: { name: undefined, environment } });
+    return repo.update({
+      client: OperationClient.Cli,
+      appId,
+      ownerId,
+      patch: { name: undefined, environment },
+    });
   }
 
   function opened(value: string | undefined): string {
@@ -379,7 +390,12 @@ describe('a config patch carries forward every variable it says nothing about', 
   test('a patch that says nothing about the environment keeps all of it', async () => {
     const before = await storedEnvironment();
 
-    await repo.update({ appId, ownerId, patch: { name: undefined, args: ['serve'] } });
+    await repo.update({
+      client: OperationClient.Cli,
+      appId,
+      ownerId,
+      patch: { name: undefined, args: ['serve'] },
+    });
 
     expect(await storedEnvironment()).toEqual(before);
   });
@@ -1064,7 +1080,12 @@ describe('an app is called what its owner said, and so may another', () => {
     }
 
     function rename({ name, ownerId }: { name: string; ownerId: OwnerId }) {
-      return repo.update({ appId, ownerId, patch: { name: Value.Parse(AppNameSchema, name) } });
+      return repo.update({
+        client: OperationClient.Cli,
+        appId,
+        ownerId,
+        patch: { name: Value.Parse(AppNameSchema, name) },
+      });
     }
 
     // Through the view, so this is also the check that the table's trigger still fires: an app
@@ -1448,6 +1469,41 @@ describe('strangers hold so many apps between them and no more', () => {
 
     expect(asked.filter((one) => one === 'created')).toHaveLength(CEILING);
   });
+});
+
+test('operation history follows committed edits and state transitions', async () => {
+  const appId = await createApp('operation-history');
+  const target = { appId, ownerId: OWNER_ID, client: OperationClient.Dashboard };
+  const patch = {
+    name: undefined,
+    access: { kind: 'public' as const },
+    environment: { set: sealed({ TOKEN: 'value' }), removed: [] },
+  };
+  await repo.update({ ...target, patch });
+  await repo.update({ ...target, patch: { ...patch, args: ['serve'] } });
+  await repo.update({ ...target, patch: { name: undefined } });
+  await repo.update({ ...target, ownerId: STRANGER_ID, patch });
+  await repo.updateState({ ...target, state: 'suspended', from: OWNED_APP_STATES });
+  await repo.updateState({ ...target, state: 'suspended', from: OWNED_APP_STATES });
+  await repo.updateState({ ...target, state: 'active', from: OWNED_APP_STATES });
+  await repo.updateState({
+    ...target,
+    client: OperationClient.System,
+    state: 'deleting',
+    from: LIVE_APP_STATES,
+  });
+  const history = await sql.unsafe(
+    'SELECT action, client FROM nibrun.operations WHERE app_id = $1 ORDER BY id',
+    [appId],
+  );
+  expect([...history]).toEqual([
+    { action: 'app.created', client: 'cli' },
+    { action: 'app.environment.updated', client: 'dashboard' },
+    { action: 'app.updated', client: 'dashboard' },
+    { action: 'app.suspended', client: 'dashboard' },
+    { action: 'app.resumed', client: 'dashboard' },
+    { action: 'app.deletion.requested', client: 'system' },
+  ]);
 });
 
 test('an operation insert failure rolls back the app change', async () => {

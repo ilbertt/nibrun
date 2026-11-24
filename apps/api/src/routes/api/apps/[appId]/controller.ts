@@ -28,9 +28,10 @@ export const AppsAppIdController = new Elysia()
   )
   .patch(
     '/apps/:appId',
-    async ({ appsService, params, body: bodyInput, user, status }) => {
+    async ({ operationClient, appsService, params, body: bodyInput, user, status }) => {
       const body = Value.Parse(AppPatchSchema, bodyInput);
       const app = await appsService.update({
+        client: operationClient,
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
         patch: body,
