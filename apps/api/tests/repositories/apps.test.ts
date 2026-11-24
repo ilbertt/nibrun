@@ -109,6 +109,7 @@ async function createApp(slug: string): Promise<AppId> {
   const label = Value.Parse(DnsLabelSchema, slug);
   const created = requireCreated(
     await repo.create({
+      client: 'cli',
       anonymousAppsAtMost: null,
       ownerId: OWNER_ID,
       name: Value.Parse(AppNameSchema, slug),
@@ -139,6 +140,7 @@ test('a new JWT-protected app stores its full access policy on creation', async 
   } satisfies AppAccessPolicy;
   const { app } = requireCreated(
     await repo.create({
+      client: 'cli',
       ownerId: OWNER_ID,
       name: Value.Parse(AppNameSchema, slug),
       slug,
@@ -167,6 +169,7 @@ test('Cloudflare Access needs a registered domain to enable or change the policy
 
   function update(access: AppAccessPolicy) {
     return repo.update({
+      client: 'cli',
       appId,
       ownerId: OWNER_ID,
       patch: { name: undefined, access, args: ['serve'] },
@@ -184,7 +187,13 @@ test('Cloudflare Access needs a registered domain to enable or change the policy
   if (!seed) {
     throw new Error('Expected the initial deployment');
   }
-  const release = { ...owner, artifactId: seed.artifact_id, initialDataFrom: null, onlyOne: false };
+  const release = {
+    client: 'cli' as const,
+    ...owner,
+    artifactId: seed.artifact_id,
+    initialDataFrom: null,
+    onlyOne: false,
+  };
   const protectedRelease = await deployments.insert(release);
   if (protectedRelease.outcome !== 'created') {
     throw new Error('Expected the protected deployment');
@@ -206,7 +215,7 @@ test('Cloudflare Access needs a registered domain to enable or change the policy
   expect(await domains.removeCustom(remaining)).toEqual({ cloudflare_id: null });
   await expect(update(CLOUDFLARE_ACCESS)).rejects.toThrow('Associate a custom domain');
   await expect(
-    deployments.insertRollback({ ...owner, rollbackOf: protectedRelease.row.id }),
+    deployments.insertRollback({ client: 'cli', ...owner, rollbackOf: protectedRelease.row.id }),
   ).rejects.toThrow('Associate a custom domain');
 });
 
@@ -221,7 +230,7 @@ test('switching to another JWT header allows domain removal without making the a
     token: { header: 'Authorization', format: 'bearer' },
   } satisfies AppAccessPolicy;
   for (const access of [CLOUDFLARE_ACCESS, custom]) {
-    await repo.update({ ...owner, patch: { name: undefined, access } });
+    await repo.update({ client: 'cli', ...owner, patch: { name: undefined, access } });
   }
   expect(await domains.removeCustom(domain)).toEqual({ cloudflare_id: null });
   expect(await repo.findById(owner)).toMatchObject({
@@ -234,6 +243,7 @@ test('owner configuration changes preserve an existing platform-enabled extra po
   const slug = Value.Parse(DnsLabelSchema, 'enabled-extra-port');
   const created = requireCreated(
     await repo.create({
+      client: 'cli',
       anonymousAppsAtMost: null,
       ownerId: OWNER_ID,
       name: Value.Parse(AppNameSchema, slug),
@@ -243,6 +253,7 @@ test('owner configuration changes preserve an existing platform-enabled extra po
     }),
   );
   const updated = await repo.update({
+    client: 'cli',
     appId: created.app.id,
     ownerId: OWNER_ID,
     patch: { name: undefined, args: ['serve'] },
@@ -325,6 +336,7 @@ describe('a config patch carries forward every variable it says nothing about', 
   beforeAll(async () => {
     const created = requireCreated(
       await repo.create({
+        client: 'cli',
         anonymousAppsAtMost: null,
         ownerId: OWNER_ID,
         name: Value.Parse(AppNameSchema, APP_SLUG),
@@ -354,7 +366,7 @@ describe('a config patch carries forward every variable it says nothing about', 
   }
 
   function patchEnvironment(environment: SealedEnvironmentPatch) {
-    return repo.update({ appId, ownerId, patch: { name: undefined, environment } });
+    return repo.update({ client: 'cli', appId, ownerId, patch: { name: undefined, environment } });
   }
 
   function opened(value: string | undefined): string {
@@ -364,7 +376,12 @@ describe('a config patch carries forward every variable it says nothing about', 
   test('a patch that says nothing about the environment keeps all of it', async () => {
     const before = await storedEnvironment();
 
-    await repo.update({ appId, ownerId, patch: { name: undefined, args: ['serve'] } });
+    await repo.update({
+      client: 'cli',
+      appId,
+      ownerId,
+      patch: { name: undefined, args: ['serve'] },
+    });
 
     expect(await storedEnvironment()).toEqual(before);
   });
@@ -406,7 +423,13 @@ describe('a config patch carries forward every variable it says nothing about', 
   });
 
   test('a deleted app with only its hostname left is still purgeable', async () => {
-    await repo.updateState({ appId, ownerId, state: 'deleting', from: LIVE_APP_STATES });
+    await repo.updateState({
+      client: 'cli',
+      appId,
+      ownerId,
+      state: 'deleting',
+      from: LIVE_APP_STATES,
+    });
     await repo.finishDeleting({ appId });
 
     expect(await repo.listPurgeable({ limit: 8 })).toEqual([appId]);
@@ -422,6 +445,7 @@ describe('an owner moves their app between the two states they own', () => {
     const appId = await createApp('suspends');
 
     const app = await repo.updateState({
+      client: 'cli',
       appId,
       ownerId: OWNER_ID,
       state: 'suspended',
@@ -435,6 +459,7 @@ describe('an owner moves their app between the two states they own', () => {
   test('and resuming it puts it back where it was', async () => {
     const appId = await createApp('resumes');
     await repo.updateState({
+      client: 'cli',
       appId,
       ownerId: OWNER_ID,
       state: 'suspended',
@@ -442,6 +467,7 @@ describe('an owner moves their app between the two states they own', () => {
     });
 
     const app = await repo.updateState({
+      client: 'cli',
       appId,
       ownerId: OWNER_ID,
       state: 'active',
@@ -456,10 +482,17 @@ describe('an owner moves their app between the two states they own', () => {
   // an app brought back to nothing, so the statement declines rather than writes.
   test('an app being deleted is left exactly where it is', async () => {
     const appId = await createApp('doomed');
-    await repo.updateState({ appId, ownerId: OWNER_ID, state: 'deleting', from: LIVE_APP_STATES });
+    await repo.updateState({
+      client: 'cli',
+      appId,
+      ownerId: OWNER_ID,
+      state: 'deleting',
+      from: LIVE_APP_STATES,
+    });
 
     expect(
       await repo.updateState({
+        client: 'cli',
         appId,
         ownerId: OWNER_ID,
         state: 'active',
@@ -474,6 +507,7 @@ describe('an owner moves their app between the two states they own', () => {
 
     expect(
       await repo.updateState({
+        client: 'cli',
         appId,
         ownerId: STRANGER_ID,
         state: 'suspended',
@@ -873,6 +907,7 @@ describe('an owner may have the apps they were given and no more', () => {
   async function makeApp({ ownerId, slug }: { ownerId: OwnerId; slug: string }) {
     const label = Value.Parse(DnsLabelSchema, slug);
     const created = await repo.create({
+      client: 'cli',
       anonymousAppsAtMost: null,
       ownerId,
       name: Value.Parse(AppNameSchema, slug),
@@ -977,6 +1012,7 @@ describe('an app is called what its owner said, and so may another', () => {
   function makeApp({ ownerId, name, slug }: { ownerId: OwnerId; name: string; slug: string }) {
     const label = Value.Parse(DnsLabelSchema, slug);
     return repo.create({
+      client: 'cli',
       anonymousAppsAtMost: null,
       ownerId,
       name: Value.Parse(AppNameSchema, name),
@@ -1030,7 +1066,12 @@ describe('an app is called what its owner said, and so may another', () => {
     }
 
     function rename({ name, ownerId }: { name: string; ownerId: OwnerId }) {
-      return repo.update({ appId, ownerId, patch: { name: Value.Parse(AppNameSchema, name) } });
+      return repo.update({
+        client: 'cli',
+        appId,
+        ownerId,
+        patch: { name: Value.Parse(AppNameSchema, name) },
+      });
     }
 
     // Through the view, so this is also the check that the table's trigger still fires: an app
@@ -1086,6 +1127,7 @@ describe('an owner whose apps are given a lifetime is shown when each one ends',
     const slug = Value.Parse(DnsLabelSchema, 'passing-tern');
     const created = requireCreated(
       await repo.create({
+        client: 'cli',
         anonymousAppsAtMost: null,
         ownerId: PASSERBY_ID,
         name: Value.Parse(AppNameSchema, slug),
@@ -1150,6 +1192,7 @@ describe('every app a stranger held changes hands at once', () => {
     const label = Value.Parse(DnsLabelSchema, slug);
     const created = requireCreated(
       await repo.create({
+        client: 'cli',
         anonymousAppsAtMost: null,
         ownerId: PASSERBY_ID,
         name: Value.Parse(AppNameSchema, slug),
@@ -1215,6 +1258,7 @@ describe("a stranger's app takes one binary and one deployment", () => {
     const label = Value.Parse(DnsLabelSchema, slug);
     const created = requireCreated(
       await repo.create({
+        client: 'cli',
         anonymousAppsAtMost: null,
         ownerId: STRANGER_ID,
         name: Value.Parse(AppNameSchema, slug),
@@ -1286,6 +1330,7 @@ describe("a stranger's app takes one binary and one deployment", () => {
     const artifactId = await stored({ appId, digest: 'a'.repeat(SHA256_HEX_LENGTH) });
     const deploy = () =>
       deployments.insert({
+        client: 'cli',
         appId,
         ownerId: STRANGER_ID,
         artifactId,
@@ -1304,6 +1349,7 @@ describe("a stranger's app takes one binary and one deployment", () => {
     const asked = await Promise.all(
       [...Array(AT_ONCE).keys()].map(() =>
         deployments.insert({
+          client: 'cli',
           appId,
           ownerId: STRANGER_ID,
           artifactId,
@@ -1362,6 +1408,7 @@ describe('strangers hold so many apps between them and no more', () => {
   async function arrive({ ownerId, slug }: { ownerId: OwnerId; slug: string }) {
     const label = Value.Parse(DnsLabelSchema, slug);
     const created = await repo.create({
+      client: 'cli',
       ownerId,
       anonymousAppsAtMost: CEILING,
       name: Value.Parse(AppNameSchema, slug),
@@ -1408,4 +1455,57 @@ describe('strangers hold so many apps between them and no more', () => {
 
     expect(asked.filter((one) => one === 'created')).toHaveLength(CEILING);
   });
+});
+
+test('operation history follows committed edits and state transitions', async () => {
+  const appId = await createApp('operation-history');
+  const target = { appId, ownerId: OWNER_ID, client: 'dashboard' as const };
+  const patch = {
+    name: undefined,
+    access: { kind: 'public' as const },
+    environment: { set: sealed({ TOKEN: 'value' }), removed: [] },
+  };
+  await repo.update({ ...target, patch });
+  await repo.update({ ...target, patch: { ...patch, args: ['serve'] } });
+  await repo.update({ ...target, patch: { name: undefined } });
+  await repo.update({ ...target, ownerId: STRANGER_ID, patch });
+  await repo.updateState({ ...target, state: 'suspended', from: OWNED_APP_STATES });
+  await repo.updateState({ ...target, state: 'suspended', from: OWNED_APP_STATES });
+  await repo.updateState({ ...target, state: 'active', from: OWNED_APP_STATES });
+  await repo.updateState({ ...target, client: 'system', state: 'deleting', from: LIVE_APP_STATES });
+  const history = await sql.unsafe(
+    'SELECT action, client FROM nibrun.operations WHERE app_id = $1 ORDER BY id',
+    [appId],
+  );
+  expect([...history]).toEqual([
+    { action: 'app.created', client: 'cli' },
+    { action: 'app.environment.updated', client: 'dashboard' },
+    { action: 'app.updated', client: 'dashboard' },
+    { action: 'app.suspended', client: 'dashboard' },
+    { action: 'app.resumed', client: 'dashboard' },
+    { action: 'app.deletion.requested', client: 'system' },
+  ]);
+});
+
+test('an operation insert failure rolls back the app change', async () => {
+  const appId = await createApp('atomic-suspension');
+  await sql.unsafe(
+    "ALTER TABLE nibrun.operations ADD CONSTRAINT refuse_test_suspension CHECK (action <> 'app.suspended') NOT VALID",
+  );
+  try {
+    expect(
+      await refusedBy(() =>
+        repo.updateState({
+          appId,
+          ownerId: OWNER_ID,
+          client: 'cli',
+          state: 'suspended',
+          from: OWNED_APP_STATES,
+        }),
+      ),
+    ).toBe('refuse_test_suspension');
+    expect(await storedState(appId)).toBe('active');
+  } finally {
+    await sql.unsafe('ALTER TABLE nibrun.operations DROP CONSTRAINT refuse_test_suspension');
+  }
 });

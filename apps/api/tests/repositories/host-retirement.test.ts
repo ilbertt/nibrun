@@ -54,6 +54,7 @@ async function retire(hostId: HostId) {
 
 function deploy(app: Awaited<ReturnType<typeof createDeployedApp>>) {
   return deploymentsRepository().insert({
+    client: 'cli',
     appId: app.appId,
     ownerId: app.ownerId,
     artifactId: app.artifactId,
@@ -125,6 +126,11 @@ test('retirement timestamps are finite and cannot be changed or cleared', async 
     ).rejects.toMatchObject({ errno: '23514' });
   }
   await sql.unsafe('UPDATE nibrun.hosts SET retired_at = retired_at WHERE id = $1', [hostId]);
+  expect([
+    ...(await sql.unsafe('SELECT action, client FROM nibrun.operations WHERE host_id = $1', [
+      hostId,
+    ])),
+  ]).toEqual([{ action: 'host.retired', client: 'system' }]);
 });
 
 test('retired origin and canonical identities cannot re-register or receive sessions', async () => {
@@ -172,6 +178,7 @@ test('redeploys and rollbacks on a retired host fail without relocating or super
   expect(await deploy(app)).toEqual({ outcome: 'no-host' });
   expect(
     await deploymentsRepository().insertRollback({
+      client: 'cli',
       appId: app.appId,
       ownerId: app.ownerId,
       rollbackOf: app.deploymentId,

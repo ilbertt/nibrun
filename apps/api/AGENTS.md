@@ -144,6 +144,12 @@ graph is constructed, so an earlier import would pin the wrong environment.
 Raw SQL via `Bun.sql` (`src/db/client.ts`), no ORM. Always schema-qualify
 (`nibrun.*`).
 
+Record audited API mutations through `recordAppOperation` in the repository transaction
+that writes the change. HTTP callers can report `dashboard` or `cli` for attribution.
+Authorization uses the authenticated caller. MCP tools and platform jobs supply their
+own client. Database triggers record host retirements and platform-initiated deployments
+because operators can perform those writes directly in SQL.
+
 Paid-request values live in feature-specific columns, such as `requested_apps_amount`.
 Each column's `CHECK` requires a valid, non-null value for its matching `request_type`
 and `NULL` for every other type. Apply the same rule when adding paid-request types.

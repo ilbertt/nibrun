@@ -1232,6 +1232,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       expect(createApp).toHaveBeenCalledTimes(isNew ? 1 : 0);
       if (isNew) {
         expect(createApp).toHaveBeenCalledWith({
+          client: 'mcp',
           ownerId,
           isAnonymous: false,
           name: app.name,
@@ -1315,6 +1316,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       expect(getApp).toHaveBeenCalledTimes(isNew ? 0 : 1);
       if (isNew) {
         expect(createApp).toHaveBeenCalledWith({
+          client: 'mcp',
           ownerId: otherOwnerId,
           isAnonymous: false,
           name: 'New app',
@@ -1411,7 +1413,13 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       deployment: DEPLOYMENT,
       url: 'https://mcp-example.apps.test',
     });
-    expect(create).toHaveBeenCalledWith({ ownerId, isAnonymous: false, name: app.name, config });
+    expect(create).toHaveBeenCalledWith({
+      client: 'mcp',
+      ownerId,
+      isAnonymous: false,
+      name: app.name,
+      config,
+    });
     expect(get).not.toHaveBeenCalled();
     expect(fetch).toHaveBeenCalledWith(
       expect.objectContaining({ appId: app.id, ownerId, isAnonymous: false }),
@@ -1458,6 +1466,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     });
     expect((await rpcBody(response)).result.isError).toBe(true);
     expect(create).toHaveBeenCalledWith({
+      client: 'mcp',
       ownerId,
       isAnonymous: false,
       name: 'New app',

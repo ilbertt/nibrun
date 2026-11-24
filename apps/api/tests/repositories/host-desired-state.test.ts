@@ -301,7 +301,12 @@ test('access edits are staged until deployed and rollback restores the pinned po
   }
 
   async function deploy() {
-    const result = await deployments.insert({ ...app, initialDataFrom: null, onlyOne: false });
+    const result = await deployments.insert({
+      client: 'cli',
+      ...app,
+      initialDataFrom: null,
+      onlyOne: false,
+    });
     if (result.outcome !== 'created') {
       throw new Error(result.outcome);
     }
@@ -309,21 +314,29 @@ test('access edits are staged until deployed and rollback restores the pinned po
   }
 
   const publicAccess = { kind: 'public' } as const;
-  const written = await apps.update({ ...app, patch: { name: undefined, access: jwt } });
+  const written = await apps.update({
+    client: 'cli',
+    ...app,
+    patch: { name: undefined, access: jwt },
+  });
   expect(written && appAccess(written)).toEqual(jwt);
   expect(await deployedAccess()).toEqual(publicAccess);
   const protectedDeployment = await deploy();
   expect(appAccess(protectedDeployment)).toEqual(jwt);
   expect(await deployedAccess()).toEqual(jwt);
 
-  await apps.update({ ...app, patch: { name: undefined, access: publicAccess } });
+  await apps.update({ client: 'cli', ...app, patch: { name: undefined, access: publicAccess } });
   expect(await deployedAccess()).toEqual(jwt);
   expect(appAccess(await deploy())).toEqual(publicAccess);
   expect(await deployedAccess()).toEqual(publicAccess);
   const historical = await deployments.findById({ ...app, deploymentId: protectedDeployment.id });
   expect(historical && appAccess(historical)).toEqual(jwt);
 
-  const rollback = await deployments.insertRollback({ ...app, rollbackOf: protectedDeployment.id });
+  const rollback = await deployments.insertRollback({
+    client: 'cli',
+    ...app,
+    rollbackOf: protectedDeployment.id,
+  });
   expect(rollback && appAccess(rollback)).toEqual(jwt);
   expect(await deployedAccess()).toEqual(jwt);
 });

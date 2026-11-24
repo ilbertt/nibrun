@@ -1,4 +1,5 @@
 import { afterEach, expect, mock, test } from 'bun:test';
+import { OPERATION_CLIENT_HEADER } from '@repo/api-constants';
 import { deployBinary } from '#lib/binary-deployment.ts';
 import { mockFetch } from '#tests/support/fetch.ts';
 
@@ -63,6 +64,7 @@ test('uploads directly without exposing bearer credentials to storage, then comp
   for (const call of calls.filter(function apiRequest(call) {
     return call.url.startsWith(ORIGIN);
   })) {
+    expect(call.headers.get(OPERATION_CLIENT_HEADER)).toBe('cli');
     expect(call.headers.get('authorization')).toBe(`Bearer ${ACCESS_TOKEN}`);
   }
   expect(

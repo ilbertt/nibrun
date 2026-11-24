@@ -19,10 +19,12 @@ import { accessColumns } from '#lib/app-access.ts';
 import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
 import { CUSTOM_KIND } from '#lib/app-hostname.ts';
 import { BadRequestError, ConflictError } from '#lib/errors.ts';
+import type { OperationAttribution } from '#lib/operation-client.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
 import { requiresCustomDomain } from '#lib/validate-app-access.ts';
 import type { StoredVolumeStorage } from '#lib/volume-storage.ts';
 import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';
+import { recordAppOperation } from '#repositories/operations.repository.ts';
 import { Repository, TEXT_ARRAY } from '#repositories/repository.ts';
 
 export type AppRow = Queries['SelectAppById'];
@@ -31,7 +33,7 @@ export type ExpirableAppRow = Queries['SelectExpirableApps'];
 
 export type CreatedApp = { app: AppRow; hostnames: AppHostnameRow[] };
 
-export type NewApp = {
+export type NewApp = OperationAttribution & {
   ownerId: OwnerId;
   name: AppName;
   slug: DnsLabel;
@@ -70,7 +72,11 @@ type OwnedApp = { appId: AppId; ownerId: OwnerId };
  * something a suspend can call off, so the states an app may be moved *out of* are named by
  * whoever is asking rather than assumed here. An app in none of them is left exactly as it is.
  */
-export type StateChange = OwnedApp & { state: AppState; from: readonly AppState[] };
+export type StateChange = OwnedApp &
+  OperationAttribution & {
+    state: keyof typeof STATE_OPERATIONS;
+    from: readonly AppState[];
+  };
 
 /**
  * What an owner may change about an app in one request: what they call it, and how it starts.
@@ -103,7 +109,9 @@ export abstract class AppsRepositoryContract {
     deploymentIds: readonly DeploymentId[];
     hostId: HostId;
   }): Promise<void>;
-  abstract update(input: OwnedApp & { patch: SealedAppPatch }): Promise<AppRow | null>;
+  abstract update(
+    input: OwnedApp & OperationAttribution & { patch: SealedAppPatch },
+  ): Promise<AppRow | null>;
   abstract updateState(input: StateChange): Promise<AppRow | null>;
   abstract stampDataInitialized(input: { appIds: readonly AppId[]; hostId: HostId }): Promise<void>;
   abstract finishDeletingVolume(input: { appId: AppId; hostId: HostId }): Promise<boolean>;
@@ -119,6 +127,12 @@ export abstract class AppsRepositoryContract {
 }
 
 export const PLATFORM_KIND: AppHostnameKind = 'platform';
+
+const STATE_OPERATIONS = {
+  active: 'app.resumed',
+  suspended: 'app.suspended',
+  deleting: 'app.deletion.requested',
+} as const satisfies Partial<Record<AppState, string>>;
 
 const ACTIVE_STATE: AppHostnameState = 'active';
 
@@ -169,6 +183,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    * instead — after the profile's, so every stranger takes the two in the same order.
    */
   create({
+    client,
     ownerId,
     name,
     slug,
@@ -273,6 +288,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         throw new Error('Reading back the created app returned no row.');
       }
 
+      await recordAppOperation({ tx, appId: app.id, client, action: 'app.created' });
       return { outcome: 'created', app, hostnames: [hostnameRow] };
     });
   }
@@ -493,22 +509,31 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    * index is the rule. Written whether or not the name moved, because reconfiguring an app changes
    * the app and the new version lands in another table, so nothing else would move `updated_at`.
    */
-  update({ appId, ownerId, patch: { name, ...config } }: OwnedApp & { patch: SealedAppPatch }) {
+  update({
+    appId,
+    ownerId,
+    client,
+    patch: { name, ...config },
+  }: OwnedApp & OperationAttribution & { patch: SealedAppPatch }) {
     return this.sql.begin(async (tx) => {
       const locked = await lockAppForMutation({ tx, appId, ownerId });
       if (!locked) {
         return null;
       }
 
-      if (Object.keys(config).length > 0) {
-        await appendConfigVersion({ tx, appId, patch: config, storage: undefined });
-      }
-
+      const configAction =
+        Object.keys(config).length > 0
+          ? await appendConfigVersion({ tx, appId, patch: config, storage: undefined })
+          : undefined;
+      const action = name !== undefined && name !== locked.name ? 'app.updated' : configAction;
       await tx.TouchApp`
         UPDATE nibrun.live_apps a
         SET name = COALESCE(${name ?? null}, a.name)
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
       `;
+      if (action) {
+        await recordAppOperation({ tx, appId, client, action });
+      }
       return await appAsChanged({ tx, appId, ownerId });
     });
   }
@@ -556,7 +581,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     appIds: readonly AppId[];
     hostId: HostId;
   }): Promise<void> {
-    // Untagged, as `updateState` is: `sql.array` is a clause the generator blanks out before it
+    // Untagged because `sql.array` is a clause the generator blanks out before it
     // parses the statement, and there is no row type to lose — this returns nothing.
     await this.sql`
       UPDATE nibrun.apps
@@ -694,23 +719,21 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     });
   }
 
-  updateState({ appId, ownerId, state, from }: StateChange) {
+  updateState({ appId, ownerId, state, from, client }: StateChange) {
     return this.sql.begin(async (tx) => {
-      if (!(await lockAppForMutation({ tx, appId, ownerId }))) {
+      const locked = await lockAppForMutation({ tx, appId, ownerId });
+      if (!locked || !from.includes(locked.state)) {
         return null;
       }
-      // Untagged for the reason `insertEnvironment` is: `sql.array` is a clause the generator
-      // blanks out before it parses the statement, and `state = ANY()` is not a predicate. There
-      // is no row type to lose — the only column is the id, and all this reads from it is
-      // whether the predicate matched anything.
-      const [updated] = await tx`
-        UPDATE nibrun.apps
-        SET state = ${state}
+      if (locked.state === state) {
+        return await appAsChanged({ tx, appId, ownerId });
+      }
+      await tx.UpdateAppState`
+        UPDATE nibrun.apps SET state = ${state}
         WHERE id = ${appId} AND owner_id = ${ownerId}
-          AND state = ANY(${tx.array([...from], TEXT_ARRAY)})
-        RETURNING id
       `;
-      return updated ? await appAsChanged({ tx, appId, ownerId }) : null;
+      await recordAppOperation({ tx, appId, client, action: STATE_OPERATIONS[state] });
+      return await appAsChanged({ tx, appId, ownerId });
     });
   }
 }
@@ -730,7 +753,7 @@ export async function appendConfigVersion({
   appId: AppId;
   patch: SealedConfigPatch;
   storage: StoredVolumeStorage | undefined;
-}): Promise<string> {
+}): Promise<'app.updated' | 'app.environment.updated' | undefined> {
   const needsDomain = requiresCustomDomain(patch.access);
   const [current] = await tx.SelectCurrentAppConfig`
     /* @notNull environment_names */
@@ -768,7 +791,8 @@ export async function appendConfigVersion({
   ) {
     throw new BadRequestError(CLOUDFLARE_ACCESS_DOMAIN_HINT);
   }
-  const config = { ...previous, ...patch };
+  const { environment: environmentPatch, ...runtimePatch } = patch;
+  const config = { ...previous, ...runtimePatch };
   const columns = accessColumns(config.access);
   const audiences = columns.access_audiences && tx.array(columns.access_audiences, TEXT_ARRAY);
   const volumeStorage = storage ?? current;
@@ -814,7 +838,7 @@ export async function appendConfigVersion({
   // Everything the patch said nothing about, which is every variable there is when it said
   // nothing at all. A name it sets or removes is left out of the copy: one row per name per
   // version, and for a name it sets that row is the one inserted below.
-  const environment = patch.environment ?? { set: {}, removed: [] };
+  const environment = environmentPatch ?? { set: {}, removed: [] };
   const edited = new Set([...Object.keys(environment.set), ...environment.removed]);
   await carryEnvironmentForward({
     tx,
@@ -823,7 +847,16 @@ export async function appendConfigVersion({
     names: current.environment_names.filter((name) => !edited.has(name)),
   });
   await insertEnvironment({ tx, configId: inserted.id, environment: environment.set });
-  return inserted.id;
+  if (!isDeepStrictEqual(previous, config)) {
+    return 'app.updated';
+  }
+  if (
+    Object.keys(environment.set).length > 0 ||
+    environment.removed.some((name) => current.environment_names.includes(name))
+  ) {
+    return 'app.environment.updated';
+  }
+  return undefined;
 }
 
 export async function lockApp({
@@ -836,7 +869,7 @@ export async function lockApp({
   ownerId: OwnerId;
 }) {
   const [app] = await tx.SelectAppForUpdate`
-    SELECT a.id, a.state, a.volume_storage_migration_state, a.volume_storage_migration_started_at,
+    SELECT a.id, a.name, a.state, a.volume_storage_migration_state, a.volume_storage_migration_started_at,
            a.volume_storage_migration_host_id
     FROM nibrun.apps a
     WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND a.state <> 'deleted'
@@ -845,12 +878,12 @@ export async function lockApp({
   return app;
 }
 
-export async function lockAppForMutation(input: Parameters<typeof lockApp>[0]): Promise<boolean> {
+export async function lockAppForMutation(input: Parameters<typeof lockApp>[0]) {
   const app = await lockApp(input);
   if (app?.volume_storage_migration_state === 'pending') {
     throw new ConflictError('Cannot change this app while its storage migration is pending.');
   }
-  return app !== undefined;
+  return app;
 }
 
 /**
@@ -906,8 +939,7 @@ async function strangersHold({
   tx: TypedSQL<Queries>;
   atLeast: number;
 }): Promise<boolean> {
-  // Untagged, as `updateState` is: there is no row type to lose, and the generator has no relation
-  // to read a lock's return through.
+  // The generator has no relation to infer the advisory lock's return type from.
   await tx`SELECT pg_advisory_xact_lock(hashtext('nibrun.anonymous_apps'))`;
   const [strangers] = await tx.SelectAnonymousAppsHeld`
     /* @notNull held */

@@ -77,6 +77,7 @@ function identity(): GitHubActionsOidcClaims {
 async function configuredApp(): Promise<AppId> {
   const slug = Value.Parse(DnsLabelSchema, `grant-${Bun.randomUUIDv7()}`);
   const created = await new AppsRepository(withTypes<Queries>(sql)).create({
+    client: 'cli',
     ownerId: OWNER_ID,
     anonymousAppsAtMost: null,
     name: Value.Parse(AppNameSchema, 'Grant app'),
@@ -314,6 +315,7 @@ async function deploymentInput(appId: AppId) {
     [appId, new Bun.CryptoHasher('sha256').update('binary').digest('hex')],
   );
   return {
+    client: 'cli' as const,
     appId,
     ownerId: OWNER_ID,
     artifactId: Value.Parse(ArtifactIdSchema, artifact.id),
@@ -374,6 +376,7 @@ test('manual redeploys and rollbacks do not inherit a GitHub artifact origin', a
   const manual = await repository.insert(input);
   expect(manual.outcome === 'created' ? manual.row.github_repository : undefined).toBeNull();
   const rollback = await repository.insertRollback({
+    client: 'cli',
     appId,
     ownerId: OWNER_ID,
     rollbackOf: github.row.id,
@@ -392,7 +395,10 @@ test('another app grant cannot attach provenance or supersede the existing deplo
     throw new Error('The current deployment must be created.');
   }
   expect(
-    await repository.insertWithDeploymentGrant({ ...input, deploymentGrantId: foreignGrant.id }),
+    await repository.insertWithDeploymentGrant({
+      ...input,
+      deploymentGrantId: foreignGrant.id,
+    }),
   ).toEqual({ outcome: 'no-grant' });
   expect(
     await repository.insertWithDeploymentGrant({
@@ -468,6 +474,12 @@ test.each(['registered-client', 'https://claude.ai/oauth/mcp-oauth-client-metada
     expect(deployed.row.initiated_by).toBe(DeploymentInitiator.Owner);
     const owned = { appId, ownerId: OWNER_ID, deploymentId: deployed.row.id };
     expect(deployed.row.mcp_client_id).toBe(clientId);
+    expect([
+      ...(await sql.unsafe(
+        'SELECT action, client FROM nibrun.operations WHERE deployment_id = $1',
+        [deployed.row.id],
+      )),
+    ]).toEqual([{ action: 'deployment.requested', client: 'mcp' }]);
     expect(deployed.row.mcp_chat_id).toBe('originating-chat');
     expect(deployed.row.github_repository).toBeNull();
     expect((await repository.findById(owned))?.mcp_client_id).toBe(clientId);
@@ -492,6 +504,7 @@ test.each(['registered-client', 'https://claude.ai/oauth/mcp-oauth-client-metada
     expect(manual.outcome === 'created' ? manual.row.mcp_client_id : undefined).toBeNull();
     expect(manual.outcome === 'created' ? manual.row.mcp_chat_id : undefined).toBeNull();
     const rollback = await repository.insertRollback({
+      client: 'cli',
       appId,
       ownerId: OWNER_ID,
       rollbackOf: deployed.row.id,

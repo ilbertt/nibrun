@@ -43,6 +43,7 @@ async function newApp(name: string) {
 
 function deploy(app: Awaited<ReturnType<typeof createDeployedApp>>) {
   return repository().insert({
+    client: 'cli',
     appId: app.appId,
     ownerId: app.ownerId,
     artifactId: app.artifactId,
@@ -135,6 +136,7 @@ test('redeploys and rollbacks retain their draining host while a different host 
   await availableHost();
   expect((await deploy(app)).outcome).toBe('created');
   const rollback = await repository().insertRollback({
+    client: 'cli',
     appId: app.appId,
     ownerId: app.ownerId,
     rollbackOf: app.deploymentId,

@@ -546,6 +546,10 @@ export interface IDeleteArtifactsByAppResult {
 export interface IDeleteAppUsageByAppResult {
 }
 
+/** Result of query `UpdateAppState`. */
+export interface IUpdateAppStateResult {
+}
+
 /** Result of query `SelectCurrentAppConfig`. */
 export interface ISelectCurrentAppConfigResult {
     has_custom_domain: boolean | null;
@@ -596,6 +600,8 @@ export interface IInsertPatchedAppConfigResult {
 /** Result of query `SelectAppForUpdate`. */
 export interface ISelectAppForUpdateResult {
     id: IAppsColumns["id"];
+    /** What its owner calls the app, and names it by. */
+    name: IAppsColumns["name"];
     state: IAppsColumns["state"];
     /** While pending, the latest app_config holds the destination and deployments and config edits wait. */
     volume_storage_migration_state: IAppsColumns["volume_storage_migration_state"];
@@ -1257,6 +1263,10 @@ export interface ISelectSpentImportsResult {
 export interface IForgetImportObjectResult {
 }
 
+/** Result of query `InsertAppOperation`. */
+export interface IInsertAppOperationResult {
+}
+
 /** Result of query `UpsertPaidRequest`. */
 export interface IUpsertPaidRequestResult {
     request_type: IPaidRequestsColumns["request_type"];
@@ -1449,6 +1459,7 @@ export interface Queries {
     DeleteImportsByApp: IDeleteImportsByAppResult;
     DeleteArtifactsByApp: IDeleteArtifactsByAppResult;
     DeleteAppUsageByApp: IDeleteAppUsageByAppResult;
+    UpdateAppState: IUpdateAppStateResult;
     SelectCurrentAppConfig: ISelectCurrentAppConfigResult;
     InsertPatchedAppConfig: IInsertPatchedAppConfigResult;
     SelectAppForUpdate: ISelectAppForUpdateResult;
@@ -1508,6 +1519,7 @@ export interface Queries {
     DeleteAbandonedImport: IDeleteAbandonedImportResult;
     SelectSpentImports: ISelectSpentImportsResult;
     ForgetImportObject: IForgetImportObjectResult;
+    InsertAppOperation: IInsertAppOperationResult;
     UpsertPaidRequest: IUpsertPaidRequestResult;
     InsertSqliteConnection: IInsertSqliteConnectionResult;
     SelectSqliteConnectionsByApp: ISelectSqliteConnectionsByAppResult;

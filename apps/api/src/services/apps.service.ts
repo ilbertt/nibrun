@@ -42,6 +42,7 @@ import {
   NotFoundError,
   TooManyRequestsError,
 } from '#lib/errors.ts';
+import type { OperationAttribution } from '#lib/operation-client.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
@@ -189,11 +190,12 @@ export class AppsService extends Service {
    * URL, and anyone is entitled to pick the same name — the id is what an app is known by here.
    */
   async create({
+    client,
     ownerId,
     isAnonymous,
     name,
     config,
-  }: {
+  }: OperationAttribution & {
     ownerId: OwnerId;
     isAnonymous: boolean;
     name: AppName;
@@ -219,6 +221,7 @@ export class AppsService extends Service {
       const slug = deriveAppSlug(name);
       try {
         const created = await this.appsRepo.create({
+          client,
           ownerId,
           name,
           slug,
@@ -329,12 +332,18 @@ export class AppsService extends Service {
    * The name moves and nothing else does: the slug was minted from the first name and is in
    * somebody's bookmarks by now, so the hostname stays.
    */
-  async update({ appId, ownerId, patch }: OwnedApp & { patch: AppPatch }): Promise<PublicApp> {
+  async update({
+    appId,
+    ownerId,
+    client,
+    patch,
+  }: OwnedApp & OperationAttribution & { patch: AppPatch }): Promise<PublicApp> {
     const { name, config } = patch;
     if (config) {
       await this.refuseValuesTheEditLeavesUngiven({ appId, ownerId, patch: config });
     }
     const app = await this.appsRepo.update({
+      client,
       appId,
       ownerId,
       patch: this.sealed(patch),
@@ -359,11 +368,13 @@ export class AppsService extends Service {
    * `deleting` is not a state there is a way back out of.
    */
   async setState({
+    client,
     appId,
     ownerId,
     state,
-  }: OwnedApp & { state: OwnedAppState }): Promise<PublicApp> {
+  }: OwnedApp & OperationAttribution & { state: OwnedAppState }): Promise<PublicApp> {
     const app = await this.appsRepo.updateState({
+      client,
       appId,
       ownerId,
       state,
@@ -563,9 +574,10 @@ export class AppsService extends Service {
    * first leaves one that cannot be described, and the whole listing fails on it rather than that
    * one app. `purgeApp` releases them once the app is `deleted` and nobody is being shown it.
    */
-  async delete({ appId, ownerId }: OwnedApp): Promise<PublicApp> {
+  async delete({ appId, ownerId, client }: OwnedApp & OperationAttribution): Promise<PublicApp> {
     const app = requireApp(
       await this.appsRepo.updateState({
+        client,
         appId,
         ownerId,
         state: 'deleting',
@@ -660,7 +672,7 @@ export class AppsService extends Service {
    */
   private async expireApp({ appId, ownerId }: OwnedApp): Promise<void> {
     try {
-      await this.delete({ appId, ownerId });
+      await this.delete({ appId, ownerId, client: 'system' });
       this.logger.info('app expired', { appId, ownerId });
     } catch (error) {
       if (error instanceof NotFoundError) {

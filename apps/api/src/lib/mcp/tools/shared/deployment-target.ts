@@ -34,6 +34,7 @@ export function appForDeployment({
 }): ReturnType<AppsService['get']> {
   return appId === undefined
     ? appsService.create({
+        client: 'mcp',
         ownerId,
         isAnonymous: false,
         name: Value.Parse(CreateAppRequestSchema.properties.name, name),
