@@ -1435,7 +1435,5 @@ test('operation settings follow the transaction when a connection is reused', as
     'SELECT action, client FROM nibrun.operations WHERE app_id = $1 ORDER BY id',
     [appId],
   );
-  expect([...history]).toEqual([
-    { action: 'app.environment.updated', client: 'system' },
-  ]);
+  expect([...history]).toEqual([{ action: 'app.environment.updated', client: 'system' }]);
 });
