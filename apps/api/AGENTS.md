@@ -144,6 +144,14 @@ graph is constructed, so an earlier import would pin the wrong environment.
 Raw SQL via `Bun.sql` (`src/db/client.ts`), no ORM. Always schema-qualify
 (`nibrun.*`).
 
+Call `setOperationContext` on the transaction that performs an audited API write.
+Postgres triggers record the client and the affected row. An app patch also supplies
+its config action on the final app update so environment edits and mixed edits each
+emit one event. HTTP callers can report `dashboard` or `cli` for attribution.
+MCP tools and platform jobs supply their own client. Operators can label a manual
+transaction with `SET LOCAL nibrun.operation_client = 'system'`. Authorization uses
+the authenticated caller.
+
 Paid-request values live in feature-specific columns, such as `requested_apps_amount`.
 Each column's `CHECK` requires a valid, non-null value for its matching `request_type`
 and `NULL` for every other type. Apply the same rule when adding paid-request types.
