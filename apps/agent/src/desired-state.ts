@@ -14,6 +14,7 @@ function nibrunnerVolume(volume: DesiredVolume): NibrunnerDesiredState['volumes'
     volumeId: volume.volumeId,
     appId: volume.appId,
     sizeBytes: volume.sizeBytes,
+    storage: null,
     desiredState: volume.desiredState,
     initialContents: {
       ...localArtifactReference(volume.seed ?? emptyDataArchive()),

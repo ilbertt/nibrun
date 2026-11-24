@@ -1,5 +1,5 @@
 /**
- * Generated from https://raw.githubusercontent.com/ilbertt/nibrunner/v2026.11.14/crates/protocol/schema/desired.schema.json
+ * Generated from https://raw.githubusercontent.com/ilbertt/nibrunner/v2026.11.15/crates/protocol/schema/desired.schema.json
  * Run bun run --filter @repo/internal-scripts generate-nibrunner-types; do not edit.
  */
 
@@ -159,6 +159,21 @@ export type OciRepository = string;
  * an absolute path to a file other than /sbin/init
  */
 export type ExecutablePath = string;
+export type S3VolumeAuth =
+  | {
+      kind: 'anonymous';
+    }
+  | {
+      accessKeyId: string;
+      kind: 'access-key';
+      secretAccessKey: string;
+    }
+  | {
+      accessKeyId: string;
+      kind: 'session';
+      secretAccessKey: string;
+      sessionToken: string;
+    };
 
 /**
  * What one host should be running. The daemon watches this document at the path its
@@ -371,6 +386,10 @@ export interface DesiredVolume {
    */
   initialContents?: InitialContents | null;
   sizeBytes: number;
+  /**
+   * Dedicated S3-compatible storage for this volume. Null selects the host backend.
+   */
+  storage: S3VolumeStorage | null;
   volumeId: VolumeId;
   [k: string]: unknown;
 }
@@ -391,4 +410,15 @@ export interface InitialContents {
    */
   objectKey: string;
   [k: string]: unknown;
+}
+export interface S3VolumeStorage {
+  auth: S3VolumeAuth;
+  bucket: string;
+  encryptionPassword: string;
+  endpoint: string;
+  prefix: ObjectKey;
+  /**
+   * Null leaves the signing region unspecified.
+   */
+  region: string | null;
 }
