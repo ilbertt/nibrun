@@ -7,7 +7,6 @@ CREATE TABLE nibrun.operations (
   github_token_jti text,
   app_id uuid REFERENCES nibrun.apps (id) ON DELETE RESTRICT,
   host_id uuid REFERENCES nibrun.hosts (id) ON DELETE RESTRICT,
-  CONSTRAINT operations_id_v7_check CHECK (uuid_extract_version(id) IS NOT DISTINCT FROM 7),
   CONSTRAINT operations_action_check CHECK (action IN (
     'app.created', 'app.updated', 'app.environment.updated', 'app.suspended', 'app.resumed',
     'app.deletion.requested', 'deployment.requested', 'deployment.rollback.requested', 'host.retired'
