@@ -25,6 +25,7 @@ export const AppsAppIdStateController = new Elysia()
   .put(
     '/apps/:appId/state',
     async function setAppState({
+      operationClient,
       appsService,
       volumeStorageMigrationsService,
       params,
@@ -48,6 +49,7 @@ export const AppsAppIdStateController = new Elysia()
         return status(StatusMap.OK, await appsService.get(ownedApp));
       }
       const app = await appsService.setState({
+        client: operationClient,
         ...ownedApp,
         state: body.state,
       });

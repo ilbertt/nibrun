@@ -47,7 +47,7 @@ import {
   NotFoundError,
   TooManyRequestsError,
 } from '#lib/errors.ts';
-import type { OperationAttribution } from '#lib/operation-client.ts';
+import { type OperationAttribution, OperationClient } from '#lib/operation-client.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
@@ -368,11 +368,13 @@ export class AppsService extends Service {
    * `deleting` is not a state there is a way back out of.
    */
   async setState({
+    client,
     appId,
     ownerId,
     state,
-  }: OwnedApp & { state: OwnedAppState }): Promise<PublicApp> {
+  }: OwnedApp & OperationAttribution & { state: OwnedAppState }): Promise<PublicApp> {
     const app = await this.appsRepo.updateState({
+      client,
       appId,
       ownerId,
       state,
@@ -572,9 +574,10 @@ export class AppsService extends Service {
    * first leaves one that cannot be described, and the whole listing fails on it rather than that
    * one app. `purgeApp` releases them once the app is `deleted` and nobody is being shown it.
    */
-  async delete({ appId, ownerId }: OwnedApp): Promise<PublicApp> {
+  async delete({ appId, ownerId, client }: OwnedApp & OperationAttribution): Promise<PublicApp> {
     const app = requireApp(
       await this.appsRepo.updateState({
+        client,
         appId,
         ownerId,
         state: 'deleting',
@@ -669,7 +672,7 @@ export class AppsService extends Service {
    */
   private async expireApp({ appId, ownerId }: OwnedApp): Promise<void> {
     try {
-      await this.delete({ appId, ownerId });
+      await this.delete({ appId, ownerId, client: OperationClient.System });
       this.logger.info('app expired', { appId, ownerId });
     } catch (error) {
       if (error instanceof NotFoundError) {

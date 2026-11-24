@@ -421,7 +421,13 @@ describe('a config patch carries forward every variable it says nothing about', 
   });
 
   test('a deleted app with only its hostname left is still purgeable', async () => {
-    await repo.updateState({ appId, ownerId, state: 'deleting', from: LIVE_APP_STATES });
+    await repo.updateState({
+      client: OperationClient.Cli,
+      appId,
+      ownerId,
+      state: 'deleting',
+      from: LIVE_APP_STATES,
+    });
     await repo.finishDeleting({ appId });
 
     expect(await repo.listPurgeable({ limit: 8 })).toEqual([appId]);
@@ -437,6 +443,7 @@ describe('an owner moves their app between the two states they own', () => {
     const appId = await createApp('suspends');
 
     const app = await repo.updateState({
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       state: 'suspended',
@@ -450,6 +457,7 @@ describe('an owner moves their app between the two states they own', () => {
   test('and resuming it puts it back where it was', async () => {
     const appId = await createApp('resumes');
     await repo.updateState({
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       state: 'suspended',
@@ -457,6 +465,7 @@ describe('an owner moves their app between the two states they own', () => {
     });
 
     const app = await repo.updateState({
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       state: 'active',
@@ -471,10 +480,17 @@ describe('an owner moves their app between the two states they own', () => {
   // an app brought back to nothing, so the statement declines rather than writes.
   test('an app being deleted is left exactly where it is', async () => {
     const appId = await createApp('doomed');
-    await repo.updateState({ appId, ownerId: OWNER_ID, state: 'deleting', from: LIVE_APP_STATES });
+    await repo.updateState({
+      client: OperationClient.Cli,
+      appId,
+      ownerId: OWNER_ID,
+      state: 'deleting',
+      from: LIVE_APP_STATES,
+    });
 
     expect(
       await repo.updateState({
+        client: OperationClient.Cli,
         appId,
         ownerId: OWNER_ID,
         state: 'active',
@@ -489,6 +505,7 @@ describe('an owner moves their app between the two states they own', () => {
 
     expect(
       await repo.updateState({
+        client: OperationClient.Cli,
         appId,
         ownerId: STRANGER_ID,
         state: 'suspended',
@@ -1431,6 +1448,29 @@ describe('strangers hold so many apps between them and no more', () => {
 
     expect(asked.filter((one) => one === 'created')).toHaveLength(CEILING);
   });
+});
+
+test('an operation insert failure rolls back the app change', async () => {
+  const appId = await createApp('atomic-suspension');
+  await sql.unsafe(
+    "ALTER TABLE nibrun.operations ADD CONSTRAINT refuse_test_suspension CHECK (action <> 'app.suspended') NOT VALID",
+  );
+  try {
+    expect(
+      await refusedBy(() =>
+        repo.updateState({
+          appId,
+          ownerId: OWNER_ID,
+          client: OperationClient.Cli,
+          state: 'suspended',
+          from: OWNED_APP_STATES,
+        }),
+      ),
+    ).toBe('refuse_test_suspension');
+    expect(await storedState(appId)).toBe('active');
+  } finally {
+    await sql.unsafe('ALTER TABLE nibrun.operations DROP CONSTRAINT refuse_test_suspension');
+  }
 });
 
 test('operation settings follow the transaction when a connection is reused', async () => {

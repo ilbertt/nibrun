@@ -262,6 +262,7 @@ test('pending migration blocks config edits, deployments, rollbacks and deletion
     },
     function remove() {
       return apps.updateState({
+        client: OperationClient.Cli,
         appId,
         ownerId: OWNER_ID,
         state: 'deleting',
