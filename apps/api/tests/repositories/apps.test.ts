@@ -1509,3 +1509,34 @@ test('an operation insert failure rolls back the app change', async () => {
     await sql.unsafe('ALTER TABLE nibrun.operations DROP CONSTRAINT refuse_test_suspension');
   }
 });
+
+test('operation settings follow the transaction when a connection is reused', async () => {
+  const appId = await createApp('operation-context');
+  using connection = await sql.reserve();
+
+  await connection.begin(async (tx) => {
+    await tx.unsafe("SET LOCAL nibrun.operation_client = 'system'");
+    await tx.unsafe("SET LOCAL nibrun.app_config_action = 'app.environment.updated'");
+    await tx.unsafe('UPDATE nibrun.apps SET name = name WHERE id = $1', [appId]);
+    await tx.unsafe('UPDATE nibrun.apps SET name = name WHERE id = $1', [appId]);
+  });
+  await connection.unsafe("UPDATE nibrun.apps SET state = 'suspended' WHERE id = $1", [appId]);
+
+  await expect(
+    connection.begin(async (tx) => {
+      await tx.unsafe("SET LOCAL nibrun.operation_client = 'mcp'");
+      await tx.unsafe("UPDATE nibrun.apps SET state = 'active' WHERE id = $1", [appId]);
+      throw new Error('roll back the resume');
+    }),
+  ).rejects.toThrow('roll back the resume');
+  await connection.unsafe("UPDATE nibrun.apps SET state = 'active' WHERE id = $1", [appId]);
+
+  const history = await connection.unsafe(
+    'SELECT action, client FROM nibrun.operations WHERE app_id = $1 ORDER BY id',
+    [appId],
+  );
+  expect([...history]).toEqual([
+    { action: 'app.created', client: 'cli' },
+    { action: 'app.environment.updated', client: 'system' },
+  ]);
+});

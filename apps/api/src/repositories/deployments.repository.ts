@@ -23,7 +23,7 @@ import { ConflictError } from '#lib/errors.ts';
 import { HOST_REPORT_MAX_AGE_MS } from '#lib/host-readiness.ts';
 import type { OperationAttribution } from '#lib/operation-client.ts';
 import { lockAppForMutation } from '#repositories/apps.repository.ts';
-import { recordAppOperation } from '#repositories/operations.repository.ts';
+import { setOperationContext } from '#repositories/operations.repository.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type DeploymentRow = Queries['SelectDeploymentById'];
@@ -226,6 +226,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       if (hostId === undefined) {
         return { outcome: 'no-host' };
       }
+      await setOperationContext({ tx, client });
       await supersedeLiveDeployment({ tx, appId, ownerId });
 
       // INSERT … SELECT rather than VALUES, so the predicate that decides ownership is the one
@@ -247,13 +248,6 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       if (!inserted) {
         return { outcome: 'no-artifact' };
       }
-      await recordAppOperation({
-        tx,
-        appId,
-        client,
-        action: 'deployment.requested',
-        deploymentId: inserted.id,
-      });
       const row = await this.selectDeployment({ tx, deploymentId: inserted.id });
       return row ? { outcome: 'created', row } : { outcome: 'no-artifact' };
     });
@@ -341,6 +335,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       if ((await this.hostForDeployment({ tx, appId, ownerId })) === undefined) {
         return null;
       }
+      await setOperationContext({ tx, client });
       await supersedeLiveDeployment({ tx, appId, ownerId });
 
       const [inserted] = await tx.InsertReplayedDeployment`
@@ -415,13 +410,6 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       if (!inserted) {
         return null;
       }
-      await recordAppOperation({
-        tx,
-        appId,
-        client,
-        action: 'deployment.rollback.requested',
-        deploymentId: inserted.id,
-      });
       return await this.selectDeployment({ tx, deploymentId: inserted.id });
     });
   }

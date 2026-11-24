@@ -24,7 +24,7 @@ import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
 import { requiresCustomDomain } from '#lib/validate-app-access.ts';
 import type { StoredVolumeStorage } from '#lib/volume-storage.ts';
 import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';
-import { recordAppOperation } from '#repositories/operations.repository.ts';
+import { type AppConfigAction, setOperationContext } from '#repositories/operations.repository.ts';
 import { Repository, TEXT_ARRAY } from '#repositories/repository.ts';
 
 export type AppRow = Queries['SelectAppById'];
@@ -74,7 +74,7 @@ type OwnedApp = { appId: AppId; ownerId: OwnerId };
  */
 export type StateChange = OwnedApp &
   OperationAttribution & {
-    state: keyof typeof STATE_OPERATIONS;
+    state: Exclude<AppState, 'deleted'>;
     from: readonly AppState[];
   };
 
@@ -127,12 +127,6 @@ export abstract class AppsRepositoryContract {
 }
 
 export const PLATFORM_KIND: AppHostnameKind = 'platform';
-
-const STATE_OPERATIONS = {
-  active: 'app.resumed',
-  suspended: 'app.suspended',
-  deleting: 'app.deletion.requested',
-} as const satisfies Partial<Record<AppState, string>>;
 
 const ACTIVE_STATE: AppHostnameState = 'active';
 
@@ -204,6 +198,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
 
       const columns = accessColumns(config.access);
       const audiences = columns.access_audiences && tx.array(columns.access_audiences, TEXT_ARRAY);
+      await setOperationContext({ tx, client });
       const [inserted] = await tx.InsertApp`
         INSERT INTO nibrun.apps (owner_id, name, slug) VALUES (${ownerId}, ${name}, ${slug})
         RETURNING id
@@ -288,7 +283,6 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         throw new Error('Reading back the created app returned no row.');
       }
 
-      await recordAppOperation({ tx, appId: app.id, client, action: 'app.created' });
       return { outcome: 'created', app, hostnames: [hostnameRow] };
     });
   }
@@ -525,15 +519,12 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         Object.keys(config).length > 0
           ? await appendConfigVersion({ tx, appId, patch: config, storage: undefined })
           : undefined;
-      const action = name !== undefined && name !== locked.name ? 'app.updated' : configAction;
+      await setOperationContext({ tx, client, configAction });
       await tx.TouchApp`
         UPDATE nibrun.live_apps a
         SET name = COALESCE(${name ?? null}, a.name)
         WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
       `;
-      if (action) {
-        await recordAppOperation({ tx, appId, client, action });
-      }
       return await appAsChanged({ tx, appId, ownerId });
     });
   }
@@ -728,11 +719,11 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       if (locked.state === state) {
         return await appAsChanged({ tx, appId, ownerId });
       }
+      await setOperationContext({ tx, client });
       await tx.UpdateAppState`
         UPDATE nibrun.apps SET state = ${state}
         WHERE id = ${appId} AND owner_id = ${ownerId}
       `;
-      await recordAppOperation({ tx, appId, client, action: STATE_OPERATIONS[state] });
       return await appAsChanged({ tx, appId, ownerId });
     });
   }
@@ -753,7 +744,7 @@ export async function appendConfigVersion({
   appId: AppId;
   patch: SealedConfigPatch;
   storage: StoredVolumeStorage | undefined;
-}): Promise<'app.updated' | 'app.environment.updated' | undefined> {
+}): Promise<AppConfigAction | undefined> {
   const needsDomain = requiresCustomDomain(patch.access);
   const [current] = await tx.SelectCurrentAppConfig`
     /* @notNull environment_names */
@@ -869,7 +860,7 @@ export async function lockApp({
   ownerId: OwnerId;
 }) {
   const [app] = await tx.SelectAppForUpdate`
-    SELECT a.id, a.name, a.state, a.volume_storage_migration_state, a.volume_storage_migration_started_at,
+    SELECT a.id, a.state, a.volume_storage_migration_state, a.volume_storage_migration_started_at,
            a.volume_storage_migration_host_id
     FROM nibrun.apps a
     WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND a.state <> 'deleted'
