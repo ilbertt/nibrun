@@ -364,7 +364,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
                  previous.restart_max_backoff_ms, previous.restart_backoff_factor,
                  previous.restart_reset_after_ms,
                  storage.volume_storage_endpoint, storage.volume_storage_bucket,
-                 storage.volume_storage_prefix, storage.volume_storage_region,
+                 rtrim(storage.volume_storage_prefix, '/'), storage.volume_storage_region,
                  storage.volume_storage_auth_kind, storage.volume_storage_access_key_id,
                  storage.volume_storage_secret_access_key, storage.volume_storage_session_token,
                  storage.volume_storage_encryption_password

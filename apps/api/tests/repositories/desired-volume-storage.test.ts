@@ -132,11 +132,13 @@ test('normal config edits and subsequent deployments preserve storage without ex
   });
   expect(changed?.args).toEqual(['changed']);
   expect(changed).not.toHaveProperty('volume_storage_secret_access_key');
-  expect(await storedColumns()).toEqual(previous);
+  expect(previous.volume_storage_prefix).toBe('apps/access-key/');
+  expect(await storedColumns()).toEqual({ ...previous, volume_storage_prefix: 'apps/access-key' });
   await deployApp(PRIVATE_APP);
-  expect((await desiredVolumes()).find((volume) => volume.storage)?.storage).toEqual(
-    storage(ACCESS_KEY_AUTH),
-  );
+  expect((await desiredVolumes()).find((volume) => volume.appId === app.id)?.storage).toEqual({
+    ...storage(ACCESS_KEY_AUTH),
+    prefix: Value.Parse(S3VolumeStorageSchema.properties.prefix, 'apps/access-key'),
+  });
 });
 
 test('an undeployed config version does not redirect an existing volume', async () => {
@@ -264,7 +266,7 @@ test.each([
     await insertConfig({ slug, storage: configured });
     const current = await deployApp(slug);
     const currentColumns = await storedColumns(slug);
-    const volume = (await desiredVolumes()).find((one) => one.appId === appId);
+    const volume = (await desiredVolumes()).find((one) => one.appId === appId)!;
     await insertConfig({ slug, storage: { ...configured, bucket: 'not-deployed' } });
     const request = {
       appId,
@@ -299,8 +301,12 @@ test.each([
       environment_names: ['TOKEN'],
     });
     expect(rollback?.artifact_id).not.toBe(current.artifact_id);
-    expect(await storedColumns(slug)).toEqual(currentColumns);
-    expect((await desiredVolumes()).find((one) => one.appId === appId)).toEqual(volume);
+    const prefix = Value.Parse(S3VolumeStorageSchema.properties.prefix, `apps/${auth.kind}`);
+    expect(await storedColumns(slug)).toEqual({ ...currentColumns, volume_storage_prefix: prefix });
+    expect((await desiredVolumes()).find((one) => one.appId === appId)).toEqual({
+      ...volume,
+      storage: { ...configured, prefix },
+    });
     const environment = await sql.unsafe(
       `SELECT e.name, e.value FROM nibrun.app_config_environment e
      JOIN nibrun.deployments d ON d.config_id = e.config_id
