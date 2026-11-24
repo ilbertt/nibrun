@@ -12,6 +12,7 @@ import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
 import { ArtifactIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { ConflictError } from '#lib/errors.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 import { openSecret, sealSecret } from '#lib/tenant-secrets.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
@@ -243,6 +244,7 @@ test('pending migration blocks config edits, deployments, rollbacks and deletion
     },
     function deploy() {
       return deployments.insert({
+        client: OperationClient.Cli,
         appId,
         ownerId: OWNER_ID,
         artifactId,
@@ -252,6 +254,7 @@ test('pending migration blocks config edits, deployments, rollbacks and deletion
     },
     function rollback() {
       return deployments.insertRollback({
+        client: OperationClient.Cli,
         appId,
         ownerId: OWNER_ID,
         rollbackOf: Value.Parse(DeploymentIdSchema, previous.id),
@@ -304,6 +307,7 @@ test('pending migration blocks config edits, deployments, rollbacks and deletion
   expect(
     (
       await deployments.insert({
+        client: OperationClient.Cli,
         appId,
         ownerId: OWNER_ID,
         artifactId,
@@ -326,6 +330,7 @@ test('a deployment racing with migration cannot select the pending destination',
   const [migration, deployment] = await Promise.allSettled([
     repository().request({ appId, ownerId: OWNER_ID, destination: destination(ACCESS_KEY_AUTH) }),
     new DeploymentsRepository(withTypes<Queries>(sql)).insert({
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       artifactId: Value.Parse(ArtifactIdSchema, previous.artifact_id),
@@ -476,7 +481,12 @@ test('only the owning host can complete a deployed destination, unlocking edits 
   ).toBe(false);
   expect(await apps.update(edit)).not.toBeNull();
   expect(
-    await deployments.insertRollback({ appId, ownerId: OWNER_ID, rollbackOf: source!.id }),
+    await deployments.insertRollback({
+      client: OperationClient.Cli,
+      appId,
+      ownerId: OWNER_ID,
+      rollbackOf: source!.id,
+    }),
   ).not.toBeNull();
   expect((await desiredVolumes()).find((volume) => volume.appId === appId)?.storage).toMatchObject({
     bucket: 'customer-data',

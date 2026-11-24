@@ -6,6 +6,7 @@ import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
 import { appAccess } from '#lib/app-access.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 import { sealSecret } from '#lib/tenant-secrets.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
@@ -301,7 +302,12 @@ test('access edits are staged until deployed and rollback restores the pinned po
   }
 
   async function deploy() {
-    const result = await deployments.insert({ ...app, initialDataFrom: null, onlyOne: false });
+    const result = await deployments.insert({
+      client: OperationClient.Cli,
+      ...app,
+      initialDataFrom: null,
+      onlyOne: false,
+    });
     if (result.outcome !== 'created') {
       throw new Error(result.outcome);
     }
@@ -323,7 +329,11 @@ test('access edits are staged until deployed and rollback restores the pinned po
   const historical = await deployments.findById({ ...app, deploymentId: protectedDeployment.id });
   expect(historical && appAccess(historical)).toEqual(jwt);
 
-  const rollback = await deployments.insertRollback({ ...app, rollbackOf: protectedDeployment.id });
+  const rollback = await deployments.insertRollback({
+    client: OperationClient.Cli,
+    ...app,
+    rollbackOf: protectedDeployment.id,
+  });
   expect(rollback && appAccess(rollback)).toEqual(jwt);
   expect(await deployedAccess()).toEqual(jwt);
 });

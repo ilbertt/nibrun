@@ -24,6 +24,7 @@ import type { PublicAppConfig } from '#lib/app-config.ts';
 import { DEFAULT_HEALTH_CHECK, DEFAULT_RESTART_POLICY } from '#lib/app-config-defaults.ts';
 import { STARTUP_DEADLINE_MS } from '#lib/deployments/lifecycle.ts';
 import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from '#lib/errors.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 import type {
   CreateDeploymentInput,
   CreatedDeployment,
@@ -81,6 +82,7 @@ const PINNED_CONFIG: PublicAppConfig = {
 // Going back to `DEPLOYMENT_ID`, which is the same route and the same verb as deploying an
 // artifact — only the body says which of the two it is.
 const ROLLBACK_REQUEST = {
+  client: OperationClient.Cli,
   appId: APP_ID,
   ownerId: OWNER_ID,
   isAnonymous: false,
@@ -180,7 +182,12 @@ class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
   }
 
   insertWithMcpClient(input: CreateMcpDeploymentInput): Promise<CreatedDeployment> {
-    return this.insert({ ...input, initialDataFrom: null, onlyOne: false });
+    return this.insert({
+      client: OperationClient.Mcp,
+      ...input,
+      initialDataFrom: null,
+      onlyOne: false,
+    });
   }
 
   insertWithDeploymentGrant(input: CreateGitHubDeploymentInput): Promise<CreatedDeployment> {
@@ -276,6 +283,7 @@ describe('a deployment publishes the config version it pins', () => {
     const { service } = serviceWith({ row: deploymentRow() });
 
     const deployment = await service.createOrRollback({
+      client: OperationClient.Cli,
       isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
@@ -408,6 +416,7 @@ test('a deployment without an available execution host is refused as a conflict'
   const { service } = serviceWith({ refusal: { outcome: 'no-host' } });
   await expect(
     service.createOrRollback({
+      client: OperationClient.Cli,
       isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
@@ -422,6 +431,7 @@ describe('an app the caller does not own is indistinguishable from one that does
 
     await expect(
       service.createOrRollback({
+        client: OperationClient.Cli,
         isAnonymous: false,
         appId: APP_ID,
         ownerId: OWNER_ID,
@@ -454,6 +464,7 @@ describe('an app the caller does not own is indistinguishable from one that does
     const { deploymentsRepo, service } = serviceWith({ row: deploymentRow(), rows: [] });
 
     await service.createOrRollback({
+      client: OperationClient.Cli,
       isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
@@ -478,6 +489,7 @@ describe('creating a deployment is asking for it to run', () => {
     const { service } = serviceWith({ row: deploymentRow({ state: 'pending' }) });
 
     const deployment = await service.createOrRollback({
+      client: OperationClient.Cli,
       isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
@@ -495,6 +507,7 @@ describe('creating a deployment is asking for it to run', () => {
 
     await expect(
       service.createOrRollback({
+        client: OperationClient.Cli,
         isAnonymous: false,
         appId: APP_ID,
         ownerId: OWNER_ID,
@@ -515,7 +528,11 @@ describe("a stranger's app is deployed once", () => {
   test('the repository is asked to take only one', async () => {
     const { deploymentsRepo, service } = serviceWith({ row: deploymentRow() });
 
-    await service.createOrRollback({ ...asStranger, source: { artifactId: ARTIFACT_ID } });
+    await service.createOrRollback({
+      client: OperationClient.Cli,
+      ...asStranger,
+      source: { artifactId: ARTIFACT_ID },
+    });
 
     expect(deploymentsRepo.calls.at(0)).toMatchObject({ onlyOne: true });
   });
@@ -524,7 +541,11 @@ describe("a stranger's app is deployed once", () => {
     const { service } = serviceWith({ refusal: { outcome: 'held' } });
 
     await expect(
-      service.createOrRollback({ ...asStranger, source: { artifactId: ARTIFACT_ID } }),
+      service.createOrRollback({
+        client: OperationClient.Cli,
+        ...asStranger,
+        source: { artifactId: ARTIFACT_ID },
+      }),
     ).rejects.toBeInstanceOf(ForbiddenError);
   });
 
@@ -532,7 +553,11 @@ describe("a stranger's app is deployed once", () => {
     const { deploymentsRepo, service } = serviceWith({ row: deploymentRow() });
 
     await expect(
-      service.createOrRollback({ ...asStranger, source: { rollbackOf: DEPLOYMENT_ID } }),
+      service.createOrRollback({
+        client: OperationClient.Cli,
+        ...asStranger,
+        source: { rollbackOf: DEPLOYMENT_ID },
+      }),
     ).rejects.toBeInstanceOf(ForbiddenError);
     expect(deploymentsRepo.calls).toEqual([]);
   });
@@ -541,6 +566,7 @@ describe("a stranger's app is deployed once", () => {
     const { deploymentsRepo, service } = serviceWith({ row: deploymentRow() });
 
     await service.createOrRollback({
+      client: OperationClient.Cli,
       appId: APP_ID,
       ownerId: OWNER_ID,
       isAnonymous: false,
@@ -761,7 +787,7 @@ describe('going back to a release is a new deployment, not an old one revived', 
     await service.createOrRollback(ROLLBACK_REQUEST);
 
     expect(deploymentsRepo.calls).toEqual([
-      { appId: APP_ID, ownerId: OWNER_ID, rollbackOf: DEPLOYMENT_ID },
+      { client: OperationClient.Cli, appId: APP_ID, ownerId: OWNER_ID, rollbackOf: DEPLOYMENT_ID },
     ]);
   });
 
@@ -803,6 +829,7 @@ describe('a deployment can say what the app starts with, once', () => {
     const { deploymentsRepo, service } = serviceWith({ row: deploymentRow() });
 
     await service.createOrRollback({
+      client: OperationClient.Cli,
       isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
@@ -816,6 +843,7 @@ describe('a deployment can say what the app starts with, once', () => {
     const { deploymentsRepo, service } = serviceWith({ row: deploymentRow() });
 
     await service.createOrRollback({
+      client: OperationClient.Cli,
       isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
@@ -832,6 +860,7 @@ describe('a deployment can say what the app starts with, once', () => {
 
     await expect(
       service.createOrRollback({
+        client: OperationClient.Cli,
         isAnonymous: false,
         appId: APP_ID,
         ownerId: OWNER_ID,
@@ -845,6 +874,7 @@ describe('a deployment can say what the app starts with, once', () => {
 
     await expect(
       service.createOrRollback({
+        client: OperationClient.Cli,
         isAnonymous: false,
         appId: APP_ID,
         ownerId: OWNER_ID,
@@ -859,6 +889,7 @@ describe('a deployment can say what the app starts with, once', () => {
     const { deploymentsRepo, service } = serviceWith({ row: deploymentRow() });
 
     await service.createOrRollback({
+      client: OperationClient.Cli,
       isAnonymous: false,
       appId: APP_ID,
       ownerId: OWNER_ID,
@@ -873,6 +904,7 @@ describe('deployment grants only deploy compiled binaries', () => {
   test('a binary deployment preserves owner and app scoping', async () => {
     const { service, deploymentsRepo } = serviceWith({ row: deploymentRow() });
     await service.createWithDeploymentGrant({
+      client: OperationClient.Cli,
       deploymentGrantId: GRANT_ID,
       appId: APP_ID,
       ownerId: OWNER_ID,
@@ -885,6 +917,7 @@ describe('deployment grants only deploy compiled binaries', () => {
         artifactId: ARTIFACT_ID,
         initialDataFrom: null,
         onlyOne: false,
+        client: OperationClient.Cli,
         deploymentGrantId: GRANT_ID,
       },
     ]);
@@ -898,6 +931,7 @@ describe('deployment grants only deploy compiled binaries', () => {
     ]) {
       await expect(
         service.createWithDeploymentGrant({
+          client: OperationClient.Cli,
           appId: APP_ID,
           ownerId: OWNER_ID,
           source,
@@ -955,6 +989,7 @@ describe('GitHub deployment provenance belongs to the deployment', () => {
     const { service } = serviceWith({ refusal: { outcome: 'no-grant' } });
     await expect(
       service.createWithDeploymentGrant({
+        client: OperationClient.Cli,
         appId: APP_ID,
         ownerId: OWNER_ID,
         deploymentGrantId: GRANT_ID,
@@ -984,6 +1019,7 @@ describe('MCP deployment provenance belongs to the deployment', () => {
         clientId,
       });
       expect(deploymentsRepo.calls[0]).toEqual({
+        client: OperationClient.Mcp,
         appId: APP_ID,
         ownerId: OWNER_ID,
         artifactId: ARTIFACT_ID,

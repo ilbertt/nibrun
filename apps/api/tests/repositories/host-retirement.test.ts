@@ -9,6 +9,7 @@ import {
 import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import { type Queries, schema } from '#db/queries.gen.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { HealthService } from '#services/health.service.ts';
@@ -54,6 +55,7 @@ async function retire(hostId: HostId) {
 
 function deploy(app: Awaited<ReturnType<typeof createDeployedApp>>) {
   return deploymentsRepository().insert({
+    client: OperationClient.Cli,
     appId: app.appId,
     ownerId: app.ownerId,
     artifactId: app.artifactId,
@@ -177,6 +179,7 @@ test('redeploys and rollbacks on a retired host fail without relocating or super
   expect(await deploy(app)).toEqual({ outcome: 'no-host' });
   expect(
     await deploymentsRepository().insertRollback({
+      client: OperationClient.Cli,
       appId: app.appId,
       ownerId: app.ownerId,
       rollbackOf: app.deploymentId,

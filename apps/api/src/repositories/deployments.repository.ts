@@ -9,6 +9,7 @@ import type {
   InstanceState,
   Ipv4Address,
 } from '@repo/protocol';
+import { setOperationContext } from '#db/operation-context.ts';
 import type { Queries } from '#db/queries.gen.ts';
 import type { Deployment, DeploymentState } from '#lib/api/deployment.ts';
 import type {
@@ -21,6 +22,7 @@ import type {
 import { CUSTOM_KIND } from '#lib/app-hostname.ts';
 import { ConflictError } from '#lib/errors.ts';
 import { HOST_REPORT_MAX_AGE_MS } from '#lib/host-readiness.ts';
+import { type OperationAttribution, OperationClient } from '#lib/operation-client.ts';
 import { lockAppForMutation } from '#repositories/apps.repository.ts';
 import { Repository } from '#repositories/repository.ts';
 
@@ -32,12 +34,13 @@ export type OwnedApp = { appId: AppId; ownerId: OwnerId };
  * `initialDataFrom` is the archive the app's filesystem should be created holding, where one was
  * named. Null is the ordinary case and the only one an app that has ever run can be in.
  */
-export type CreateDeploymentInput = OwnedApp & {
-  artifactId: ArtifactId;
-  initialDataFrom: ImportId | null;
-  // Whether the app takes this one deployment and no other.
-  onlyOne: boolean;
-};
+export type CreateDeploymentInput = OperationAttribution &
+  OwnedApp & {
+    artifactId: ArtifactId;
+    initialDataFrom: ImportId | null;
+    // Whether the app takes this one deployment and no other.
+    onlyOne: boolean;
+  };
 
 /**
  * Why a deployment was not written, where "not found" would not be the truth.
@@ -62,16 +65,18 @@ export type CreateMcpDeploymentInput = OwnedApp & {
   chatId: NonNullable<Deployment['mcp']>['chatId'];
 };
 
-export type CreateGitHubDeploymentInput = OwnedApp & {
-  artifactId: ArtifactId;
-  deploymentGrantId: DeploymentGrantId;
-};
+export type CreateGitHubDeploymentInput = OperationAttribution &
+  OwnedApp & {
+    artifactId: ArtifactId;
+    deploymentGrantId: DeploymentGrantId;
+  };
 
 /**
  * Going back to a release is a new row naming the one it replays, rather than that one revived:
  * a deployment never moves backwards, and the history keeps both the release and the rollback.
  */
-export type RollbackDeploymentInput = OwnedApp & { rollbackOf: DeploymentId };
+export type RollbackDeploymentInput = OperationAttribution &
+  OwnedApp & { rollbackOf: DeploymentId };
 
 type Transaction = TypedSQL<Queries>;
 
@@ -163,6 +168,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       onlyOne: false,
       deploymentGrantId: null,
       mcpClientId: clientId,
+      client: OperationClient.Mcp,
       mcpChatId: chatId ?? null,
     });
   }
@@ -178,6 +184,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
   }
 
   private insertDeployment({
+    client,
     appId,
     ownerId,
     artifactId,
@@ -219,6 +226,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       if (hostId === undefined) {
         return { outcome: 'no-host' };
       }
+      await setOperationContext({ tx, client });
       await supersedeLiveDeployment({ tx, appId, ownerId });
 
       // INSERT … SELECT rather than VALUES, so the predicate that decides ownership is the one
@@ -300,6 +308,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
    * to another app is not a deployment this request can name.
    */
   insertRollback({
+    client,
     appId,
     ownerId,
     rollbackOf,
@@ -326,6 +335,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       if ((await this.hostForDeployment({ tx, appId, ownerId })) === undefined) {
         return null;
       }
+      await setOperationContext({ tx, client });
       await supersedeLiveDeployment({ tx, appId, ownerId });
 
       const [inserted] = await tx.InsertReplayedDeployment`
@@ -397,7 +407,10 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
         LEFT JOIN rollback_config config ON true
         RETURNING id
       `;
-      return inserted ? await this.selectDeployment({ tx, deploymentId: inserted.id }) : null;
+      if (!inserted) {
+        return null;
+      }
+      return await this.selectDeployment({ tx, deploymentId: inserted.id });
     });
   }
 
