@@ -4,7 +4,7 @@ CREATE TABLE nibrun.operations (
   action text NOT NULL,
   client text NOT NULL,
   app_id uuid REFERENCES nibrun.apps (id) ON DELETE RESTRICT,
-  deployment_id uuid,
+  deployment_id uuid REFERENCES nibrun.deployments (id) ON DELETE SET NULL,
   host_id uuid REFERENCES nibrun.hosts (id) ON DELETE RESTRICT,
   CONSTRAINT operations_action_check CHECK (action IN (
     'app.created', 'app.updated', 'app.environment.updated', 'app.suspended', 'app.resumed',
@@ -12,7 +12,7 @@ CREATE TABLE nibrun.operations (
   )),
   CONSTRAINT operations_client_check CHECK (client IN ('dashboard', 'cli', 'mcp', 'system', 'unknown')),
   CONSTRAINT operations_deployment_target_check CHECK (
-    (deployment_id IS NOT NULL) = (action LIKE 'deployment.%')
+    deployment_id IS NULL OR action LIKE 'deployment.%'
   ),
   CONSTRAINT operations_target_check CHECK (
     CASE WHEN action = 'host.retired' THEN host_id IS NOT NULL AND app_id IS NULL AND client = 'system'
@@ -24,15 +24,32 @@ COMMENT ON COLUMN nibrun.operations.created_at IS
   'Derived from the uuidv7 id; the moment the row was created. @notNull';
 COMMENT ON COLUMN nibrun.operations.app_id IS $c$@type import('@repo/protocol').AppId$c$;
 COMMENT ON COLUMN nibrun.operations.deployment_id IS
-  $c$The deployment created by the request, including a rollback. Retained after the app's deployments are purged. @type import('@repo/protocol').DeploymentId$c$;
+  $c$The deployment created by the request, including a rollback. Cleared when the deployment is purged. @type import('@repo/protocol').DeploymentId$c$;
 COMMENT ON COLUMN nibrun.operations.host_id IS $c$@type import('@repo/protocol').HostId$c$;
 
 CREATE INDEX operations_app_id_id_idx ON nibrun.operations (app_id, id) WHERE app_id IS NOT NULL;
 CREATE INDEX operations_deployment_id_idx ON nibrun.operations (deployment_id) WHERE deployment_id IS NOT NULL;
 CREATE INDEX operations_host_id_id_idx ON nibrun.operations (host_id, id) WHERE host_id IS NOT NULL;
 
-CREATE TRIGGER operations_append_only BEFORE UPDATE OR DELETE OR TRUNCATE ON nibrun.operations
+CREATE TRIGGER operations_refuse_delete BEFORE DELETE OR TRUNCATE ON nibrun.operations
   FOR EACH STATEMENT EXECUTE FUNCTION nibrun.refuse_write();
+
+CREATE FUNCTION nibrun.preserve_operation() RETURNS trigger
+LANGUAGE plpgsql AS $$
+BEGIN
+  IF OLD.deployment_id IS NOT NULL AND NEW.deployment_id IS NULL AND
+     NOT EXISTS (SELECT 1 FROM nibrun.deployments WHERE id = OLD.deployment_id) THEN
+    OLD.deployment_id := NULL;
+    IF NEW IS NOT DISTINCT FROM OLD THEN
+      RETURN NULL;
+    END IF;
+  END IF;
+  RAISE EXCEPTION '% is append-only; % refused', TG_TABLE_NAME, TG_OP;
+END;
+$$;
+
+CREATE TRIGGER preserve_operation AFTER UPDATE ON nibrun.operations
+  FOR EACH ROW EXECUTE FUNCTION nibrun.preserve_operation();
 
 CREATE FUNCTION nibrun.require_operation_deployment() RETURNS trigger
 LANGUAGE plpgsql AS $$
@@ -47,4 +64,4 @@ END;
 $$;
 
 CREATE TRIGGER require_operation_deployment BEFORE INSERT ON nibrun.operations
-  FOR EACH ROW WHEN (NEW.deployment_id IS NOT NULL) EXECUTE FUNCTION nibrun.require_operation_deployment();
+  FOR EACH ROW WHEN (NEW.action LIKE 'deployment.%') EXECUTE FUNCTION nibrun.require_operation_deployment();
