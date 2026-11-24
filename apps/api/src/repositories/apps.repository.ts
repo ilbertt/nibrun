@@ -11,6 +11,7 @@ import type {
   Hostname,
   ObjectKey,
 } from '@repo/protocol';
+import { type AppConfigAction, setOperationContext } from '#db/operation-context.ts';
 import type { Queries } from '#db/queries.gen.ts';
 import { APP_STATES, type AppHostnameState, type AppName, type AppState } from '#lib/api/app.ts';
 import type { DnsLabel } from '#lib/api/dns-label.ts';
@@ -24,7 +25,6 @@ import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
 import { requiresCustomDomain } from '#lib/validate-app-access.ts';
 import type { StoredVolumeStorage } from '#lib/volume-storage.ts';
 import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';
-import { type AppConfigAction, setOperationContext } from '#repositories/operations.repository.ts';
 import { Repository, TEXT_ARRAY } from '#repositories/repository.ts';
 
 export type AppRow = Queries['SelectAppById'];

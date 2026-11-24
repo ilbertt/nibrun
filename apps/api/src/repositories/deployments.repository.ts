@@ -9,6 +9,7 @@ import type {
   InstanceState,
   Ipv4Address,
 } from '@repo/protocol';
+import { setOperationContext } from '#db/operation-context.ts';
 import type { Queries } from '#db/queries.gen.ts';
 import type { Deployment, DeploymentState } from '#lib/api/deployment.ts';
 import type {
@@ -23,7 +24,6 @@ import { ConflictError } from '#lib/errors.ts';
 import { HOST_REPORT_MAX_AGE_MS } from '#lib/host-readiness.ts';
 import { type OperationAttribution, OperationClient } from '#lib/operation-client.ts';
 import { lockAppForMutation } from '#repositories/apps.repository.ts';
-import { setOperationContext } from '#repositories/operations.repository.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type DeploymentRow = Queries['SelectDeploymentById'];
