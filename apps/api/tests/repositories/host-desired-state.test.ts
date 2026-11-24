@@ -6,6 +6,7 @@ import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
 import { appAccess } from '#lib/app-access.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 import { sealSecret } from '#lib/tenant-secrets.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
@@ -302,7 +303,7 @@ test('access edits are staged until deployed and rollback restores the pinned po
 
   async function deploy() {
     const result = await deployments.insert({
-      client: 'cli',
+      client: OperationClient.Cli,
       ...app,
       initialDataFrom: null,
       onlyOne: false,
@@ -315,7 +316,7 @@ test('access edits are staged until deployed and rollback restores the pinned po
 
   const publicAccess = { kind: 'public' } as const;
   const written = await apps.update({
-    client: 'cli',
+    client: OperationClient.Cli,
     ...app,
     patch: { name: undefined, access: jwt },
   });
@@ -325,7 +326,11 @@ test('access edits are staged until deployed and rollback restores the pinned po
   expect(appAccess(protectedDeployment)).toEqual(jwt);
   expect(await deployedAccess()).toEqual(jwt);
 
-  await apps.update({ client: 'cli', ...app, patch: { name: undefined, access: publicAccess } });
+  await apps.update({
+    client: OperationClient.Cli,
+    ...app,
+    patch: { name: undefined, access: publicAccess },
+  });
   expect(await deployedAccess()).toEqual(jwt);
   expect(appAccess(await deploy())).toEqual(publicAccess);
   expect(await deployedAccess()).toEqual(publicAccess);
@@ -333,7 +338,7 @@ test('access edits are staged until deployed and rollback restores the pinned po
   expect(historical && appAccess(historical)).toEqual(jwt);
 
   const rollback = await deployments.insertRollback({
-    client: 'cli',
+    client: OperationClient.Cli,
     ...app,
     rollbackOf: protectedDeployment.id,
   });

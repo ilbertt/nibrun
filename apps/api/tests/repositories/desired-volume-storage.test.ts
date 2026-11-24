@@ -14,6 +14,7 @@ import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import { type Queries, schema } from '#db/queries.gen.ts';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 import { openSecret, sealSecret } from '#lib/tenant-secrets.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
@@ -142,7 +143,7 @@ test('normal config edits and subsequent deployments preserve storage without ex
   const previous = await storedColumns();
   const [app] = await sql.unsafe('SELECT id FROM nibrun.apps WHERE slug = $1', [PRIVATE_APP]);
   const changed = await new AppsRepository(withTypes<Queries>(sql)).update({
-    client: 'cli',
+    client: OperationClient.Cli,
     appId: Value.Parse(AppIdSchema, app.id),
     ownerId: OWNER_ID,
     patch: { name: undefined, args: ['changed'] },
@@ -256,7 +257,7 @@ test.each([
     await insertConfig({ slug, storage: undefined });
     const previousSecret = sealSecret({ key: TEST_SECRETS_KEY, plaintext: 'previous-environment' });
     await apps.update({
-      client: 'cli',
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       patch: {
@@ -287,7 +288,7 @@ test.each([
     const volume = (await desiredVolumes()).find((one) => one.appId === appId)!;
     await insertConfig({ slug, storage: { ...configured, bucket: 'not-deployed' } });
     const request = {
-      client: 'cli' as const,
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       rollbackOf: Value.Parse(DeploymentIdSchema, previous.id),
@@ -347,7 +348,7 @@ test.each([
   const previous = await deployApp(slug);
   const volume = (await desiredVolumes()).find((one) => one.appId === appId);
   await new AppsRepository(withTypes<Queries>(sql)).update({
-    client: 'cli',
+    client: OperationClient.Cli,
     appId,
     ownerId: OWNER_ID,
     patch: { name: undefined, args: ['newer'] },
@@ -358,7 +359,7 @@ test.each([
     [appId, OWNER_ID],
   );
   const rollback = await new DeploymentsRepository(withTypes<Queries>(sql)).insertRollback({
-    client: 'cli',
+    client: OperationClient.Cli,
     appId,
     ownerId: OWNER_ID,
     rollbackOf: Value.Parse(DeploymentIdSchema, previous.id),

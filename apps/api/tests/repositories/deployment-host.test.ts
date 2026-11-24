@@ -4,6 +4,7 @@ import type { DeploymentId, HostId } from '@repo/protocol';
 import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
 import { DeploymentInitiator } from '#lib/api/deployment-initiator.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 import {
   DeploymentsRepository,
   type ReportedDeployment,
@@ -95,7 +96,7 @@ test('a system host migration keeps its initiator while user redeploys and rollb
     DeploymentInitiator.SystemHostMigration,
   );
   const redeployed = await repository.insert({
-    client: 'cli',
+    client: OperationClient.Cli,
     ...owned,
     artifactId: app.artifactId,
     initialDataFrom: null,
@@ -106,7 +107,7 @@ test('a system host migration keeps its initiator while user redeploys and rollb
     DeploymentInitiator.Owner,
   );
   const rollback = await repository.insertRollback({
-    client: 'cli',
+    client: OperationClient.Cli,
     ...owned,
     rollbackOf: migrationId,
   });
@@ -211,7 +212,7 @@ test('a redeploy inherits the previous execution host', async () => {
     app.deploymentId,
   ]);
   const deployed = await new DeploymentsRepository(withTypes<Queries>(sql)).insert({
-    client: 'cli',
+    client: OperationClient.Cli,
     appId: app.appId,
     ownerId: app.ownerId,
     artifactId: app.artifactId,
@@ -239,7 +240,7 @@ test('an artifact rollback keeps the current host rather than replaying the orig
     [DESTINATION_HOST_ID, app.deploymentId],
   );
   const replayed = await new DeploymentsRepository(withTypes<Queries>(sql)).insertRollback({
-    client: 'cli',
+    client: OperationClient.Cli,
     appId: app.appId,
     ownerId: app.ownerId,
     rollbackOf: app.deploymentId,

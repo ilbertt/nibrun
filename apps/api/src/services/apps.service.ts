@@ -42,7 +42,7 @@ import {
   NotFoundError,
   TooManyRequestsError,
 } from '#lib/errors.ts';
-import type { OperationAttribution } from '#lib/operation-client.ts';
+import { type OperationAttribution, OperationClient } from '#lib/operation-client.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
@@ -672,7 +672,7 @@ export class AppsService extends Service {
    */
   private async expireApp({ appId, ownerId }: OwnedApp): Promise<void> {
     try {
-      await this.delete({ appId, ownerId, client: 'system' });
+      await this.delete({ appId, ownerId, client: OperationClient.System });
       this.logger.info('app expired', { appId, ownerId });
     } catch (error) {
       if (error instanceof NotFoundError) {

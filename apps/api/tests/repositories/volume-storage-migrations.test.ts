@@ -12,6 +12,7 @@ import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
 import { ArtifactIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { ConflictError } from '#lib/errors.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 import { openSecret, sealSecret } from '#lib/tenant-secrets.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
@@ -104,7 +105,7 @@ test.each([
     const appId = await createApp({ name: auth.kind, deployed: true, configured: false });
     const environment = { TOKEN: sealed('original-environment') };
     await new AppsRepository(withTypes<Queries>(sql)).update({
-      client: 'cli',
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       patch: { name: undefined, args: ['serve'], environment: { set: environment, removed: [] } },
@@ -237,7 +238,7 @@ test('pending migration blocks config edits, deployments, rollbacks and deletion
   const attempts = [
     function edit() {
       return apps.update({
-        client: 'cli',
+        client: OperationClient.Cli,
         appId,
         ownerId: OWNER_ID,
         patch: { name: undefined, args: ['edited'] },
@@ -245,7 +246,7 @@ test('pending migration blocks config edits, deployments, rollbacks and deletion
     },
     function deploy() {
       return deployments.insert({
-        client: 'cli',
+        client: OperationClient.Cli,
         appId,
         ownerId: OWNER_ID,
         artifactId,
@@ -255,7 +256,7 @@ test('pending migration blocks config edits, deployments, rollbacks and deletion
     },
     function rollback() {
       return deployments.insertRollback({
-        client: 'cli',
+        client: OperationClient.Cli,
         appId,
         ownerId: OWNER_ID,
         rollbackOf: Value.Parse(DeploymentIdSchema, previous.id),
@@ -263,7 +264,7 @@ test('pending migration blocks config edits, deployments, rollbacks and deletion
     },
     function remove() {
       return apps.updateState({
-        client: 'cli',
+        client: OperationClient.Cli,
         appId,
         ownerId: OWNER_ID,
         state: 'deleting',
@@ -300,7 +301,7 @@ test('pending migration blocks config edits, deployments, rollbacks and deletion
   expect(
     (
       await apps.update({
-        client: 'cli',
+        client: OperationClient.Cli,
         appId,
         ownerId: OWNER_ID,
         patch: { name: undefined, args: ['after-cancel'] },
@@ -310,7 +311,7 @@ test('pending migration blocks config edits, deployments, rollbacks and deletion
   expect(
     (
       await deployments.insert({
-        client: 'cli',
+        client: OperationClient.Cli,
         appId,
         ownerId: OWNER_ID,
         artifactId,
@@ -333,7 +334,7 @@ test('a deployment racing with migration cannot select the pending destination',
   const [migration, deployment] = await Promise.allSettled([
     repository().request({ appId, ownerId: OWNER_ID, destination: destination(ACCESS_KEY_AUTH) }),
     new DeploymentsRepository(withTypes<Queries>(sql)).insert({
-      client: 'cli',
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       artifactId: Value.Parse(ArtifactIdSchema, previous.artifact_id),
@@ -463,7 +464,7 @@ test('only the owning host can complete a deployed destination, unlocking edits 
   expect((await repository().findByApp(attempt))?.state).toBe('pending');
   const apps = new AppsRepository(withTypes<Queries>(sql));
   const edit = {
-    client: 'cli' as const,
+    client: OperationClient.Cli,
     appId,
     ownerId: OWNER_ID,
     patch: { name: undefined, args: ['after-migration'] },
@@ -486,7 +487,7 @@ test('only the owning host can complete a deployed destination, unlocking edits 
   expect(await apps.update(edit)).not.toBeNull();
   expect(
     await deployments.insertRollback({
-      client: 'cli',
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       rollbackOf: source!.id,
@@ -618,7 +619,7 @@ test('timeout recovery leaves fresh requests and started work blocked', async ()
   expect(await repository().abortUnstarted({ ...recovery, createdBefore })).toBe(false);
   await expect(
     new AppsRepository(withTypes<Queries>(sql)).update({
-      client: 'cli',
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       patch: { name: undefined, args: ['unsafe'] },
@@ -681,7 +682,7 @@ test('started recovery requires the owning host and attempt, including after a r
   );
   await expect(
     new AppsRepository(withTypes<Queries>(sql)).update({
-      client: 'cli',
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       patch: { name: undefined, args: ['still-blocked'] },

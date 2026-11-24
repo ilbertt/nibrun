@@ -12,6 +12,7 @@ import { configWithDefaults } from '#lib/app-config.ts';
 import { DEPLOYMENT_GRANT_LIFETIME_MS } from '#lib/deployment-grant-policy.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { GitHubActionsOidcClaims } from '#lib/github-actions-oidc.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { GitHubDeploymentGrantsRepository } from '#repositories/github-deployment-grants.repository.ts';
@@ -77,7 +78,7 @@ function identity(): GitHubActionsOidcClaims {
 async function configuredApp(): Promise<AppId> {
   const slug = Value.Parse(DnsLabelSchema, `grant-${Bun.randomUUIDv7()}`);
   const created = await new AppsRepository(withTypes<Queries>(sql)).create({
-    client: 'cli',
+    client: OperationClient.Cli,
     ownerId: OWNER_ID,
     anonymousAppsAtMost: null,
     name: Value.Parse(AppNameSchema, 'Grant app'),
@@ -315,7 +316,7 @@ async function deploymentInput(appId: AppId) {
     [appId, new Bun.CryptoHasher('sha256').update('binary').digest('hex')],
   );
   return {
-    client: 'cli' as const,
+    client: OperationClient.Cli,
     appId,
     ownerId: OWNER_ID,
     artifactId: Value.Parse(ArtifactIdSchema, artifact.id),
@@ -376,7 +377,7 @@ test('manual redeploys and rollbacks do not inherit a GitHub artifact origin', a
   const manual = await repository.insert(input);
   expect(manual.outcome === 'created' ? manual.row.github_repository : undefined).toBeNull();
   const rollback = await repository.insertRollback({
-    client: 'cli',
+    client: OperationClient.Cli,
     appId,
     ownerId: OWNER_ID,
     rollbackOf: github.row.id,
@@ -504,7 +505,7 @@ test.each(['registered-client', 'https://claude.ai/oauth/mcp-oauth-client-metada
     expect(manual.outcome === 'created' ? manual.row.mcp_client_id : undefined).toBeNull();
     expect(manual.outcome === 'created' ? manual.row.mcp_chat_id : undefined).toBeNull();
     const rollback = await repository.insertRollback({
-      client: 'cli',
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       rollbackOf: deployed.row.id,

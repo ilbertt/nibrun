@@ -1,11 +1,22 @@
 import { HttpOperationClient, OPERATION_CLIENT_HEADER } from '@repo/api-constants';
 
-export type OperationClient = `${HttpOperationClient}` | 'mcp' | 'system' | 'unknown';
+export enum OperationClient {
+  Dashboard = 'dashboard',
+  Cli = 'cli',
+  Mcp = 'mcp',
+  System = 'system',
+  Unknown = 'unknown',
+}
+
 export type OperationAttribution = { client: OperationClient };
 
 export function httpOperationClient(request: Request): OperationClient {
-  const client = request.headers.get(OPERATION_CLIENT_HEADER);
-  return client === HttpOperationClient.Dashboard || client === HttpOperationClient.Cli
-    ? client
-    : 'unknown';
+  switch (request.headers.get(OPERATION_CLIENT_HEADER)) {
+    case HttpOperationClient.Dashboard:
+      return OperationClient.Dashboard;
+    case HttpOperationClient.Cli:
+      return OperationClient.Cli;
+    default:
+      return OperationClient.Unknown;
+  }
 }

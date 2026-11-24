@@ -21,7 +21,7 @@ import type {
 import { CUSTOM_KIND } from '#lib/app-hostname.ts';
 import { ConflictError } from '#lib/errors.ts';
 import { HOST_REPORT_MAX_AGE_MS } from '#lib/host-readiness.ts';
-import type { OperationAttribution } from '#lib/operation-client.ts';
+import { type OperationAttribution, OperationClient } from '#lib/operation-client.ts';
 import { lockAppForMutation } from '#repositories/apps.repository.ts';
 import { setOperationContext } from '#repositories/operations.repository.ts';
 import { Repository } from '#repositories/repository.ts';
@@ -168,7 +168,7 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       onlyOne: false,
       deploymentGrantId: null,
       mcpClientId: clientId,
-      client: 'mcp',
+      client: OperationClient.Mcp,
       mcpChatId: chatId ?? null,
     });
   }

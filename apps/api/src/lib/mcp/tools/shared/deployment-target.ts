@@ -2,6 +2,7 @@ import { AppIdSchema } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import type { OwnerId } from '#lib/api/identifiers.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 import { CreateAppRequestSchema } from '#routes/api/apps/model.ts';
 import type { AppsService } from '#services/apps.service.ts';
 
@@ -34,7 +35,7 @@ export function appForDeployment({
 }): ReturnType<AppsService['get']> {
   return appId === undefined
     ? appsService.create({
-        client: 'mcp',
+        client: OperationClient.Mcp,
         ownerId,
         isAnonymous: false,
         name: Value.Parse(CreateAppRequestSchema.properties.name, name),
