@@ -2230,6 +2230,27 @@ export interface ILiveAppsTable {
     constraints: keyof (typeof schema)["live_apps"]["_constraints"];
 }
 
+/** Columns of `operations`. */
+export interface IOperationsColumns {
+    id: string;
+    /** Derived from the uuidv7 id; the moment the row was created. */
+    created_at: Date;
+    action: string;
+    client: string;
+    app_id: import("@repo/protocol").AppId | null;
+    /** The deployment created by the request, including a rollback. Retained after the app's deployments are purged. */
+    deployment_id: import("@repo/protocol").DeploymentId | null;
+    host_id: import("@repo/protocol").HostId | null;
+}
+
+/** Schema of `operations`. */
+export interface IOperationsTable {
+    columns: IOperationsColumns;
+    relationType: (typeof schema)["operations"]["_relationType"];
+    indexes: keyof (typeof schema)["operations"]["_indexes"];
+    constraints: keyof (typeof schema)["operations"]["_constraints"];
+}
+
 /** Columns of `paid_requests`. */
 export interface IPaidRequestsColumns {
     id: string;
@@ -2988,6 +3009,34 @@ export const schema = {
         _indexes: {},
         _constraints: {}
     },
+    operations: {
+        _relationName: "operations",
+        _relationType: "table",
+        _columns: {
+            id: { _columnName: "id", _foreignKeys: {} },
+            created_at: { _columnName: "created_at", _foreignKeys: {} },
+            action: { _columnName: "action", _foreignKeys: {} },
+            client: { _columnName: "client", _foreignKeys: {} },
+            app_id: { _columnName: "app_id", _foreignKeys: { operations_app_id_fkey: { _constraintName: "operations_app_id_fkey", _references: { _relationName: "apps", _columnName: "id" } } } },
+            deployment_id: { _columnName: "deployment_id", _foreignKeys: {} },
+            host_id: { _columnName: "host_id", _foreignKeys: { operations_host_id_fkey: { _constraintName: "operations_host_id_fkey", _references: { _relationName: "hosts", _columnName: "id" } } } }
+        },
+        _indexes: {
+            operations_app_id_id_idx: { _indexName: "operations_app_id_id_idx" },
+            operations_deployment_id_idx: { _indexName: "operations_deployment_id_idx" },
+            operations_host_id_id_idx: { _indexName: "operations_host_id_id_idx" },
+            operations_pkey: { _indexName: "operations_pkey" }
+        },
+        _constraints: {
+            operations_action_check: { _constraintName: "operations_action_check" },
+            operations_app_id_fkey: { _constraintName: "operations_app_id_fkey" },
+            operations_client_check: { _constraintName: "operations_client_check" },
+            operations_deployment_target_check: { _constraintName: "operations_deployment_target_check" },
+            operations_host_id_fkey: { _constraintName: "operations_host_id_fkey" },
+            operations_pkey: { _constraintName: "operations_pkey" },
+            operations_target_check: { _constraintName: "operations_target_check" }
+        }
+    },
     paid_requests: {
         _relationName: "paid_requests",
         _relationType: "table",
@@ -3133,6 +3182,7 @@ export interface Tables {
     imports: IImportsTable;
     latest_app_deployments: ILatestAppDeploymentsTable;
     live_apps: ILiveAppsTable;
+    operations: IOperationsTable;
     paid_requests: IPaidRequestsTable;
     profiles: IProfilesTable;
     purgeable_apps: IPurgeableAppsTable;
