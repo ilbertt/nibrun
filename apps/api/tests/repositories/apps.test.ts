@@ -24,6 +24,7 @@ import { DnsLabelSchema } from '#lib/api/dns-label.ts';
 import { type ArtifactId, type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { appAccess } from '#lib/app-access.ts';
 import { configWithDefaults, type SealedEnvironmentPatch } from '#lib/app-config.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 import { openSecret, sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
 import { AppHostnamesRepository } from '#repositories/app-hostnames.repository.ts';
 import {
@@ -184,7 +185,13 @@ test('Cloudflare Access needs a registered domain to enable or change the policy
   if (!seed) {
     throw new Error('Expected the initial deployment');
   }
-  const release = { ...owner, artifactId: seed.artifact_id, initialDataFrom: null, onlyOne: false };
+  const release = {
+    client: OperationClient.Cli,
+    ...owner,
+    artifactId: seed.artifact_id,
+    initialDataFrom: null,
+    onlyOne: false,
+  };
   const protectedRelease = await deployments.insert(release);
   if (protectedRelease.outcome !== 'created') {
     throw new Error('Expected the protected deployment');
@@ -206,7 +213,11 @@ test('Cloudflare Access needs a registered domain to enable or change the policy
   expect(await domains.removeCustom(remaining)).toEqual({ cloudflare_id: null });
   await expect(update(CLOUDFLARE_ACCESS)).rejects.toThrow('Associate a custom domain');
   await expect(
-    deployments.insertRollback({ ...owner, rollbackOf: protectedRelease.row.id }),
+    deployments.insertRollback({
+      client: OperationClient.Cli,
+      ...owner,
+      rollbackOf: protectedRelease.row.id,
+    }),
   ).rejects.toThrow('Associate a custom domain');
 });
 
@@ -1286,6 +1297,7 @@ describe("a stranger's app takes one binary and one deployment", () => {
     const artifactId = await stored({ appId, digest: 'a'.repeat(SHA256_HEX_LENGTH) });
     const deploy = () =>
       deployments.insert({
+        client: OperationClient.Cli,
         appId,
         ownerId: STRANGER_ID,
         artifactId,
@@ -1304,6 +1316,7 @@ describe("a stranger's app takes one binary and one deployment", () => {
     const asked = await Promise.all(
       [...Array(AT_ONCE).keys()].map(() =>
         deployments.insert({
+          client: OperationClient.Cli,
           appId,
           ownerId: STRANGER_ID,
           artifactId,

@@ -4,6 +4,7 @@ import type { DeploymentId, HostId } from '@repo/protocol';
 import type { SQL } from 'bun';
 import type { Queries } from '#db/queries.gen.ts';
 import { DeploymentInitiator } from '#lib/api/deployment-initiator.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 import {
   DeploymentsRepository,
   type ReportedDeployment,
@@ -95,6 +96,7 @@ test('a system host migration keeps its initiator while user redeploys and rollb
     DeploymentInitiator.SystemHostMigration,
   );
   const redeployed = await repository.insert({
+    client: OperationClient.Cli,
     ...owned,
     artifactId: app.artifactId,
     initialDataFrom: null,
@@ -104,8 +106,26 @@ test('a system host migration keeps its initiator while user redeploys and rollb
   expect(redeployed.outcome === 'created' ? redeployed.row.initiated_by : undefined).toBe(
     DeploymentInitiator.Owner,
   );
-  const rollback = await repository.insertRollback({ ...owned, rollbackOf: migrationId });
+  const rollback = await repository.insertRollback({
+    client: OperationClient.Cli,
+    ...owned,
+    rollbackOf: migrationId,
+  });
   expect(rollback?.initiated_by).toBe(DeploymentInitiator.Owner);
+  expect([
+    ...(await sql.unsafe(
+      'SELECT action, client, deployment_id FROM nibrun.operations WHERE app_id = $1 ORDER BY id',
+      [app.appId],
+    )),
+  ]).toEqual([
+    { action: 'deployment.requested', client: 'system', deployment_id: migrationId },
+    {
+      action: 'deployment.requested',
+      client: 'cli',
+      deployment_id: redeployed.outcome === 'created' ? redeployed.row.id : null,
+    },
+    { action: 'deployment.rollback.requested', client: 'cli', deployment_id: rollback?.id },
+  ]);
   expect((await repository.findById({ ...owned, deploymentId: migrationId }))?.initiated_by).toBe(
     DeploymentInitiator.SystemHostMigration,
   );
@@ -192,6 +212,7 @@ test('a redeploy inherits the previous execution host', async () => {
     app.deploymentId,
   ]);
   const deployed = await new DeploymentsRepository(withTypes<Queries>(sql)).insert({
+    client: OperationClient.Cli,
     appId: app.appId,
     ownerId: app.ownerId,
     artifactId: app.artifactId,
@@ -219,6 +240,7 @@ test('an artifact rollback keeps the current host rather than replaying the orig
     [DESTINATION_HOST_ID, app.deploymentId],
   );
   const replayed = await new DeploymentsRepository(withTypes<Queries>(sql)).insertRollback({
+    client: OperationClient.Cli,
     appId: app.appId,
     ownerId: app.ownerId,
     rollbackOf: app.deploymentId,

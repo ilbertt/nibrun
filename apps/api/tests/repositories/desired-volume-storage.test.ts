@@ -14,6 +14,7 @@ import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import { type Queries, schema } from '#db/queries.gen.ts';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 import { openSecret, sealSecret } from '#lib/tenant-secrets.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
@@ -285,6 +286,7 @@ test.each([
     const volume = (await desiredVolumes()).find((one) => one.appId === appId)!;
     await insertConfig({ slug, storage: { ...configured, bucket: 'not-deployed' } });
     const request = {
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       rollbackOf: Value.Parse(DeploymentIdSchema, previous.id),
@@ -354,6 +356,7 @@ test.each([
     [appId, OWNER_ID],
   );
   const rollback = await new DeploymentsRepository(withTypes<Queries>(sql)).insertRollback({
+    client: OperationClient.Cli,
     appId,
     ownerId: OWNER_ID,
     rollbackOf: Value.Parse(DeploymentIdSchema, previous.id),

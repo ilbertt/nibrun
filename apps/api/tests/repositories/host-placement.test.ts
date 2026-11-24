@@ -4,6 +4,7 @@ import { HOST_STATES } from '@repo/protocol';
 import type { SQL } from 'bun';
 import { type Queries, schema } from '#db/queries.gen.ts';
 import { HOST_REPORT_MAX_AGE_MS } from '#lib/host-readiness.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
@@ -43,6 +44,7 @@ async function newApp(name: string) {
 
 function deploy(app: Awaited<ReturnType<typeof createDeployedApp>>) {
   return repository().insert({
+    client: OperationClient.Cli,
     appId: app.appId,
     ownerId: app.ownerId,
     artifactId: app.artifactId,
@@ -135,6 +137,7 @@ test('redeploys and rollbacks retain their draining host while a different host 
   await availableHost();
   expect((await deploy(app)).outcome).toBe('created');
   const rollback = await repository().insertRollback({
+    client: OperationClient.Cli,
     appId: app.appId,
     ownerId: app.ownerId,
     rollbackOf: app.deploymentId,
