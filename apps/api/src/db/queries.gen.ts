@@ -558,6 +558,10 @@ export interface IDeleteArtifactsByAppResult {
 export interface IDeleteAppUsageByAppResult {
 }
 
+/** Result of query `UpdateAppState`. */
+export interface IUpdateAppStateResult {
+}
+
 /** Result of query `SelectCurrentAppConfig`. */
 export interface ISelectCurrentAppConfigResult {
     has_custom_domain: boolean | null;
@@ -1464,6 +1468,7 @@ export interface Queries {
     DeleteImportsByApp: IDeleteImportsByAppResult;
     DeleteArtifactsByApp: IDeleteArtifactsByAppResult;
     DeleteAppUsageByApp: IDeleteAppUsageByAppResult;
+    UpdateAppState: IUpdateAppStateResult;
     SelectCurrentAppConfig: ISelectCurrentAppConfigResult;
     InsertPatchedAppConfig: IInsertPatchedAppConfigResult;
     SelectAppForUpdate: ISelectAppForUpdateResult;

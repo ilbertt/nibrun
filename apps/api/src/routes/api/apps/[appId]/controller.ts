@@ -47,8 +47,9 @@ export const AppsAppIdController = new Elysia()
   // rest, so the state it comes back in is the whole answer.
   .delete(
     '/apps/:appId',
-    async ({ appsService, params, user, status }) => {
+    async ({ operationClient, appsService, params, user, status }) => {
       const app = await appsService.delete({
+        client: operationClient,
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: Value.Parse(OwnerIdSchema, user.id),
       });

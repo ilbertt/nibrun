@@ -72,7 +72,11 @@ type OwnedApp = { appId: AppId; ownerId: OwnerId };
  * something a suspend can call off, so the states an app may be moved *out of* are named by
  * whoever is asking rather than assumed here. An app in none of them is left exactly as it is.
  */
-export type StateChange = OwnedApp & { state: AppState; from: readonly AppState[] };
+export type StateChange = OwnedApp &
+  OperationAttribution & {
+    state: Exclude<AppState, 'deleted'>;
+    from: readonly AppState[];
+  };
 
 /**
  * What an owner may change about an app in one request: what they call it, and how it starts.
@@ -566,7 +570,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     appIds: readonly AppId[];
     hostId: HostId;
   }): Promise<void> {
-    // Untagged, as `updateState` is: `sql.array` is a clause the generator blanks out before it
+    // Untagged because `sql.array` is a clause the generator blanks out before it
     // parses the statement, and there is no row type to lose — this returns nothing.
     await this.sql`
       UPDATE nibrun.apps
@@ -704,23 +708,21 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     });
   }
 
-  updateState({ appId, ownerId, state, from }: StateChange) {
+  updateState({ appId, ownerId, state, from, client }: StateChange) {
     return this.sql.begin(async (tx) => {
-      if (!(await lockAppForMutation({ tx, appId, ownerId }))) {
+      const locked = await lockAppForMutation({ tx, appId, ownerId });
+      if (!locked || !from.includes(locked.state)) {
         return null;
       }
-      // Untagged for the reason `insertEnvironment` is: `sql.array` is a clause the generator
-      // blanks out before it parses the statement, and `state = ANY()` is not a predicate. There
-      // is no row type to lose — the only column is the id, and all this reads from it is
-      // whether the predicate matched anything.
-      const [updated] = await tx`
-        UPDATE nibrun.apps
-        SET state = ${state}
+      if (locked.state === state) {
+        return await appAsChanged({ tx, appId, ownerId });
+      }
+      await setOperationContext({ tx, client });
+      await tx.UpdateAppState`
+        UPDATE nibrun.apps SET state = ${state}
         WHERE id = ${appId} AND owner_id = ${ownerId}
-          AND state = ANY(${tx.array([...from], TEXT_ARRAY)})
-        RETURNING id
       `;
-      return updated ? await appAsChanged({ tx, appId, ownerId }) : null;
+      return await appAsChanged({ tx, appId, ownerId });
     });
   }
 }
@@ -855,12 +857,12 @@ export async function lockApp({
   return app;
 }
 
-export async function lockAppForMutation(input: Parameters<typeof lockApp>[0]): Promise<boolean> {
+export async function lockAppForMutation(input: Parameters<typeof lockApp>[0]) {
   const app = await lockApp(input);
   if (app?.volume_storage_migration_state === 'pending') {
     throw new ConflictError('Cannot change this app while its storage migration is pending.');
   }
-  return app !== undefined;
+  return app;
 }
 
 /**
@@ -916,8 +918,7 @@ async function strangersHold({
   tx: TypedSQL<Queries>;
   atLeast: number;
 }): Promise<boolean> {
-  // Untagged, as `updateState` is: there is no row type to lose, and the generator has no relation
-  // to read a lock's return through.
+  // The generator has no relation to infer the advisory lock's return type from.
   await tx`SELECT pg_advisory_xact_lock(hashtext('nibrun.anonymous_apps'))`;
   const [strangers] = await tx.SelectAnonymousAppsHeld`
     /* @notNull held */

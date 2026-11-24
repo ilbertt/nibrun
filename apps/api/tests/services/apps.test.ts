@@ -939,10 +939,12 @@ describe('an app the caller does not own is one that does not exist', () => {
 
     await expect(service.get(owned)).rejects.toBeInstanceOf(NotFoundError);
     await expect(service.update({ ...owned, patch: {} })).rejects.toBeInstanceOf(NotFoundError);
-    await expect(service.delete(owned)).rejects.toBeInstanceOf(NotFoundError);
-    await expect(service.setState({ ...owned, state: 'suspended' })).rejects.toBeInstanceOf(
+    await expect(service.delete({ ...owned, client: OperationClient.Cli })).rejects.toBeInstanceOf(
       NotFoundError,
     );
+    await expect(
+      service.setState({ client: OperationClient.Cli, ...owned, state: 'suspended' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
 
@@ -988,7 +990,11 @@ describe('an app is suspended by saying so, and comes back the release it left a
       const appsRepo = new StubAppsRepository({ failures: 0 });
       appsRepo.owns = true;
 
-      const app = await serviceWith({ appsRepo }).setState({ ...owned, state });
+      const app = await serviceWith({ appsRepo }).setState({
+        client: OperationClient.Cli,
+        ...owned,
+        state,
+      });
 
       expect(app.state).toBe(state);
     });
@@ -1002,7 +1008,11 @@ describe('an app is suspended by saying so, and comes back the release it left a
     appsRepo.deleting = [APP_ID];
 
     await expect(
-      serviceWith({ appsRepo }).setState({ ...owned, state: 'active' }),
+      serviceWith({ appsRepo }).setState({
+        client: OperationClient.Cli,
+        ...owned,
+        state: 'active',
+      }),
     ).rejects.toBeInstanceOf(ConflictError);
   });
 });
@@ -1021,7 +1031,11 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
     appsRepo.owns = true;
     appsRepo.deployedApps = [APP_ID];
 
-    const app = await serviceWith({ appsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
+    const app = await serviceWith({ appsRepo }).delete({
+      client: OperationClient.Cli,
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+    });
 
     expect(app.state).toBe('deleting');
     expect(appsRepo.deleted).toEqual([]);
@@ -1034,7 +1048,11 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
     appsRepo.owns = true;
     const exportsRepo = new StubExportCancellationRepository();
 
-    await serviceWith({ appsRepo, exportsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
+    await serviceWith({ appsRepo, exportsRepo }).delete({
+      client: OperationClient.Cli,
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+    });
 
     expect(exportsRepo.cancelled).toEqual([APP_ID]);
   });
@@ -1045,7 +1063,11 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
     const exportsRepo = new StubExportCancellationRepository();
 
     await expect(
-      serviceWith({ appsRepo, exportsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID }),
+      serviceWith({ appsRepo, exportsRepo }).delete({
+        client: OperationClient.Cli,
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+      }),
     ).rejects.toBeInstanceOf(NotFoundError);
     expect(exportsRepo.cancelled).toEqual([]);
   });
@@ -1337,6 +1359,7 @@ describe('an app keeps its hostnames until it is deleted rather than deleting', 
     hostnamesRepo.disposable.set(APP_ID, appHostnames());
 
     const app = await serviceWith({ appsRepo, hostnamesRepo, customHostnamesRepo: edge }).delete({
+      client: OperationClient.Cli,
       appId: APP_ID,
       ownerId: OWNER_ID,
     });
@@ -1355,7 +1378,7 @@ describe('an app keeps its hostnames until it is deleted rather than deleting', 
     hostnamesRepo.disposable.set(APP_ID, appHostnames());
     const apps = serviceWith({ appsRepo, hostnamesRepo, customHostnamesRepo: edge });
 
-    await apps.delete({ appId: APP_ID, ownerId: OWNER_ID });
+    await apps.delete({ client: OperationClient.Cli, appId: APP_ID, ownerId: OWNER_ID });
     appsRepo.purgeable.push(APP_ID);
     await apps.purgeDeleted();
 
@@ -1375,7 +1398,7 @@ describe('an app keeps its hostnames until it is deleted rather than deleting', 
     edge.failures.add(CLOUDFLARE_ID);
     const apps = serviceWith({ appsRepo, hostnamesRepo, customHostnamesRepo: edge });
 
-    await apps.delete({ appId: APP_ID, ownerId: OWNER_ID });
+    await apps.delete({ client: OperationClient.Cli, appId: APP_ID, ownerId: OWNER_ID });
     appsRepo.purgeable.push(APP_ID);
     await apps.purgeDeleted();
 
@@ -1532,7 +1555,11 @@ describe('an app with no filesystem to tear down is not left waiting for one', (
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.owns = true;
 
-    const app = await serviceWith({ appsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
+    const app = await serviceWith({ appsRepo }).delete({
+      client: OperationClient.Cli,
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+    });
 
     expect(app.state).toBe('deleted');
     expect(appsRepo.deleted).toEqual([APP_ID]);
@@ -1545,7 +1572,11 @@ describe('an app with no filesystem to tear down is not left waiting for one', (
     appsRepo.owns = true;
     appsRepo.deployedApps = [APP_ID];
 
-    const app = await serviceWith({ appsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
+    const app = await serviceWith({ appsRepo }).delete({
+      client: OperationClient.Cli,
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+    });
 
     expect(app.state).toBe('deleting');
     expect(appsRepo.deleted).toEqual([]);
@@ -1558,7 +1589,11 @@ describe('an app with no filesystem to tear down is not left waiting for one', (
     appsRepo.owns = true;
     const exportsRepo = new StubExportCancellationRepository();
 
-    await serviceWith({ appsRepo, exportsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
+    await serviceWith({ appsRepo, exportsRepo }).delete({
+      client: OperationClient.Cli,
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+    });
 
     expect(exportsRepo.cancelled).toEqual([APP_ID]);
   });
