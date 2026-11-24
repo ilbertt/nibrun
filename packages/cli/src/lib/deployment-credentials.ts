@@ -1,5 +1,5 @@
-import { createPublicApiClient } from '@repo/api-client/public';
 import { GITHUB_ACTIONS_OIDC_AUDIENCE } from '@repo/api-constants';
+import { createCliApiClient } from '#lib/api.ts';
 import { DeploymentError, deploymentApiRequest } from '#lib/deployment-error.ts';
 
 const EXPIRY_MARGIN_MS = 30_000;
@@ -38,7 +38,7 @@ export class DeploymentCredentials implements DeploymentCredentialsContract {
     }
     const identity = await this.identityToken();
     this.input.maskSecret(identity);
-    const api = createPublicApiClient({
+    const api = createCliApiClient({
       baseUrl: this.input.apiUrl,
       headers: { authorization: `Bearer ${identity}` },
     });
