@@ -42,6 +42,7 @@ export type DeployFormValues = {
   args: string | undefined;
   environment: EnvironmentVariable[] | undefined;
   initialData: FileSource | undefined;
+  volumeStorageFile: File | undefined;
 };
 
 export type DeployFormApi = ReactFormExtendedApi<
@@ -82,6 +83,7 @@ const UNTOUCHED: DeployFormValues = {
   args: undefined,
   environment: undefined,
   initialData: undefined,
+  volumeStorageFile: undefined,
 };
 
 export function validateBinary({ value }: { value: FileSource | undefined }): string | undefined {
@@ -303,24 +305,30 @@ function asReleaseRequest({
         ...configured,
         binary,
         appId: replacing?.id,
-        name: replacing === undefined ? value.name.trim() || undefined : undefined,
-        initialData: initialDataFrom({ file: value.initialData, replacing }),
+        ...newAppInputs({ value, replacing }),
       };
 }
 
-/**
- * The archive as the deploy sends it. Nothing at all for an app that already exists: its data was
- * created with it, and the form does not offer this there — but the values outlive the field, and
- * a release is made of what they hold rather than of what was on screen.
- */
-function initialDataFrom({
-  file,
+// Form values can outlive hidden fields when switching from creation to an existing deployment.
+function newAppInputs({
+  value,
   replacing,
 }: {
-  file: FileSource | undefined;
+  value: DeployFormValues;
   replacing: AppSummary | undefined;
-}): DeployableArchive | undefined {
-  if (file === undefined || replacing !== undefined) {
+}) {
+  if (replacing !== undefined) {
+    return { name: undefined, volumeStorageFile: undefined, initialData: undefined };
+  }
+  return {
+    name: value.name.trim() || undefined,
+    volumeStorageFile: value.volumeStorageFile,
+    initialData: initialDataFrom(value.initialData),
+  };
+}
+
+function initialDataFrom(file: FileSource | undefined): DeployableArchive | undefined {
+  if (file === undefined) {
     return undefined;
   }
   const fetched = fetchedFile(file);

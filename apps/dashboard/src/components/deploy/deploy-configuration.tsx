@@ -8,6 +8,7 @@ import {
 import { Field, FieldDescription, FieldError, FieldLabel } from '@repo/ui/components/field';
 import { Input } from '@repo/ui/components/input';
 import { Textarea } from '@repo/ui/components/textarea';
+import { CustomerVolumeField } from '#components/deploy/customer-volume-field.tsx';
 import { DeployAccessField } from '#components/deploy/deploy-access-field.tsx';
 import { DeployEnvironmentField } from '#components/deploy/deploy-environment-field.tsx';
 import { DeployInitialDataField } from '#components/deploy/deploy-initial-data-field.tsx';
@@ -157,6 +158,16 @@ export function DeployConfiguration({
             </AccordionTrigger>
             <AccordionContent keepMounted>
               <DeployInitialDataField api={api} />
+            </AccordionContent>
+          </AccordionItem>
+        </Accordion>
+      )}
+      {!locked && (
+        <Accordion>
+          <AccordionItem>
+            <AccordionTrigger>Storage bucket</AccordionTrigger>
+            <AccordionContent keepMounted>
+              <CustomerVolumeField api={api} />
             </AccordionContent>
           </AccordionItem>
         </Accordion>

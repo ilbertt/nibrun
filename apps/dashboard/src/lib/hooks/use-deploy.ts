@@ -8,6 +8,7 @@ import {
   type DeployStep,
   deploy,
   describeUnservedDeployment,
+  readCustomerVolume,
   redeploy,
   type UploadProgress,
 } from '@repo/app-operations';
@@ -32,6 +33,7 @@ export type DeployRequest = Configured & {
   appId: string | undefined;
   name: string | undefined;
   initialData: DeployableArchive | undefined;
+  volumeStorageFile: File | undefined;
 };
 
 /** The same release without a binary to upload, which only an app already running one can ask for. */
@@ -93,6 +95,10 @@ export function useDeploy({
           ? await deploy({
               api,
               ...request,
+              volumeStorage:
+                request.volumeStorageFile === undefined
+                  ? undefined
+                  : await readCustomerVolume(request.volumeStorageFile),
               onStep: reportStep,
               upload: browserUpload,
               whileUploading: ({ task }) => task(onProgress),

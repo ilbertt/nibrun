@@ -30,6 +30,7 @@ const UNTOUCHED: DeployFormValues = {
   args: undefined,
   environment: undefined,
   initialData: undefined,
+  volumeStorageFile: undefined,
 };
 
 // Cast because what this file is about is which fields the form offers, not what an app row holds.
@@ -113,6 +114,7 @@ describe('what a deploy is beyond the binary itself', () => {
     const markup = renderToStaticMarkup(<Configuration replacing={undefined} />);
 
     expect(markup).toContain(INITIAL_DATA);
+    expect(markup).toContain('deploy-storage-file');
     expect(markup).toContain('.tar.gz');
     expect(markup).toContain('.zip');
   });
@@ -126,6 +128,7 @@ describe('what a deploy is beyond the binary itself', () => {
     const markup = renderToStaticMarkup(<Configuration replacing={RUNNING} />);
 
     expect(markup).not.toContain(INITIAL_DATA);
+    expect(markup).not.toContain('deploy-storage-file');
     expect(markup).toContain('Environment variables');
   });
 });

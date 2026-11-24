@@ -98,6 +98,8 @@ S3-compatible bucket and credentials with access to it. Keep the ZeroFS password
 nib run ./my-server --name my-app --volume-storage ./bucket.json
 ```
 
+The dashboard accepts the same JSON file under **Storage bucket** when creating an app.
+
 nibrun assigns the prefix `apps/<app-id>` in that bucket. Supply the provider's signing region
 (including `"auto"`), or `null` for the host default. Choose a password of at least eight bytes.
 Keep the configuration file out of source control. The host receives these secrets to run the app.

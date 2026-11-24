@@ -1,0 +1,11 @@
+{
+  "endpoint": "https://objects.example.com",
+  "bucket": "my-app-data",
+  "region": null,
+  "auth": {
+    "kind": "access-key",
+    "accessKeyId": "<access key ID>",
+    "secretAccessKey": "<secret access key>"
+  },
+  "encryptionPassword": "<your ZeroFS password>"
+}
