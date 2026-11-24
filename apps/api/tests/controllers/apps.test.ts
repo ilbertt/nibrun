@@ -75,6 +75,30 @@ describe('nothing under /api/apps answers a caller with no session', () => {
 // Elysia raises its own 422 for a schema violation; `elysiaErrorHandler` rewrites it, and a
 // client reading the status would otherwise see two different codes for one kind of mistake.
 describe('a malformed request is a bad request', () => {
+  test.each([
+    { method: 'POST', url: APPS_URL, fields: { name: 'test-app' } },
+    { method: 'PATCH', url: APP_URL, fields: {} },
+  ] as const)('app owners cannot assign a bucket with $method', async ({ method, url, fields }) => {
+    const response = await sendJson({
+      method,
+      url,
+      body: {
+        ...fields,
+        config: {
+          access: { kind: 'public' },
+          volumeStorage: {
+            endpoint: 'https://objects.example.test',
+            bucket: 'customer-data',
+            region: null,
+            auth: { kind: 'anonymous' },
+            encryptionPassword: 'test-password',
+          },
+        },
+      },
+    });
+    expect(response.status).toBe(StatusMap['Bad Request']);
+  });
+
   test('creating an app without naming it', async () => {
     const response = await sendJson({ method: 'POST', url: APPS_URL, body: { config: {} } });
 

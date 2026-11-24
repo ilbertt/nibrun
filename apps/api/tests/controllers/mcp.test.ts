@@ -235,6 +235,7 @@ function ownedApp() {
     idleTimeoutMs: 300_000,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
+    volumeStorage: null,
     volumeUsage: null,
     computeUsage: null,
     expiresAt: null,

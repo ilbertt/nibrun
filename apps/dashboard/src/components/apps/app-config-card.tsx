@@ -26,7 +26,7 @@ export function AppConfigCard({ app }: { app: AppSummary }) {
         <AppRunCommand app={app} />
         <AppActivation app={app} />
         <AppEnvironment app={app} />
-        <AppVolume />
+        <AppVolume storage={app.volumeStorage ?? null} />
       </CardContent>
     </Card>
   );
