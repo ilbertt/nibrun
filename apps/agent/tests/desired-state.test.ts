@@ -18,6 +18,7 @@ test('an empty initialization archive creates data under /app/data without wrapp
   const desired = desiredState({ volumes: [desiredVolume()], instances: [desiredInstance()] });
   const converted = nibrunnerDesiredState({ desired, revision: 'revision-1' });
   const archive = emptyDataArchive();
+  expect(converted.volumes[0]?.storage).toBeNull();
   expect((await new Bun.Archive(archive.bytes).files()).size).toBe(0);
   expect(converted.volumes[0]?.initialContents).toEqual({
     digest: archive.digest,
