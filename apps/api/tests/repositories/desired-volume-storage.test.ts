@@ -18,6 +18,7 @@ import { openSecret, sealSecret } from '#lib/tenant-secrets.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
+import { ExportsRepository } from '#repositories/exports.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { registerHost } from '#tests/support/hosts.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
@@ -120,6 +121,21 @@ test('a config row stores ordinary fields as columns and seals each credential s
     expect(row[column]).not.toBe(plaintext);
     expect(openSecret({ key: TEST_SECRETS_KEY, sealed: row[column] })).toBe(plaintext);
   }
+});
+
+test('a customer bucket export is refused before it reaches the host desired document', async () => {
+  const slug = 'private-export';
+  await createApp(slug);
+  await insertConfig({ slug, storage: storage(ACCESS_KEY_AUTH) });
+  await deployApp(slug);
+  const [app] = await sql.unsafe('SELECT id FROM nibrun.apps WHERE slug = $1', [slug]);
+  const exports = new ExportsRepository(withTypes<Queries>(sql));
+  const appId = Value.Parse(AppIdSchema, app.id);
+  const ownerId = Value.Parse(OwnerIdSchema, 'owner');
+  await expect(exports.request({ appId, ownerId, expiresAt: new Date() })).rejects.toThrow(
+    'customer bucket',
+  );
+  expect(await exports.listByApp({ appId, ownerId })).toEqual([]);
 });
 
 test('normal config edits and subsequent deployments preserve storage without exposing its columns', async () => {
