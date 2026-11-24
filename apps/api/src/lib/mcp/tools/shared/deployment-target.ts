@@ -9,7 +9,7 @@ export const DeploymentTargetSchema = Type.Object(
   {
     appId: Type.Optional(AppIdSchema),
     name: Type.Optional(CreateAppRequestSchema.properties.name),
-    config: Type.Omit(CreateAppRequestSchema.properties.config, ['environment'], {
+    config: Type.Pick(CreateAppRequestSchema.properties.config, ['access', 'args', 'httpPort'], {
       additionalProperties: false,
       description: 'Initial runtime options. Set environment variables directly in the dashboard.',
     }),

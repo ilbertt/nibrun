@@ -7,6 +7,7 @@ import {
 } from '@repo/protocol';
 import { type Brand, type BrandedSchema, stringEnum } from '@repo/typebox-extensions';
 import { type TString, Type } from '@sinclair/typebox';
+import { CustomerVolumeSchema } from '#lib/api/customer-volume.ts';
 import { DnsLabelSchema } from '#lib/api/dns-label.ts';
 import { TenantEnvironmentPatchSchema } from '#lib/api/environment.ts';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
@@ -70,7 +71,11 @@ const ownedConfig = {
 };
 
 export const NewAppConfigSchema = Type.Object(
-  { ...ownedConfig, environment: Type.Optional(AppConfigSchema.properties.environment) },
+  {
+    ...ownedConfig,
+    environment: Type.Optional(AppConfigSchema.properties.environment),
+    volumeStorage: Type.Optional(CustomerVolumeSchema),
+  },
   { additionalProperties: false },
 );
 

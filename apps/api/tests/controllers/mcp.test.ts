@@ -1160,6 +1160,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       const tool = listed.result.tools.find((entry: { name: string }) => entry.name === name);
       expect(tool.inputSchema.properties.config.additionalProperties).toBe(false);
       expect(tool.inputSchema.properties.config.properties).not.toHaveProperty('environment');
+      expect(tool.inputSchema.properties.config.properties).not.toHaveProperty('volumeStorage');
       expect(JSON.stringify(tool.inputSchema)).not.toContain('x-nibrun-secret');
 
       const createApp = spyOn(appsService, 'create');

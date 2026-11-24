@@ -22,6 +22,7 @@ import { Value } from '@sinclair/typebox/value';
 import { SQL } from 'bun';
 import { schema } from '#db/queries.gen.ts';
 import type { NewAppConfig } from '#lib/api/app.ts';
+import { CustomerVolumeSchema } from '#lib/api/customer-volume.ts';
 
 const HOST_ID = Value.Parse(HostIdSchema, 'reporting-host');
 
@@ -639,6 +640,24 @@ test('a new app cannot enable Cloudflare Access before registering a domain', as
     'Associate a custom domain',
   );
   expect(appsRepo.offeredConfigs).toHaveLength(0);
+});
+
+test('app creation seals customer credentials and leaves the public response free of them', async () => {
+  const appsRepo = new StubAppsRepository({ failures: 0 });
+  const volumeStorage = Value.Parse(CustomerVolumeSchema, {
+    endpoint: 'https://s3.example.test',
+    bucket: 'documents',
+    region: 'auto',
+    auth: { kind: 'access-key', accessKeyId: 'id', secretAccessKey: 'private-access' },
+    encryptionPassword: 'private-password',
+  });
+  const app = await createApp({ appsRepo, config: { access: { kind: 'public' }, volumeStorage } });
+  expect(appsRepo.offeredConfigs[0]?.volumeStorage).toMatchObject({
+    volume_storage_bucket: 'documents',
+    volume_storage_region: 'auto',
+  });
+  expect(JSON.stringify(appsRepo.offeredConfigs[0])).not.toContain('private-');
+  expect(JSON.stringify(app)).not.toContain('private-');
 });
 
 test('app creation and edits accept the policy through config, and the owner reads it there', async () => {

@@ -47,6 +47,7 @@ import { REDACTED } from '#lib/redact-secrets.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import { requiresCustomDomain, validatedAppAccess } from '#lib/validate-app-access.ts';
+import { sealCustomerVolume } from '#lib/volume-storage.ts';
 import { toVolumeStorageMigration } from '#lib/volume-storage-migration.ts';
 import type {
   AppHostnameRow,
@@ -211,6 +212,9 @@ export class AppsService extends Service {
     });
     const appConfig = {
       ...withDefaults,
+      ...(config?.volumeStorage && {
+        volumeStorage: sealCustomerVolume({ storage: config.volumeStorage, key: this.secretsKey }),
+      }),
       access: validatedAppAccess(withDefaults.access),
       environment: sealEnvironment({ key: this.secretsKey, environment }),
     };

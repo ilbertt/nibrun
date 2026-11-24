@@ -75,6 +75,33 @@ describe('nothing under /api/apps answers a caller with no session', () => {
 // Elysia raises its own 422 for a schema violation; `elysiaErrorHandler` rewrites it, and a
 // client reading the status would otherwise see two different codes for one kind of mistake.
 describe('a malformed request is a bad request', () => {
+  test.each([
+    { field: 'auth', value: { kind: 'invalid', secretAccessKey: 'private-key' } },
+    { field: 'prefix', value: 'another-app' },
+    { field: 'region', value: '' },
+  ])('invalid customer volume $field does not expose secrets', async ({ field, value }) => {
+    const response = await sendJson({
+      method: 'POST',
+      url: APPS_URL,
+      body: {
+        name: 'customer',
+        config: {
+          access: { kind: 'public' },
+          volumeStorage: {
+            endpoint: 'https://s3.example.com',
+            bucket: 'customer',
+            region: null,
+            auth: { kind: 'anonymous' },
+            encryptionPassword: 'private-password',
+            [field]: value,
+          },
+        },
+      },
+    });
+    expect(response.status).toBe(StatusMap['Bad Request']);
+    expect(await response.text()).not.toContain('private-');
+  });
+
   test('creating an app without naming it', async () => {
     const response = await sendJson({ method: 'POST', url: APPS_URL, body: { config: {} } });
 

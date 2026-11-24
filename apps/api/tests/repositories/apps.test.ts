@@ -20,11 +20,14 @@ import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import type { Queries, Tables } from '#db/queries.gen.ts';
 import { AppNameSchema, OWNED_APP_STATES } from '#lib/api/app.ts';
+import { CustomerVolumeSchema } from '#lib/api/customer-volume.ts';
 import { DnsLabelSchema } from '#lib/api/dns-label.ts';
 import { type ArtifactId, type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { appAccess } from '#lib/app-access.ts';
 import { configWithDefaults, type SealedEnvironmentPatch } from '#lib/app-config.ts';
 import { openSecret, sealEnvironment, sealedFromStore } from '#lib/tenant-secrets.ts';
+import { sealCustomerVolume } from '#lib/volume-storage.ts';
+import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppHostnamesRepository } from '#repositories/app-hostnames.repository.ts';
 import {
   type AppCreation,
@@ -252,6 +255,11 @@ test('owner configuration changes preserve an existing platform-enabled extra po
 
 async function createHostedUsageApp(slug: string): Promise<AppId> {
   const appId = await createApp(slug);
+  await placeDeployment(appId);
+  return appId;
+}
+
+async function placeDeployment(appId: AppId) {
   const [artifact] = await sql.unsafe(
     `INSERT INTO nibrun.artifacts (app_id, digest, size_bytes, object_key, original_file_name)
      VALUES ($1, repeat('a', 64), 1, $2, 'app') RETURNING id`,
@@ -263,8 +271,53 @@ async function createHostedUsageApp(slug: string): Promise<AppId> {
      WHERE app_id = $1 ORDER BY id DESC LIMIT 1`,
     [appId, artifact.id, HOST_ID],
   );
-  return appId;
 }
+
+test('a customer bucket created with an app reaches its deployed volume with a unique prefix', async () => {
+  const source = Value.Parse(CustomerVolumeSchema, {
+    endpoint: 'https://s3.example.test:9443',
+    bucket: 'tenant-bucket',
+    region: null,
+    auth: {
+      kind: 'session',
+      accessKeyId: 'id',
+      secretAccessKey: 'private-access',
+      sessionToken: 'private-session',
+    },
+    encryptionPassword: 'private-password',
+  });
+  const created = requireCreated(
+    await repo.create({
+      anonymousAppsAtMost: null,
+      ownerId: OWNER_ID,
+      name: Value.Parse(AppNameSchema, 'bucket'),
+      slug: Value.Parse(DnsLabelSchema, 'bucket'),
+      hostname: Value.Parse(HostnameSchema, 'bucket.apps.example.com'),
+      config: {
+        ...configWithDefaults(),
+        environment: {},
+        volumeStorage: sealCustomerVolume({ key: TEST_SECRETS_KEY, storage: source }),
+      },
+    }),
+  );
+  const id = created.app.id;
+  expect(JSON.stringify(created)).not.toContain('private-');
+  const [row] = await sql.unsafe(
+    'SELECT volume_storage_secret_access_key, volume_storage_session_token, volume_storage_encryption_password FROM nibrun.app_configs WHERE app_id = $1',
+    [id],
+  );
+  expect(JSON.stringify(row)).not.toContain('private-');
+  await placeDeployment(id);
+  const agent = new AgentRepository({ sql: withTypes<Queries>(sql), secretsKey: TEST_SECRETS_KEY });
+  const desired = await agent.desiredState({ hostId: HOST_ID, retainedDeploymentsPerApp: 2 });
+  expect(desired.volumes.find((volume) => volume.appId === id)?.storage).toEqual({
+    endpoint: source.endpoint,
+    bucket: source.bucket,
+    prefix: Value.Parse(ObjectKeySchema, `apps/${id}`),
+    auth: source.auth,
+    encryptionPassword: source.encryptionPassword,
+  });
+});
 
 async function recordComputeUsageForApps({
   readings,

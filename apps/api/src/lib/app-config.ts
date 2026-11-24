@@ -15,6 +15,7 @@ import {
 } from '#lib/app-config-defaults.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
+import type { sealCustomerVolume } from '#lib/volume-storage.ts';
 
 // An owner reads which variables are set, never what they hold: the values are sealed in the
 // database and only opened where desired state is built, so there is nothing here to return.
@@ -27,6 +28,7 @@ export type PublicAppConfig = Omit<AppConfig, 'environment'> & {
 
 export type StoredAppConfig = Omit<PublicAppConfig, 'environment'> & {
   environment: SealedEnvironment;
+  volumeStorage?: ReturnType<typeof sealCustomerVolume>;
 };
 
 /**

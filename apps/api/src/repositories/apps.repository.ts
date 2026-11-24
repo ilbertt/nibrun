@@ -21,7 +21,7 @@ import { CUSTOM_KIND } from '#lib/app-hostname.ts';
 import { BadRequestError, ConflictError } from '#lib/errors.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
 import { requiresCustomDomain } from '#lib/validate-app-access.ts';
-import type { StoredVolumeStorage } from '#lib/volume-storage.ts';
+import { initialVolumeStorage, type StoredVolumeStorage } from '#lib/volume-storage.ts';
 import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';
 import { Repository, TEXT_ARRAY } from '#repositories/repository.ts';
 
@@ -197,6 +197,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         throw new Error('Inserting into nibrun.apps returned no row.');
       }
 
+      const storage = initialVolumeStorage({ appId: inserted.id, storage: config.volumeStorage });
       const [insertedConfig] = await tx.InsertAppConfig`
         /* @notNull id */
         INSERT INTO nibrun.app_configs (
@@ -206,7 +207,10 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           health_check_grace_period_ms, health_check_healthy_threshold,
           health_check_unhealthy_threshold,
           restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
-          restart_backoff_factor, restart_reset_after_ms
+          restart_backoff_factor, restart_reset_after_ms,
+          volume_storage_endpoint, volume_storage_bucket, volume_storage_prefix, volume_storage_region,
+          volume_storage_auth_kind, volume_storage_access_key_id, volume_storage_secret_access_key,
+          volume_storage_session_token, volume_storage_encryption_password
         )
         VALUES (
           ${columns.access_kind}, ${columns.access_header}, ${columns.access_format}, ${columns.access_issuer},
@@ -219,7 +223,11 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           ${config.healthCheck.healthyThreshold}, ${config.healthCheck.unhealthyThreshold},
           ${config.restartPolicy.maxRestarts}, ${config.restartPolicy.initialBackoffMs},
           ${config.restartPolicy.maxBackoffMs}, ${config.restartPolicy.backoffFactor},
-          ${config.restartPolicy.resetAfterMs}
+          ${config.restartPolicy.resetAfterMs},
+          ${storage.volume_storage_endpoint}, ${storage.volume_storage_bucket},
+          ${storage.volume_storage_prefix}, ${storage.volume_storage_region}, ${storage.volume_storage_auth_kind},
+          ${storage.volume_storage_access_key_id}, ${storage.volume_storage_secret_access_key},
+          ${storage.volume_storage_session_token}, ${storage.volume_storage_encryption_password}
         )
         RETURNING id
       `;
