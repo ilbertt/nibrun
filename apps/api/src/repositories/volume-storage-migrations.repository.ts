@@ -95,7 +95,7 @@ export class VolumeStorageMigrationsRepository
           ...destination,
           volume_storage_prefix: Value.Parse(
             ObjectKeySchema,
-            `apps/${appId}/${crypto.randomUUID()}/`,
+            `apps/${appId}/${crypto.randomUUID()}`,
           ),
         },
       });

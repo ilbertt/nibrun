@@ -132,7 +132,11 @@ test.each([
     expect(await apps.listByOwner({ ownerId: OWNER_ID })).toContainEqual(
       expect.objectContaining(status),
     );
-    expect(String(job.volume_storage_prefix).startsWith(`apps/${appId}/`)).toBe(true);
+    expect(job.volume_storage_prefix?.split('/')).toEqual([
+      'apps',
+      appId,
+      expect.stringMatching(/^[a-f0-9-]+$/),
+    ]);
     expect(job).not.toHaveProperty('volume_storage_access_key_id');
     expect(job).not.toHaveProperty('volume_storage_secret_access_key');
     expect(job).not.toHaveProperty('volume_storage_session_token');

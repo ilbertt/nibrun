@@ -148,11 +148,13 @@ test('normal config edits and subsequent deployments preserve storage without ex
   });
   expect(changed?.args).toEqual(['changed']);
   expect(changed).not.toHaveProperty('volume_storage_secret_access_key');
-  expect(await storedColumns()).toEqual(previous);
+  expect(previous.volume_storage_prefix).toBe('apps/access-key/');
+  expect(await storedColumns()).toEqual({ ...previous, volume_storage_prefix: 'apps/access-key' });
   await deployApp(PRIVATE_APP);
-  expect((await desiredVolumes()).find((volume) => volume.storage)?.storage).toEqual(
-    storage(ACCESS_KEY_AUTH),
-  );
+  expect((await desiredVolumes()).find((volume) => volume.appId === app.id)?.storage).toEqual({
+    ...storage(ACCESS_KEY_AUTH),
+    prefix: Value.Parse(S3VolumeStorageSchema.properties.prefix, 'apps/access-key'),
+  });
 });
 
 test('an undeployed config version does not redirect an existing volume', async () => {
@@ -228,7 +230,7 @@ test('deletion retains the deployment’s storage even after every release is su
   ]);
   expect((await desiredVolumes()).find((volume) => volume.appId === app.id)).toMatchObject({
     desiredState: 'absent',
-    storage: storage(ACCESS_KEY_AUTH),
+    storage: { ...storage(ACCESS_KEY_AUTH), prefix: 'apps/access-key' },
   });
   await sql.unsafe(`UPDATE nibrun.apps SET state = 'deleted' WHERE id = $1`, [app.id]);
   expect((await desiredVolumes()).some((volume) => volume.appId === app.id)).toBe(false);
@@ -280,7 +282,7 @@ test.each([
     await insertConfig({ slug, storage: configured });
     const current = await deployApp(slug);
     const currentColumns = await storedColumns(slug);
-    const volume = (await desiredVolumes()).find((one) => one.appId === appId);
+    const volume = (await desiredVolumes()).find((one) => one.appId === appId)!;
     await insertConfig({ slug, storage: { ...configured, bucket: 'not-deployed' } });
     const request = {
       appId,
@@ -315,8 +317,12 @@ test.each([
       environment_names: ['TOKEN'],
     });
     expect(rollback?.artifact_id).not.toBe(current.artifact_id);
-    expect(await storedColumns(slug)).toEqual(currentColumns);
-    expect((await desiredVolumes()).find((one) => one.appId === appId)).toEqual(volume);
+    const prefix = Value.Parse(S3VolumeStorageSchema.properties.prefix, `apps/${auth.kind}`);
+    expect(await storedColumns(slug)).toEqual({ ...currentColumns, volume_storage_prefix: prefix });
+    expect((await desiredVolumes()).find((one) => one.appId === appId)).toEqual({
+      ...volume,
+      storage: { ...configured, prefix },
+    });
     const environment = await sql.unsafe(
       `SELECT e.name, e.value FROM nibrun.app_config_environment e
      JOIN nibrun.deployments d ON d.config_id = e.config_id
@@ -336,13 +342,13 @@ test.each([
   const appId = Value.Parse(AppIdSchema, await createApp(slug));
   await insertConfig({ slug, storage: configured });
   const previous = await deployApp(slug);
+  const volume = (await desiredVolumes()).find((one) => one.appId === appId);
   await new AppsRepository(withTypes<Queries>(sql)).update({
     appId,
     ownerId: OWNER_ID,
     patch: { name: undefined, args: ['newer'] },
   });
   await deployApp(slug);
-  const volume = (await desiredVolumes()).find((one) => one.appId === appId);
   const [before] = await sql.unsafe(
     'SELECT count(*) FROM nibrun.app_configs c JOIN nibrun.apps a ON a.id = c.app_id WHERE a.id = $1 AND a.owner_id = $2',
     [appId, OWNER_ID],

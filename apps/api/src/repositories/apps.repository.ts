@@ -800,7 +800,7 @@ export async function appendConfigVersion({
       ${config.restartPolicy.maxRestarts}, ${config.restartPolicy.initialBackoffMs},
       ${config.restartPolicy.maxBackoffMs}, ${config.restartPolicy.backoffFactor},
       ${config.restartPolicy.resetAfterMs},
-      ${volumeStorage.volume_storage_endpoint}, ${volumeStorage.volume_storage_bucket}, ${volumeStorage.volume_storage_prefix},
+      ${volumeStorage.volume_storage_endpoint}, ${volumeStorage.volume_storage_bucket}, rtrim(${volumeStorage.volume_storage_prefix}::text, '/'),
       ${volumeStorage.volume_storage_region}, ${volumeStorage.volume_storage_auth_kind}, ${volumeStorage.volume_storage_access_key_id},
       ${volumeStorage.volume_storage_secret_access_key}, ${volumeStorage.volume_storage_session_token},
       ${volumeStorage.volume_storage_encryption_password}
