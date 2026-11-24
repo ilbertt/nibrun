@@ -5,6 +5,10 @@ type AppRoutes = ReturnType<PublicApiClient['api']['apps']>;
 type DeploymentRoutes = ReturnType<AppRoutes['deployments']>;
 
 export type App = Treaty.Data<AppRoutes['get']>;
+type AppCreationConfig = NonNullable<
+  Parameters<PublicApiClient['api']['apps']['post']>[0]['config']
+>;
+export type CustomerVolumeStorage = NonNullable<AppCreationConfig['volumeStorage']>;
 export type PaidRequest = Treaty.Data<ReturnType<PublicApiClient['api']['paid-requests']>['put']>;
 export type PaidRequestType = PaidRequest['requestType'];
 export type AppQuotaExceeded = Extract<

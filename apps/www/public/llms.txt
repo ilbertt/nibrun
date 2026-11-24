@@ -44,6 +44,15 @@ trusted repository and workflow, give the workflow `id-token: write`, then deplo
 OIDC support; deployments use the app’s saved arguments and configuration. See the
 [GitHub Actions example](https://github.com/ilbertt/nibrun/blob/main/skills/deploy-to-nibrun/SKILL.md#github-actions).
 
+## Customer-owned app storage
+
+Use `nib run ./my-server --name my-app --volume-storage ./bucket.json` when creating an app.
+The local JSON file contains the HTTPS S3 endpoint, bucket, region (string or null), auth
+and ZeroFS encryptionPassword. Keep the credentials in a private file. The API accepts the
+same object as `config.volumeStorage` on POST /api/apps and assigns `apps/<app-id>` as the
+bucket prefix. Redeployments keep the original storage. A customer-bucket app can be recovered
+using its bucket contents and password; native app exports require managed storage.
+
 ## Starting with data
 
 An app can be created with `data/` already holding something — a seeded SQLite file, a corpus, an

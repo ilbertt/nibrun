@@ -18,6 +18,7 @@ export type RunOptions = {
   env?: string[] | undefined;
   unset?: string[] | undefined;
   dataFolder?: InitialData | undefined;
+  volumeStorageFile?: string | undefined;
 };
 
 type Plan = {
@@ -56,7 +57,10 @@ async function fillGaps({
   }
   // Not asked when a folder was given: an app's data is created as the app is, so naming one has
   // already answered which app this lands on.
-  const app = options.dataFolder === undefined ? await chooseApp({ api }) : undefined;
+  const app =
+    options.dataFolder === undefined && options.volumeStorageFile === undefined
+      ? await chooseApp({ api })
+      : undefined;
   if (app !== undefined) {
     return { ...options, app };
   }
@@ -135,6 +139,7 @@ function summary({ options, binarySource, args }: Plan): string {
     ['binary', binarySource],
     ['app', options.app?.name ?? options.name],
     ['port', options.port],
+    ['storage file', options.volumeStorageFile],
     [
       'data',
       options.dataFolder?.kind === 'url' ? options.dataFolder.url : options.dataFolder?.path,

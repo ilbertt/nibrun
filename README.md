@@ -75,6 +75,38 @@ curl -fsSL https://nibrun.com/install.sh | sh
 nib run ./my-server
 ```
 
+### Deploy with your own bucket
+
+For a new app, save the following as a private local file such as `bucket.json`. Use an existing
+S3-compatible bucket and credentials with access to it. Keep the ZeroFS password for recovery.
+
+```json
+{
+  "endpoint": "https://objects.example.com",
+  "bucket": "my-app-data",
+  "region": null,
+  "auth": {
+    "kind": "access-key",
+    "accessKeyId": "<access key ID>",
+    "secretAccessKey": "<secret access key>"
+  },
+  "encryptionPassword": "<your ZeroFS password>"
+}
+```
+
+```sh
+nib run ./my-server --name my-app --volume-storage ./bucket.json
+```
+
+nibrun assigns the prefix `apps/<app-id>` in that bucket. Supply the provider's signing region
+(including `"auto"`), or `null` for the host default. Choose a password of at least eight bytes.
+Keep the configuration file out of source control. The host receives these secrets to run the app.
+Redeploy normally with `--app`; storage is selected only at creation.
+
+Customer buckets contain encrypted ZeroFS objects. Retain the bucket contents and password to
+[recover the volume independently](https://nibrunner.dev/docs/guides/volumes). Host exports are
+available for apps using nibrun-managed storage.
+
 ## Take it with you
 
 ```sh

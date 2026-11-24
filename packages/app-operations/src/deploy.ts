@@ -1,4 +1,5 @@
 import type {
+  CustomerVolumeStorage,
   DeploymentState,
   Filename,
   Sha256Digest,
@@ -89,6 +90,7 @@ export type DeployInput = ConfigEdit & {
   // What the app's `data/` is created holding. Nameable on any deployment and accepted on one
   // only while the app's filesystem does not exist yet, which the api is the end that knows.
   initialData?: DeployableArchive | undefined;
+  volumeStorage?: CustomerVolumeStorage | undefined;
   onStep?: ((step: DeployStep) => void) | undefined;
   whileUploading?: UploadWait | undefined;
   upload?: UploadTransport | undefined;
@@ -107,15 +109,24 @@ export async function deploy({
   appId,
   name,
   initialData,
+  volumeStorage,
   onStep,
   whileUploading = unwatched,
   upload = streamedUpload,
   ...edit
 }: DeployInput): Promise<Deployed> {
+  if (appId !== undefined && volumeStorage !== undefined) {
+    throw new ApiError('Customer storage can only be selected when creating an app.');
+  }
   const target = appId === undefined ? null : await appFor({ api, appId, operation: 'release' });
   const app =
     target === null
-      ? await createApp({ api, name: name ?? binaryName(binary), config: configPatch(edit) })
+      ? await createApp({
+          api,
+          name: name ?? binaryName(binary),
+          config: configPatch(edit),
+          volumeStorage,
+        })
       : await updateApp({ api, appId: target.app.id, currentApp: target.app, ...edit });
   onStep?.({ kind: 'app', appId: app.id, name: app.name });
 
@@ -160,10 +171,12 @@ async function createApp({
   api,
   name,
   config,
+  volumeStorage,
 }: {
   api: PublicApiClient;
   name: string | undefined;
   config: ReturnType<typeof configPatch>;
+  volumeStorage: CustomerVolumeStorage | undefined;
 }) {
   if (name === undefined) {
     throw new ApiError('An app needs a name, and this url ends in nothing to take one from.');
@@ -174,6 +187,7 @@ async function createApp({
       name,
       config: {
         ...defaults,
+        ...(volumeStorage !== undefined && { volumeStorage }),
         access: defaults.access ?? DEFAULT_APP_ACCESS,
         ...(environment !== undefined && {
           environment: Object.fromEntries(

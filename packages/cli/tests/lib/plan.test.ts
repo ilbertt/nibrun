@@ -98,6 +98,17 @@ test('a folder to start the data from is not a question about which app', async 
   ]);
 });
 
+test('a customer bucket file selects a new app without offering existing apps', async () => {
+  const resolved = await completeOptions({
+    api: apiListing({ apps: [{ name: 'existing', state: 'active' }] }),
+    options: { volumeStorageFile: 'bucket.json', name: 'customer', port: 3000 },
+    binarySource: 'server',
+    args: [],
+  });
+  expect(resolved.app).toBeUndefined();
+  expect(prompts.transcript()).toEqual(['confirm:Create customer and deploy?']);
+});
+
 test('a flag already given is not asked about again', async () => {
   const resolved = await completeOptions({
     api: apiListing({ apps: [] }),

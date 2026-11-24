@@ -245,6 +245,7 @@ test.each([
   { flags: ['--env', 'NAME=value'] },
   { flags: ['--unset', 'NAME'] },
   { flags: ['--data-folder', '/data'] },
+  { flags: ['--volume-storage', 'storage.json'] },
   { flags: ['--sha256', '1234'] },
 ])('trusted deployment refuses account option $flags', async ({ flags }) => {
   const { cli } = workflowCli();

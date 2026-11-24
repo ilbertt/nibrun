@@ -212,6 +212,31 @@ test.each([
   ]);
 });
 
+test('a customer bucket is sent only with app creation, before the first deployment', async () => {
+  const sent: Sent[] = [];
+  storeAnswering({ sent });
+  const volumeStorage = {
+    endpoint: 'https://s3.example.test',
+    bucket: 'customer',
+    region: null,
+    auth: { kind: 'anonymous' as const },
+    encryptionPassword: 'private-password',
+  };
+  const options = {
+    api: apiHolding({ apps: [], sent }),
+    binary: binary(),
+    args: [],
+    volumeStorage,
+  };
+  await deploy(options);
+  expect(sent[0]).toMatchObject({ what: 'create', body: { config: { volumeStorage } } });
+  expect(JSON.stringify(sent.slice(1))).not.toContain('private-password');
+  await expect(deploy({ ...options, appId: APP_ID })).rejects.toThrow(
+    'only be selected when creating',
+  );
+  expect(sent.filter((operation) => operation.what === 'create')).toHaveLength(1);
+});
+
 test('a new app uploads without searching other apps for its digest', async () => {
   const sent: Sent[] = [];
   storeAnswering({ sent });

@@ -1,4 +1,4 @@
-import { basename } from 'node:path';
+import { basename, resolve } from 'node:path';
 import type { App, Sha256Digest, TenantArguments } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { ApiError } from '@repo/api-client/unwrap';
@@ -6,6 +6,7 @@ import {
   appQuotaExceeded,
   type DeployableBinary,
   type Deployed,
+  readCustomerVolume,
   deploy as startDeployment,
   type UploadableBinary,
 } from '@repo/app-operations';
@@ -57,7 +58,12 @@ async function startRelease({
   env,
   unset,
   dataFolder,
+  volumeStorageFile,
 }: Omit<DeployInput, 'detach'>): Promise<Deployed> {
+  const volumeStorage =
+    volumeStorageFile === undefined
+      ? undefined
+      : await readCustomerVolume(Bun.file(resolve(volumeStorageFile)));
   const environment = environmentEdit({ env, unset });
   const opened =
     dataFolder === undefined || dataFolder.kind === 'url'
@@ -74,6 +80,7 @@ async function startRelease({
       name,
       port,
       ...(environment !== undefined && { environment }),
+      volumeStorage,
       initialData: dataFolder?.kind === 'url' ? { url: dataFolder.url } : opened?.archive,
       onStep: (step) => announce({ step, ui }),
       whileUploading: ({ message, task }) => {

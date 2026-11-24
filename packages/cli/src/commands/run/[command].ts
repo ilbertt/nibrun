@@ -19,6 +19,7 @@ import { RELEASE_OUTPUT } from '#lib/release.ts';
 // parsh spells a flag exactly as its key, and this one is read back out of the options it was
 // declared in — so the two halves are one name rather than two spellings of it.
 const DATA_FOLDER_FLAG = 'data-folder';
+const VOLUME_STORAGE_FLAG = 'volume-storage';
 
 export const command = defineCommand('run [command]', {
   description:
@@ -49,6 +50,11 @@ export const command = defineCommand('run [command]', {
       schema: z.string().optional(),
       description:
         'What the file at the url should hash to, as its release publishes it — for an archive, the archive rather than the executable inside it. nibrun refuses a download that hashes to anything else. Only for a url: a file on this machine is not fetched.',
+    },
+    [VOLUME_STORAGE_FLAG]: {
+      schema: z.string().min(1).optional(),
+      description:
+        'Create the app with its own S3-compatible bucket. Read the storage configuration and credentials from a local JSON file.',
     },
     [DATA_FOLDER_FLAG]: {
       schema: z.string().optional(),
@@ -93,8 +99,14 @@ export const command = defineCommand('run [command]', {
       detach,
       sha256,
       [DATA_FOLDER_FLAG]: dataFolderPath,
+      [VOLUME_STORAGE_FLAG]: volumeStorageFile,
       ...flags
     } = options;
+    if (flags.app !== undefined && volumeStorageFile !== undefined) {
+      throw new UsageError(
+        '--volume-storage applies only to a new app and cannot be combined with --app.',
+      );
+    }
     const access = accessFrom(options);
     const { binarySource, args } = parseCommandLine(params.command);
     const { api } = context;
@@ -113,7 +125,7 @@ export const command = defineCommand('run [command]', {
     ui.open('nib run');
     const app =
       flags.app === undefined ? undefined : await selectApp({ api, name: flags.app, interactive });
-    const given = { ...flags, app, dataFolder };
+    const given = { ...flags, app, dataFolder, volumeStorageFile };
 
     const resolved = interactive
       ? await completeOptions({ api, options: given, binarySource, args })

@@ -23,6 +23,7 @@ export {
   refusedArchiveBody,
 } from '#archive.ts';
 export { readCrons } from '#crons.ts';
+export { readCustomerVolume } from '#customer-volume.ts';
 export { deleteApp } from '#delete.ts';
 export {
   awaitDeploymentSettled,
