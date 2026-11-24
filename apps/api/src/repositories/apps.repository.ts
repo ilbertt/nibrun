@@ -257,6 +257,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
                c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+               storage.volume_storage_bucket, storage.volume_storage_prefix,
                u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
                u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
                d.expires_at
@@ -265,6 +266,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           SELECT * FROM nibrun.app_configs_with_environment c
           WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
         ) c ON true
+        JOIN nibrun.app_configs storage ON storage.id = c.id
         LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
         LEFT JOIN nibrun.app_deadlines d ON d.app_id = a.id
         WHERE a.id = ${inserted.id} AND a.owner_id = ${ownerId}
@@ -291,6 +293,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
              c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+             storage.volume_storage_bucket, storage.volume_storage_prefix,
              u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
              u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
              d.expires_at
@@ -299,6 +302,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         SELECT * FROM nibrun.app_configs_with_environment c
         WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
       ) c ON true
+      JOIN nibrun.app_configs storage ON storage.id = c.id
       LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
       LEFT JOIN nibrun.app_deadlines d ON d.app_id = a.id
       WHERE a.owner_id = ${ownerId}
@@ -467,6 +471,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
              c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+             storage.volume_storage_bucket, storage.volume_storage_prefix,
              u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
              u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
              d.expires_at
@@ -475,6 +480,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         SELECT * FROM nibrun.app_configs_with_environment c
         WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
       ) c ON true
+      JOIN nibrun.app_configs storage ON storage.id = c.id
       LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
       LEFT JOIN nibrun.app_deadlines d ON d.app_id = a.id
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
@@ -950,6 +956,7 @@ async function appAsChanged({
            c.health_check_unhealthy_threshold,
            c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
            c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+           storage.volume_storage_bucket, storage.volume_storage_prefix,
            u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
            u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
            d.expires_at
@@ -958,6 +965,7 @@ async function appAsChanged({
       SELECT * FROM nibrun.app_configs_with_environment c
       WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
     ) c ON true
+    JOIN nibrun.app_configs storage ON storage.id = c.id
     LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
     LEFT JOIN nibrun.app_deadlines d ON d.app_id = a.id
     WHERE a.id = ${appId} AND a.owner_id = ${ownerId}

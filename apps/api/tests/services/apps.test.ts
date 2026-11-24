@@ -114,6 +114,8 @@ function appRow(slug: DnsLabel): AppRow {
     activation: 'always',
     idle_timeout_ms: MIN_IDLE_TIMEOUT_MS,
     config_id: 'config-1',
+    volume_storage_bucket: null,
+    volume_storage_prefix: null,
     volume_storage_migration_state: null,
     volume_storage_migration_message: null,
     volume_storage_migration_started_at: null,
@@ -853,6 +855,20 @@ describe('the placeholder a read returns cannot be set as a value', () => {
     ).rejects.toBeInstanceOf(BadRequestError);
     expect(appsRepo.offeredConfigs).toHaveLength(0);
   });
+});
+
+test('an owner can see the bucket and prefix assigned to their app', async () => {
+  const appsRepo = Object.assign(new StubAppsRepository({ failures: 0 }), {
+    findById() {
+      return Promise.resolve({
+        ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)),
+        volume_storage_bucket: 'customer-data',
+        volume_storage_prefix: 'apps/customer',
+      });
+    },
+  });
+  const app = await serviceWith({ appsRepo }).get({ appId: APP_ID, ownerId: OWNER_ID });
+  expect(app.volumeStorage).toMatchObject({ bucket: 'customer-data', prefix: 'apps/customer' });
 });
 
 // A 403 would confirm the app exists to someone with no right to know it does.

@@ -43,6 +43,7 @@ function appResource(ownerId: OwnerId) {
         createdAt: timestamp,
       },
     ],
+    volumeStorage: null,
     volumeUsage: null,
     computeUsage: null,
     expiresAt: null,
