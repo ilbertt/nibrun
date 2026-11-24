@@ -283,8 +283,10 @@ class FakeStorage implements ArtifactStorageRepositoryContract {
 }
 
 class FakeAppsRepository {
-  isOwnedBy({ ownerId }: { appId: AppId; ownerId: OwnerId }): Promise<boolean> {
-    return Promise.resolve(ownerId === OWNER_ID);
+  constructor(private readonly bucket: string | null) {}
+
+  findById({ ownerId }: { appId: AppId; ownerId: OwnerId }) {
+    return Promise.resolve(ownerId === OWNER_ID ? { volume_storage_bucket: this.bucket } : null);
   }
 }
 
@@ -302,7 +304,7 @@ class FakeSource implements RemoteSourceRepositoryContract {
   }
 }
 
-function build() {
+function build(bucket: string | null = null) {
   const importsRepo = new FakeImportsRepository(OWNER_ID);
   const storage = new FakeStorage();
   const source = new FakeSource();
@@ -315,7 +317,7 @@ function build() {
       storageRepo: storage,
       sourceRepo: source,
       fetchSlots: new RemoteFetchSlots(),
-      appsRepo: new FakeAppsRepository() as unknown as AppsRepositoryContract,
+      appsRepo: new FakeAppsRepository(bucket) as unknown as AppsRepositoryContract,
     }),
   };
 }
@@ -346,6 +348,20 @@ async function uploaded({
     }),
   };
 }
+
+test('a customer volume refuses seed archives before signing an upload or fetching a URL', async () => {
+  const { service, source, storage } = build('customer-data');
+  const ownedApp = { appId: APP_ID, ownerId: OWNER_ID };
+  await expect(
+    service.create({ ...ownedApp, filename: UPLOADED_NAME, sizeBytes: ARCHIVE.byteLength }),
+  ).rejects.toThrow('customer volume');
+  await expect(service.createFromUrl({ ...ownedApp, url: REMOTE_ARCHIVE_URL })).rejects.toThrow(
+    'customer volume',
+  );
+  expect(source.opened).toEqual([]);
+  expect(storage.signed).toEqual([]);
+  expect(storage.objects.size).toBe(0);
+});
 
 describe('an upload is addressed by the row it makes', () => {
   test('the caller is handed a url signed for exactly the size they declared', async () => {

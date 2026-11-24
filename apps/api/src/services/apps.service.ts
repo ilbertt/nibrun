@@ -15,6 +15,7 @@ import {
   interpolableRuntimeValue,
   namesExtraPublicPortValues,
 } from '@repo/protocol/runtime-values';
+import { Value } from '@sinclair/typebox/value';
 import { schema } from '#db/queries.gen.ts';
 import {
   type App,
@@ -25,6 +26,10 @@ import {
   OWNED_APP_STATES,
   type OwnedAppState,
 } from '#lib/api/app.ts';
+import {
+  type VolumeStorageLocation,
+  VolumeStorageLocationSchema,
+} from '#lib/api/customer-volume.ts';
 import type { OwnerId } from '#lib/api/identifiers.ts';
 import {
   configWithDefaults,
@@ -67,6 +72,7 @@ import { Service } from '#services/service.ts';
 export type PublicApp = Omit<App, 'config' | 'hostnames'> & {
   config: PublicAppConfig;
   hostnames: PublicAppHostname[];
+  volumeStorage: VolumeStorageLocation | null;
   /** `null` until a host has measured the filesystem, which it cannot while nothing mounts it. */
   volumeUsage: FilesystemUsage | null;
   computeUsage: ComputeUsage | null;
@@ -801,6 +807,13 @@ function toPublicApp({ app, hostnames }: AppWithHostnames): PublicApp {
     slug: app.slug,
     hostnames: hostnames.map(toAppHostname),
     config: toAppConfig(app),
+    volumeStorage:
+      app.volume_storage_bucket === null
+        ? null
+        : Value.Parse(VolumeStorageLocationSchema, {
+            bucket: app.volume_storage_bucket,
+            prefix: app.volume_storage_prefix,
+          }),
     volumeUsage: toVolumeUsage(app),
     computeUsage: toComputeUsage(app),
     expiresAt: app.expires_at === null ? null : toTimestamp(app.expires_at),
