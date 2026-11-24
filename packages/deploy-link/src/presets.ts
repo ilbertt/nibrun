@@ -386,15 +386,15 @@ export const DEPLOY_PRESETS = {
   fusion: {
     isRecommended: false,
     projectUrl: 'https://github.com/0x2E/fusion',
-    version: 'v1.3.1',
+    version: 'v1.3.2',
     markdownContent: fusionPage,
     category: DeployCategory.Feeds,
     title: 'Fusion',
     subtitle: 'An RSS reader for your own feeds, behind a password.',
     deployLink: {
       name: 'fusion',
-      binary: 'https://github.com/0x2E/fusion/releases/download/v1.3.1/fusion-linux-amd64',
-      sha256: '7a70c60fd2e6cde722eb63c943008f5c4d342f504a3fa0c5b835b94c3e0d4307',
+      binary: 'https://github.com/0x2E/fusion/releases/download/v1.3.2/fusion-linux-amd64',
+      sha256: 'f544df5848b8271c3f1f5b99b46d3c96478fd159cc14e8ef2f5f0b646280d4e9',
       port: 8080,
       env: [
         `FUSION_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
