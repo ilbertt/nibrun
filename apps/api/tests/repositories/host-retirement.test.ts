@@ -125,6 +125,11 @@ test('retirement timestamps are finite and cannot be changed or cleared', async 
     ).rejects.toMatchObject({ errno: '23514' });
   }
   await sql.unsafe('UPDATE nibrun.hosts SET retired_at = retired_at WHERE id = $1', [hostId]);
+  expect([
+    ...(await sql.unsafe('SELECT action, client FROM nibrun.operations WHERE host_id = $1', [
+      hostId,
+    ])),
+  ]).toEqual([{ action: 'host.retired', client: 'system' }]);
 });
 
 test('retired origin and canonical identities cannot re-register or receive sessions', async () => {
