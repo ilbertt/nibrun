@@ -372,13 +372,13 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
           JOIN nibrun.app_configs previous ON previous.id = source.config_id
           JOIN nibrun.app_configs storage ON storage.id = source.storage_config_id
           WHERE ROW(previous.volume_storage_endpoint, previous.volume_storage_bucket,
-                    previous.volume_storage_prefix, previous.volume_storage_region,
+                    rtrim(previous.volume_storage_prefix, '/'), previous.volume_storage_region,
                     previous.volume_storage_auth_kind, previous.volume_storage_access_key_id,
                     previous.volume_storage_secret_access_key, previous.volume_storage_session_token,
                     previous.volume_storage_encryption_password)
             IS DISTINCT FROM
                 ROW(storage.volume_storage_endpoint, storage.volume_storage_bucket,
-                    storage.volume_storage_prefix, storage.volume_storage_region,
+                    rtrim(storage.volume_storage_prefix, '/'), storage.volume_storage_region,
                     storage.volume_storage_auth_kind, storage.volume_storage_access_key_id,
                     storage.volume_storage_secret_access_key, storage.volume_storage_session_token,
                     storage.volume_storage_encryption_password)

@@ -214,7 +214,7 @@ test('deletion retains the deployment’s storage even after every release is su
   ]);
   expect((await desiredVolumes()).find((volume) => volume.appId === app.id)).toMatchObject({
     desiredState: 'absent',
-    storage: storage(ACCESS_KEY_AUTH),
+    storage: { ...storage(ACCESS_KEY_AUTH), prefix: 'apps/access-key' },
   });
   await sql.unsafe(`UPDATE nibrun.apps SET state = 'deleted' WHERE id = $1`, [app.id]);
   expect((await desiredVolumes()).some((volume) => volume.appId === app.id)).toBe(false);
@@ -326,13 +326,13 @@ test.each([
   const appId = Value.Parse(AppIdSchema, await createApp(slug));
   await insertConfig({ slug, storage: configured });
   const previous = await deployApp(slug);
+  const volume = (await desiredVolumes()).find((one) => one.appId === appId);
   await new AppsRepository(withTypes<Queries>(sql)).update({
     appId,
     ownerId: OWNER_ID,
     patch: { name: undefined, args: ['newer'] },
   });
   await deployApp(slug);
-  const volume = (await desiredVolumes()).find((one) => one.appId === appId);
   const [before] = await sql.unsafe(
     'SELECT count(*) FROM nibrun.app_configs c JOIN nibrun.apps a ON a.id = c.app_id WHERE a.id = $1 AND a.owner_id = $2',
     [appId, OWNER_ID],
