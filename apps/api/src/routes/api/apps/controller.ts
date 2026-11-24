@@ -28,9 +28,10 @@ export const AppsController = new Elysia()
   )
   .post(
     '/apps',
-    async ({ appsService, body: bodyInput, user, status }) => {
+    async ({ operationClient, appsService, body: bodyInput, user, status }) => {
       const body = Value.Parse(CreateAppRequestSchema, bodyInput);
       const app = await appsService.create({
+        client: operationClient,
         ownerId: Value.Parse(OwnerIdSchema, user.id),
         isAnonymous: user.isAnonymous,
         name: body.name,
