@@ -78,6 +78,7 @@ function identity(): GitHubActionsOidcClaims {
 async function configuredApp(): Promise<AppId> {
   const slug = Value.Parse(DnsLabelSchema, `grant-${Bun.randomUUIDv7()}`);
   const created = await new AppsRepository(withTypes<Queries>(sql)).create({
+    client: OperationClient.Cli,
     ownerId: OWNER_ID,
     anonymousAppsAtMost: null,
     name: Value.Parse(AppNameSchema, 'Grant app'),

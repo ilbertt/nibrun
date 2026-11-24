@@ -110,6 +110,7 @@ async function createApp(slug: string): Promise<AppId> {
   const label = Value.Parse(DnsLabelSchema, slug);
   const created = requireCreated(
     await repo.create({
+      client: OperationClient.Cli,
       anonymousAppsAtMost: null,
       ownerId: OWNER_ID,
       name: Value.Parse(AppNameSchema, slug),
@@ -140,6 +141,7 @@ test('a new JWT-protected app stores its full access policy on creation', async 
   } satisfies AppAccessPolicy;
   const { app } = requireCreated(
     await repo.create({
+      client: OperationClient.Cli,
       ownerId: OWNER_ID,
       name: Value.Parse(AppNameSchema, slug),
       slug,
@@ -245,6 +247,7 @@ test('owner configuration changes preserve an existing platform-enabled extra po
   const slug = Value.Parse(DnsLabelSchema, 'enabled-extra-port');
   const created = requireCreated(
     await repo.create({
+      client: OperationClient.Cli,
       anonymousAppsAtMost: null,
       ownerId: OWNER_ID,
       name: Value.Parse(AppNameSchema, slug),
@@ -336,6 +339,7 @@ describe('a config patch carries forward every variable it says nothing about', 
   beforeAll(async () => {
     const created = requireCreated(
       await repo.create({
+        client: OperationClient.Cli,
         anonymousAppsAtMost: null,
         ownerId: OWNER_ID,
         name: Value.Parse(AppNameSchema, APP_SLUG),
@@ -884,6 +888,7 @@ describe('an owner may have the apps they were given and no more', () => {
   async function makeApp({ ownerId, slug }: { ownerId: OwnerId; slug: string }) {
     const label = Value.Parse(DnsLabelSchema, slug);
     const created = await repo.create({
+      client: OperationClient.Cli,
       anonymousAppsAtMost: null,
       ownerId,
       name: Value.Parse(AppNameSchema, slug),
@@ -988,6 +993,7 @@ describe('an app is called what its owner said, and so may another', () => {
   function makeApp({ ownerId, name, slug }: { ownerId: OwnerId; name: string; slug: string }) {
     const label = Value.Parse(DnsLabelSchema, slug);
     return repo.create({
+      client: OperationClient.Cli,
       anonymousAppsAtMost: null,
       ownerId,
       name: Value.Parse(AppNameSchema, name),
@@ -1097,6 +1103,7 @@ describe('an owner whose apps are given a lifetime is shown when each one ends',
     const slug = Value.Parse(DnsLabelSchema, 'passing-tern');
     const created = requireCreated(
       await repo.create({
+        client: OperationClient.Cli,
         anonymousAppsAtMost: null,
         ownerId: PASSERBY_ID,
         name: Value.Parse(AppNameSchema, slug),
@@ -1161,6 +1168,7 @@ describe('every app a stranger held changes hands at once', () => {
     const label = Value.Parse(DnsLabelSchema, slug);
     const created = requireCreated(
       await repo.create({
+        client: OperationClient.Cli,
         anonymousAppsAtMost: null,
         ownerId: PASSERBY_ID,
         name: Value.Parse(AppNameSchema, slug),
@@ -1226,6 +1234,7 @@ describe("a stranger's app takes one binary and one deployment", () => {
     const label = Value.Parse(DnsLabelSchema, slug);
     const created = requireCreated(
       await repo.create({
+        client: OperationClient.Cli,
         anonymousAppsAtMost: null,
         ownerId: STRANGER_ID,
         name: Value.Parse(AppNameSchema, slug),
@@ -1375,6 +1384,7 @@ describe('strangers hold so many apps between them and no more', () => {
   async function arrive({ ownerId, slug }: { ownerId: OwnerId; slug: string }) {
     const label = Value.Parse(DnsLabelSchema, slug);
     const created = await repo.create({
+      client: OperationClient.Cli,
       ownerId,
       anonymousAppsAtMost: CEILING,
       name: Value.Parse(AppNameSchema, slug),
@@ -1448,5 +1458,8 @@ test('operation settings follow the transaction when a connection is reused', as
     'SELECT action, client FROM nibrun.operations WHERE app_id = $1 ORDER BY id',
     [appId],
   );
-  expect([...history]).toEqual([{ action: 'app.environment.updated', client: 'system' }]);
+  expect([...history]).toEqual([
+    { action: 'app.created', client: 'cli' },
+    { action: 'app.environment.updated', client: 'system' },
+  ]);
 });

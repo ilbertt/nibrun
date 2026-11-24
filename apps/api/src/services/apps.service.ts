@@ -47,6 +47,7 @@ import {
   NotFoundError,
   TooManyRequestsError,
 } from '#lib/errors.ts';
+import type { OperationAttribution } from '#lib/operation-client.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
@@ -195,11 +196,12 @@ export class AppsService extends Service {
    * URL, and anyone is entitled to pick the same name — the id is what an app is known by here.
    */
   async create({
+    client,
     ownerId,
     isAnonymous,
     name,
     config,
-  }: {
+  }: OperationAttribution & {
     ownerId: OwnerId;
     isAnonymous: boolean;
     name: AppName;
@@ -225,6 +227,7 @@ export class AppsService extends Service {
       const slug = deriveAppSlug(name);
       try {
         const created = await this.appsRepo.create({
+          client,
           ownerId,
           name,
           slug,

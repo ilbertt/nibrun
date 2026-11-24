@@ -11,6 +11,7 @@ import type {
   Hostname,
   ObjectKey,
 } from '@repo/protocol';
+import { setOperationContext } from '#db/operation-context.ts';
 import type { Queries } from '#db/queries.gen.ts';
 import { APP_STATES, type AppHostnameState, type AppName, type AppState } from '#lib/api/app.ts';
 import type { DnsLabel } from '#lib/api/dns-label.ts';
@@ -19,6 +20,7 @@ import { accessColumns } from '#lib/app-access.ts';
 import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
 import { CUSTOM_KIND } from '#lib/app-hostname.ts';
 import { BadRequestError, ConflictError } from '#lib/errors.ts';
+import type { OperationAttribution } from '#lib/operation-client.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
 import { requiresCustomDomain } from '#lib/validate-app-access.ts';
 import type { StoredVolumeStorage } from '#lib/volume-storage.ts';
@@ -31,7 +33,7 @@ export type ExpirableAppRow = Queries['SelectExpirableApps'];
 
 export type CreatedApp = { app: AppRow; hostnames: AppHostnameRow[] };
 
-export type NewApp = {
+export type NewApp = OperationAttribution & {
   ownerId: OwnerId;
   name: AppName;
   slug: DnsLabel;
@@ -169,6 +171,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    * instead — after the profile's, so every stranger takes the two in the same order.
    */
   create({
+    client,
     ownerId,
     name,
     slug,
@@ -189,6 +192,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
 
       const columns = accessColumns(config.access);
       const audiences = columns.access_audiences && tx.array(columns.access_audiences, TEXT_ARRAY);
+      await setOperationContext({ tx, client });
       const [inserted] = await tx.InsertApp`
         INSERT INTO nibrun.apps (owner_id, name, slug) VALUES (${ownerId}, ${name}, ${slug})
         RETURNING id

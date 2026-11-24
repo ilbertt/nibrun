@@ -22,6 +22,7 @@ import { Value } from '@sinclair/typebox/value';
 import { SQL } from 'bun';
 import { schema } from '#db/queries.gen.ts';
 import type { NewAppConfig } from '#lib/api/app.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 
 const HOST_ID = Value.Parse(HostIdSchema, 'reporting-host');
 
@@ -506,6 +507,7 @@ function createApp({
   config?: NewAppConfig;
 }) {
   return serviceWith({ appsRepo }).create({
+    client: OperationClient.Cli,
     ownerId: OWNER_ID,
     isAnonymous: false,
     name: APP_NAME,
@@ -1695,6 +1697,7 @@ test.each([false, true])(
   async (isAnonymous) => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     const app = await serviceWith({ appsRepo }).create({
+      client: OperationClient.Cli,
       ownerId: OWNER_ID,
       isAnonymous,
       name: APP_NAME,
@@ -1734,6 +1737,7 @@ describe('strangers hold so many apps between them and no more', () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
     await serviceWith({ appsRepo }).create({
+      client: OperationClient.Cli,
       ownerId: OWNER_ID,
       isAnonymous: true,
       name: APP_NAME,
@@ -1755,7 +1759,12 @@ describe('strangers hold so many apps between them and no more', () => {
     appsRepo.strangersHold = MAX_ANONYMOUS_APPS;
 
     await expect(
-      serviceWith({ appsRepo }).create({ ownerId: OWNER_ID, isAnonymous: true, name: APP_NAME }),
+      serviceWith({ appsRepo }).create({
+        client: OperationClient.Cli,
+        ownerId: OWNER_ID,
+        isAnonymous: true,
+        name: APP_NAME,
+      }),
     ).rejects.toBeInstanceOf(TooManyRequestsError);
     // Nothing was written, so nothing is re-rolled.
     expect(appsRepo.offeredSlugs).toHaveLength(1);
