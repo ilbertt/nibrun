@@ -1,6 +1,7 @@
 import type { AppId, CheckpointId, ExportId, ExportState, HostId } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import type { OwnerId } from '#lib/api/identifiers.ts';
+import { ConflictError } from '#lib/errors.ts';
 import { lockAppForMutation } from '#repositories/apps.repository.ts';
 import { Repository } from '#repositories/repository.ts';
 
@@ -59,7 +60,18 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
     // INSERT … SELECT rather than VALUES, so the predicate that decides ownership is the one the
     // row is written through rather than one checked beside it.
     const [inserted] = await this.sql.begin(async (tx) => {
-      await lockAppForMutation({ tx, appId, ownerId });
+      if (!(await lockAppForMutation({ tx, appId, ownerId }))) {
+        return [];
+      }
+      const [volume] = await tx.SelectExportVolumeStorage`
+        SELECT c.volume_storage_endpoint
+        FROM nibrun.deployments d JOIN nibrun.app_configs c ON c.id = d.config_id
+        WHERE d.app_id = ${appId}
+        ORDER BY d.id DESC LIMIT 1
+      `;
+      if (volume?.volume_storage_endpoint != null) {
+        throw new ConflictError('Host exports are unavailable for apps using a customer bucket.');
+      }
       return tx.InsertExport`
         INSERT INTO nibrun.exports (app_id, artifact_id, config_id, expires_at)
         SELECT a.id, d.artifact_id, d.config_id, ${expiresAt}

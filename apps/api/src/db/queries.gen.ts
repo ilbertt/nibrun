@@ -1061,6 +1061,11 @@ export interface ISelectDeploymentGrantToUseResult {
     id: IGithubDeploymentGrantsColumns["id"];
 }
 
+/** Result of query `SelectExportVolumeStorage`. */
+export interface ISelectExportVolumeStorageResult {
+    volume_storage_endpoint: IAppConfigsColumns["volume_storage_endpoint"];
+}
+
 /** Result of query `InsertExport`. */
 export interface IInsertExportResult {
     id: IExportsColumns["id"];
@@ -1483,6 +1488,7 @@ export interface Queries {
     SelectAppAwaitingData: ISelectAppAwaitingDataResult;
     SelectUsableImport: ISelectUsableImportResult;
     SelectDeploymentGrantToUse: ISelectDeploymentGrantToUseResult;
+    SelectExportVolumeStorage: ISelectExportVolumeStorageResult;
     InsertExport: IInsertExportResult;
     SelectExportsByApp: ISelectExportsByAppResult;
     SelectExportById: ISelectExportByIdResult;
