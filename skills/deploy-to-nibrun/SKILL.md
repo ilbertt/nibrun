@@ -102,7 +102,12 @@ where they enter the values directly under **Environment variables**. Wait for t
 then deploy using that `appId`. Native file binding can still be used for the binary; direct
 uploads use the prepared artifact as described below.
 
-Include `chatId` in `deploy_app` when your current chat ID is available; omit it rather than
+To change a deployed app’s startup arguments, HTTP port, or HTTP access, call `update_app` with
+its `appId` and a `config` containing the fields to change. For example, `{"httpPort":8080}`
+redeploys the latest binary on port 8080. Pass `{"args":[]}` to clear startup arguments.
+Use `get_app` to check the new deployment.
+
+Include `chatId` in `deploy_app` or `update_app` when your current chat ID is available; omit it rather than
 guessing. Without it, nibrun records the client's `_meta["openai/session"]` when available.
 This metadata is an anonymized conversation ID and cannot be assumed to resolve to a chat URL.
 

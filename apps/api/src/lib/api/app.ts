@@ -69,6 +69,13 @@ const ownedConfig = {
   httpPort: Type.Optional(AppConfigSchema.properties.httpPort),
 };
 
+export const RuntimeSettingsPatchSchema = Type.Partial(Type.Object(ownedConfig), {
+  additionalProperties: false,
+  minProperties: 1,
+});
+
+export type RuntimeSettingsPatch = typeof RuntimeSettingsPatchSchema.static;
+
 export const NewAppConfigSchema = Type.Object(
   { ...ownedConfig, environment: Type.Optional(AppConfigSchema.properties.environment) },
   { additionalProperties: false },

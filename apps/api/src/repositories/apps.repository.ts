@@ -513,7 +513,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     appId,
     ownerId,
     client,
-    patch: { name, ...config },
+    patch,
   }: OwnedApp & OperationAttribution & { patch: SealedAppPatch }) {
     return this.sql.begin(async (tx) => {
       const locked = await lockAppForMutation({ tx, appId, ownerId });
@@ -521,16 +521,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         return null;
       }
 
-      const configAction =
-        Object.keys(config).length > 0
-          ? await appendConfigVersion({ tx, appId, patch: config, storage: undefined })
-          : undefined;
-      await setOperationContext({ tx, client, configAction });
-      await tx.TouchApp`
-        UPDATE nibrun.live_apps a
-        SET name = COALESCE(${name ?? null}, a.name)
-        WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
-      `;
+      await patchLockedApp({ tx, appId, ownerId, client, patch });
       return await appAsChanged({ tx, appId, ownerId });
     });
   }
@@ -733,6 +724,26 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       return await appAsChanged({ tx, appId, ownerId });
     });
   }
+}
+
+export async function patchLockedApp({
+  tx,
+  appId,
+  ownerId,
+  client,
+  patch: { name, ...config },
+}: OwnedApp & OperationAttribution & { tx: TypedSQL<Queries>; patch: SealedAppPatch }) {
+  const configAction =
+    Object.keys(config).length > 0
+      ? await appendConfigVersion({ tx, appId, patch: config, storage: undefined })
+      : undefined;
+  await setOperationContext({ tx, client, configAction });
+
+  await tx.TouchApp`
+    UPDATE nibrun.live_apps a
+    SET name = COALESCE(${name ?? null}, a.name)
+    WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+  `;
 }
 
 /**
