@@ -8,6 +8,7 @@ import { McpDeploymentSchema } from '#lib/api/deployment.ts';
 import { ArtifactIdSchema, type OAuthClientId, type OwnerId } from '#lib/api/identifiers.ts';
 import { fromTypeBox } from '#lib/mcp/schema.ts';
 import { DEPLOY_TO_NIBRUN_SKILL_URI } from '#lib/mcp/skills.ts';
+import { deploymentChatId } from '#lib/mcp/tools/shared/chat-id.ts';
 import {
   appForDeployment,
   DeploymentTargetSchema,
@@ -127,9 +128,7 @@ export function registerDeployAppTool({
         appId: app.id,
         ownerId,
         clientId,
-        chatId:
-          input.chatId ??
-          (Value.Check(McpDeploymentSchema.properties.chatId, sessionId) ? sessionId : undefined),
+        chatId: deploymentChatId({ chatId: input.chatId, sessionId }),
         artifactId: artifact.id,
       });
       return { app, deployment, url: appUrl(app.hostnames) };

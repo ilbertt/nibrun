@@ -493,22 +493,14 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    * index is the rule. Written whether or not the name moved, because reconfiguring an app changes
    * the app and the new version lands in another table, so nothing else would move `updated_at`.
    */
-  update({ appId, ownerId, patch: { name, ...config } }: OwnedApp & { patch: SealedAppPatch }) {
+  update({ appId, ownerId, patch }: OwnedApp & { patch: SealedAppPatch }) {
     return this.sql.begin(async (tx) => {
       const locked = await lockAppForMutation({ tx, appId, ownerId });
       if (!locked) {
         return null;
       }
 
-      if (Object.keys(config).length > 0) {
-        await appendConfigVersion({ tx, appId, patch: config, storage: undefined });
-      }
-
-      await tx.TouchApp`
-        UPDATE nibrun.live_apps a
-        SET name = COALESCE(${name ?? null}, a.name)
-        WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
-      `;
+      await patchLockedApp({ tx, appId, ownerId, patch });
       return await appAsChanged({ tx, appId, ownerId });
     });
   }
@@ -713,6 +705,23 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
       return updated ? await appAsChanged({ tx, appId, ownerId }) : null;
     });
   }
+}
+
+export async function patchLockedApp({
+  tx,
+  appId,
+  ownerId,
+  patch: { name, ...config },
+}: OwnedApp & { tx: TypedSQL<Queries>; patch: SealedAppPatch }) {
+  if (Object.keys(config).length > 0) {
+    await appendConfigVersion({ tx, appId, patch: config, storage: undefined });
+  }
+
+  await tx.TouchApp`
+    UPDATE nibrun.live_apps a
+    SET name = COALESCE(${name ?? null}, a.name)
+    WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+  `;
 }
 
 /**

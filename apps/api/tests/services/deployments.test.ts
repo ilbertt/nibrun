@@ -168,6 +168,10 @@ class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
   }
 
   insert(input: CreateDeploymentInput): Promise<CreatedDeployment> {
+    return this.recordInsert(input);
+  }
+
+  private recordInsert(input: Record<string, unknown>): Promise<CreatedDeployment> {
     this.calls.push(input);
     if (this.#behaviour.runError) {
       return Promise.reject(this.#behaviour.runError);
@@ -180,7 +184,7 @@ class FakeDeploymentsRepository implements DeploymentsRepositoryContract {
   }
 
   insertWithMcpClient(input: CreateMcpDeploymentInput): Promise<CreatedDeployment> {
-    return this.insert({ ...input, initialDataFrom: null, onlyOne: false });
+    return this.recordInsert({ ...input, initialDataFrom: null, onlyOne: false });
   }
 
   insertWithDeploymentGrant(input: CreateGitHubDeploymentInput): Promise<CreatedDeployment> {

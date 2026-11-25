@@ -10,6 +10,7 @@ import type {
   Ipv4Address,
 } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
+import type { RuntimeSettingsPatch } from '#lib/api/app.ts';
 import type { Deployment, DeploymentState } from '#lib/api/deployment.ts';
 import type {
   ArtifactId,
@@ -21,7 +22,7 @@ import type {
 import { CUSTOM_KIND } from '#lib/app-hostname.ts';
 import { ConflictError } from '#lib/errors.ts';
 import { HOST_REPORT_MAX_AGE_MS } from '#lib/host-readiness.ts';
-import { lockAppForMutation } from '#repositories/apps.repository.ts';
+import { lockAppForMutation, patchLockedApp } from '#repositories/apps.repository.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type DeploymentRow = Queries['SelectDeploymentById'];
@@ -56,11 +57,11 @@ export type CreatedDeployment =
   | { outcome: 'data-exists' }
   | { outcome: 'held' };
 
-export type CreateMcpDeploymentInput = OwnedApp & {
-  artifactId: ArtifactId;
-  clientId: OAuthClientId;
-  chatId: NonNullable<Deployment['mcp']>['chatId'];
-};
+export type CreateMcpDeploymentInput = OwnedApp &
+  ({ artifactId: ArtifactId } | { config: RuntimeSettingsPatch }) & {
+    clientId: OAuthClientId;
+    chatId: NonNullable<Deployment['mcp']>['chatId'];
+  };
 
 export type CreateGitHubDeploymentInput = OwnedApp & {
   artifactId: ArtifactId;
@@ -157,6 +158,39 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
     chatId,
     ...input
   }: CreateMcpDeploymentInput): Promise<CreatedDeployment> {
+    if ('config' in input) {
+      const { appId, ownerId, config } = input;
+      return this.sql.begin(async (tx): Promise<CreatedDeployment> => {
+        if (!(await lockAppForMutation({ tx, appId, ownerId }))) {
+          return { outcome: 'no-artifact' };
+        }
+        const [release] = await tx.SelectArtifactForSettingsUpdate`
+          SELECT d.artifact_id FROM nibrun.latest_app_deployments latest
+          JOIN nibrun.deployments d ON d.id = latest.deployment_id
+          JOIN nibrun.live_apps a ON a.id = latest.app_id
+          WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+        `;
+        if (!release) {
+          return { outcome: 'no-artifact' };
+        }
+        const hostId = await this.hostForDeployment({ tx, appId, ownerId });
+        if (hostId === undefined) {
+          return { outcome: 'no-host' };
+        }
+        await patchLockedApp({ tx, appId, ownerId, patch: { ...config, name: undefined } });
+        return this.publishArtifact({
+          tx,
+          appId,
+          ownerId,
+          hostId,
+          artifactId: release.artifact_id,
+          initialDataFrom: null,
+          deploymentGrantId: null,
+          mcpClientId: clientId,
+          mcpChatId: chatId ?? null,
+        });
+      });
+    }
     return this.insertDeployment({
       ...input,
       initialDataFrom: null,
@@ -219,30 +253,63 @@ export class DeploymentsRepository extends Repository implements DeploymentsRepo
       if (hostId === undefined) {
         return { outcome: 'no-host' };
       }
-      await supersedeLiveDeployment({ tx, appId, ownerId });
-
-      // INSERT … SELECT rather than VALUES, so the predicate that decides ownership is the one
-      // the row is written through rather than one checked beside it.
-      const [inserted] = await tx.InsertDeployment`
-        INSERT INTO nibrun.deployments
-          (app_id, artifact_id, config_id, initial_data_import_id, github_deployment_grant_id, mcp_client_id, mcp_chat_id, host_id)
-        SELECT a.id, ar.id, c.id, ${initialDataFrom}, ${deploymentGrantId}, ${mcpClientId}, ${mcpChatId}, ${hostId}
-        FROM nibrun.live_apps a
-        JOIN nibrun.artifacts ar ON ar.app_id = a.id
-        JOIN LATERAL (
-          SELECT id FROM nibrun.app_configs_with_environment c
-          WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
-        ) c ON true
-        WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND ar.id = ${artifactId}
-          AND ar.digest IS NOT NULL
-        RETURNING id
-      `;
-      if (!inserted) {
-        return { outcome: 'no-artifact' };
-      }
-      const row = await this.selectDeployment({ tx, deploymentId: inserted.id });
-      return row ? { outcome: 'created', row } : { outcome: 'no-artifact' };
+      return this.publishArtifact({
+        tx,
+        appId,
+        ownerId,
+        hostId,
+        artifactId,
+        initialDataFrom,
+        deploymentGrantId,
+        mcpClientId,
+        mcpChatId,
+      });
     });
+  }
+
+  private async publishArtifact({
+    tx,
+    appId,
+    ownerId,
+    hostId,
+    artifactId,
+    initialDataFrom,
+    deploymentGrantId,
+    mcpClientId,
+    mcpChatId,
+  }: Omit<CreateDeploymentInput, 'onlyOne'> & {
+    tx: Transaction;
+    hostId: HostId;
+    deploymentGrantId: DeploymentGrantId | null;
+    mcpClientId: OAuthClientId | null;
+    mcpChatId: string | null;
+  }): Promise<CreatedDeployment> {
+    await supersedeLiveDeployment({ tx, appId, ownerId });
+
+    // INSERT … SELECT rather than VALUES, so the predicate that decides ownership is the one
+    // the row is written through rather than one checked beside it.
+    const [inserted] = await tx.InsertDeployment`
+      INSERT INTO nibrun.deployments
+        (app_id, artifact_id, config_id, initial_data_import_id, github_deployment_grant_id, mcp_client_id, mcp_chat_id, host_id)
+      SELECT a.id, ar.id, c.id, ${initialDataFrom}, ${deploymentGrantId}, ${mcpClientId}, ${mcpChatId}, ${hostId}
+      FROM nibrun.live_apps a
+      JOIN nibrun.artifacts ar ON ar.app_id = a.id
+      JOIN LATERAL (
+        SELECT id FROM nibrun.app_configs_with_environment c
+        WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
+      ) c ON true
+      WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND ar.id = ${artifactId}
+        AND ar.digest IS NOT NULL
+      RETURNING id
+    `;
+    if (!inserted) {
+      throw new ConflictError('The selected artifact is no longer deployable.');
+    }
+    const row = await this.selectDeployment({ tx, deploymentId: inserted.id });
+    if (!row) {
+      throw new Error('The newly inserted deployment could not be read.');
+    }
+    return { outcome: 'created', row };
   }
 
   private async creationRefusal({

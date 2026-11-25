@@ -4,7 +4,7 @@ import { type AppId, HostnameSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import { type Queries, schema } from '#db/queries.gen.ts';
-import { AppNameSchema } from '#lib/api/app.ts';
+import { AppNameSchema, RuntimeSettingsPatchSchema } from '#lib/api/app.ts';
 import { DeploymentInitiator } from '#lib/api/deployment-initiator.ts';
 import { DnsLabelSchema } from '#lib/api/dns-label.ts';
 import { ArtifactIdSchema, OAuthClientIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
@@ -17,6 +17,7 @@ import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { GitHubDeploymentGrantsRepository } from '#repositories/github-deployment-grants.repository.ts';
 import { TrustedWorkflowsRepository } from '#repositories/trusted-workflows.repository.ts';
 import { GitHubDeploymentGrantsService } from '#services/github-deployment-grants.service.ts';
+import { CLOUDFLARE_ACCESS } from '#tests/support/cloudflare-access.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import {
   GitHubOidcProviderFixture,
@@ -448,6 +449,62 @@ test.each([
     mcp_client_id: input.clientId,
     mcp_chat_id: input.chatId,
   });
+});
+
+test('settings redeploys pin the latest binary and merge concurrent partial edits', async () => {
+  const appId = await configuredApp();
+  const repo = new DeploymentsRepository(withTypes<Queries>(sql));
+  const settings = {
+    appId,
+    ownerId: OWNER_ID,
+    clientId: Value.Parse(OAuthClientIdSchema, 'settings-client'),
+    chatId: 'settings-chat',
+  };
+  const port = Value.Parse(RuntimeSettingsPatchSchema, { httpPort: 8080 });
+  expect(await repo.insertWithMcpClient({ ...settings, config: port })).toEqual({
+    outcome: 'no-artifact',
+  });
+
+  const binary = await deploymentInput(appId);
+  expect((await repo.insert(binary)).outcome).toBe('created');
+  expect(
+    await repo.insertWithMcpClient({ ...settings, ownerId: OTHER_OWNER_ID, config: port }),
+  ).toEqual({ outcome: 'no-artifact' });
+  await expect(
+    repo.insertWithMcpClient({ ...settings, config: { access: CLOUDFLARE_ACCESS } }),
+  ).rejects.toThrow();
+  const [original] = await repo.listByApp(settings);
+  expect(original).toMatchObject({ state: 'pending', http_port: configWithDefaults().httpPort });
+
+  const access = {
+    ...CLOUDFLARE_ACCESS,
+    token: { header: 'Authorization', format: 'bearer' as const },
+  };
+  const edits = await Promise.all([
+    repo.insertWithMcpClient({ ...settings, config: { access, args: ['serve'] } }),
+    repo.insertWithMcpClient({ ...settings, config: port }),
+  ]);
+  expect(edits.map((edit) => edit.outcome)).toEqual(['created', 'created']);
+  const cleared = await repo.insertWithMcpClient({ ...settings, config: { args: [] } });
+  expect(cleared).toMatchObject({
+    outcome: 'created',
+    row: {
+      artifact_id: binary.artifactId,
+      args: [],
+      http_port: 8080,
+      access_kind: 'jwt',
+      mcp_client_id: settings.clientId,
+      mcp_chat_id: settings.chatId,
+    },
+  });
+  const history = await repo.listByApp(settings);
+  expect(history.map((release) => release.state)).toEqual([
+    'pending',
+    'superseded',
+    'superseded',
+    'superseded',
+  ]);
+  expect(history[1]).toMatchObject({ args: ['serve'], http_port: 8080, access_kind: 'jwt' });
 });
 
 test.each(['registered-client', 'https://claude.ai/oauth/mcp-oauth-client-metadata'])(

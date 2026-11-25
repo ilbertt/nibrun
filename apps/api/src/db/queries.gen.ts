@@ -468,10 +468,6 @@ export interface ISelectAppByIdResult {
     expires_at: Date | null;
 }
 
-/** Result of query `TouchApp`. */
-export interface ITouchAppResult {
-}
-
 /** Result of query `SelectFinishableDeletion`. */
 export interface ISelectFinishableDeletionResult {
     app_id: IAppsColumns["id"];
@@ -544,6 +540,10 @@ export interface IDeleteArtifactsByAppResult {
 
 /** Result of query `DeleteAppUsageByApp`. */
 export interface IDeleteAppUsageByAppResult {
+}
+
+/** Result of query `TouchApp`. */
+export interface ITouchAppResult {
 }
 
 /** Result of query `SelectCurrentAppConfig`. */
@@ -804,6 +804,11 @@ export interface ISelectCurrentAppExecutionResult {
     deployment_id: IDeploymentsColumns["id"];
     /** An app keeps its last execution host while stopped, failed or awaiting volume deletion. */
     host_id: IDeploymentsColumns["host_id"];
+}
+
+/** Result of query `SelectArtifactForSettingsUpdate`. */
+export interface ISelectArtifactForSettingsUpdateResult {
+    artifact_id: IDeploymentsColumns["artifact_id"];
 }
 
 /** Result of query `SelectDeployableArtifact`. */
@@ -1428,7 +1433,6 @@ export interface Queries {
     SelectCreatedApp: ISelectCreatedAppResult;
     SelectAppsByOwner: ISelectAppsByOwnerResult;
     SelectAppById: ISelectAppByIdResult;
-    TouchApp: ITouchAppResult;
     SelectFinishableDeletion: ISelectFinishableDeletionResult;
     SelectFinishableDeletions: ISelectFinishableDeletionsResult;
     FinishDeletingApp: IFinishDeletingAppResult;
@@ -1444,6 +1448,7 @@ export interface Queries {
     DeleteImportsByApp: IDeleteImportsByAppResult;
     DeleteArtifactsByApp: IDeleteArtifactsByAppResult;
     DeleteAppUsageByApp: IDeleteAppUsageByAppResult;
+    TouchApp: ITouchAppResult;
     SelectCurrentAppConfig: ISelectCurrentAppConfigResult;
     InsertPatchedAppConfig: IInsertPatchedAppConfigResult;
     SelectAppForUpdate: ISelectAppForUpdateResult;
@@ -1464,6 +1469,7 @@ export interface Queries {
     SelectCachedBinary: ISelectCachedBinaryResult;
     SelectExecutionHost: ISelectExecutionHostResult;
     SelectCurrentAppExecution: ISelectCurrentAppExecutionResult;
+    SelectArtifactForSettingsUpdate: ISelectArtifactForSettingsUpdateResult;
     SelectDeployableArtifact: ISelectDeployableArtifactResult;
     InsertDeployment: IInsertDeploymentResult;
     SelectPreviousDeploymentHost: ISelectPreviousDeploymentHostResult;

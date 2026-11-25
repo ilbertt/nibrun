@@ -462,6 +462,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       MCP_TOOL_NAMES.prepareDeploy,
       MCP_TOOL_NAMES.listFiles,
       MCP_TOOL_NAMES.queryDatabase,
+      MCP_TOOL_NAMES.updateApp,
     ]);
     expect(result.tools[0]).toMatchObject({
       name: MCP_TOOL_NAMES.listApps,
@@ -491,6 +492,48 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(output.currentDeployment.anyOf[0].required).toEqual(DeploymentResponseSchema.required);
     expect(output.currentDeployment.anyOf).toContainEqual({ type: 'null' });
     expect(JSON.stringify(result.tools[1].outputSchema)).not.toContain('"nullable"');
+  });
+
+  test('updates only the supplied settings for the authenticated owner and client', async () => {
+    const deploy = spyOn(deploymentsService, 'createWithMcpClient').mockResolvedValue(DEPLOYMENT);
+    const config = { args: [], httpPort: 8080 };
+    const response = await rpc({
+      method: 'tools/call',
+      token: await accessToken(),
+      protocolVersion,
+      params: {
+        name: MCP_TOOL_NAMES.updateApp,
+        arguments: { appId: ARTIFACT.appId, config },
+        _meta: { 'openai/session': 'update-chat' },
+      },
+    });
+    expect((await rpcBody(response)).result.structuredContent).toEqual({ deployment: DEPLOYMENT });
+    expect(deploy).toHaveBeenCalledWith({
+      appId: ARTIFACT.appId,
+      ownerId,
+      clientId: MCP_CLIENT_ID,
+      chatId: 'update-chat',
+      config,
+    });
+  });
+
+  test.each([
+    {},
+    { environment: { TOKEN: 'private' } },
+    { httpPort: 65536 },
+    { access: {} },
+    { args: 'serve' },
+  ])('rejects invalid settings before attempting a redeploy: %j', async (config) => {
+    const deploy = spyOn(deploymentsService, 'createWithMcpClient');
+    const response = await rpc({
+      method: 'tools/call',
+      token: await accessToken(),
+      protocolVersion,
+      params: { name: MCP_TOOL_NAMES.updateApp, arguments: { appId: ARTIFACT.appId, config } },
+    });
+    const body = await rpcBody(response);
+    expect(body.error ?? body.result?.isError).toBeTruthy();
+    expect(deploy).not.toHaveBeenCalled();
   });
 
   test('advertises a finite log read using the existing log schemas', async () => {

@@ -14,6 +14,7 @@ import { DeploymentLifecycle } from '#lib/deployments/lifecycle.ts';
 import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from '#lib/errors.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
+import { validatedAppAccess } from '#lib/validate-app-access.ts';
 import type {
   CreatedDeployment,
   CreateMcpDeploymentInput,
@@ -120,6 +121,9 @@ export class DeploymentsService extends Service {
   }
 
   async createWithMcpClient(input: CreateMcpDeploymentInput): Promise<PublicDeployment> {
+    if ('config' in input && input.config.access !== undefined) {
+      validatedAppAccess(input.config.access);
+    }
     return await this.created(this.deploymentsRepo.insertWithMcpClient(input));
   }
 
