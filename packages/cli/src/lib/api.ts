@@ -1,4 +1,5 @@
 import { createPublicApiClient, type PublicApiClient } from '@repo/api-client/public';
+import { HttpOperationClient, OPERATION_CLIENT_HEADER } from '@repo/api-constants';
 import type { Credentials } from '#lib/credentials.ts';
 
 export type ApiInput = {
@@ -7,7 +8,17 @@ export type ApiInput = {
 };
 
 export function createApi({ baseUrl, credentials }: ApiInput): PublicApiClient {
-  return createPublicApiClient({ baseUrl, headers: authHeaders({ baseUrl, credentials }) });
+  return createCliApiClient({ baseUrl, headers: authHeaders({ baseUrl, credentials }) });
+}
+
+export function createCliApiClient({
+  baseUrl,
+  headers,
+}: Parameters<typeof createPublicApiClient>[0]): PublicApiClient {
+  return createPublicApiClient({
+    baseUrl,
+    headers: { ...headers, [OPERATION_CLIENT_HEADER]: HttpOperationClient.Cli },
+  });
 }
 
 /**

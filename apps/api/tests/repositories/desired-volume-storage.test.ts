@@ -14,10 +14,12 @@ import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import { type Queries, schema } from '#db/queries.gen.ts';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 import { openSecret, sealSecret } from '#lib/tenant-secrets.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
+import { ExportsRepository } from '#repositories/exports.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { registerHost } from '#tests/support/hosts.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
@@ -122,21 +124,39 @@ test('a config row stores ordinary fields as columns and seals each credential s
   }
 });
 
+test('a customer bucket export is refused before it reaches the host desired document', async () => {
+  const slug = 'private-export';
+  await createApp(slug);
+  await insertConfig({ slug, storage: storage(ACCESS_KEY_AUTH) });
+  await deployApp(slug);
+  const [app] = await sql.unsafe('SELECT id FROM nibrun.apps WHERE slug = $1', [slug]);
+  const exports = new ExportsRepository(withTypes<Queries>(sql));
+  const appId = Value.Parse(AppIdSchema, app.id);
+  const ownerId = Value.Parse(OwnerIdSchema, 'owner');
+  await expect(exports.request({ appId, ownerId, expiresAt: new Date() })).rejects.toThrow(
+    'customer bucket',
+  );
+  expect(await exports.listByApp({ appId, ownerId })).toEqual([]);
+});
+
 test('normal config edits and subsequent deployments preserve storage without exposing its columns', async () => {
   const previous = await storedColumns();
   const [app] = await sql.unsafe('SELECT id FROM nibrun.apps WHERE slug = $1', [PRIVATE_APP]);
   const changed = await new AppsRepository(withTypes<Queries>(sql)).update({
+    client: OperationClient.Cli,
     appId: Value.Parse(AppIdSchema, app.id),
     ownerId: OWNER_ID,
     patch: { name: undefined, args: ['changed'] },
   });
   expect(changed?.args).toEqual(['changed']);
   expect(changed).not.toHaveProperty('volume_storage_secret_access_key');
-  expect(await storedColumns()).toEqual(previous);
+  expect(previous.volume_storage_prefix).toBe('apps/access-key/');
+  expect(await storedColumns()).toEqual({ ...previous, volume_storage_prefix: 'apps/access-key' });
   await deployApp(PRIVATE_APP);
-  expect((await desiredVolumes()).find((volume) => volume.storage)?.storage).toEqual(
-    storage(ACCESS_KEY_AUTH),
-  );
+  expect((await desiredVolumes()).find((volume) => volume.appId === app.id)?.storage).toEqual({
+    ...storage(ACCESS_KEY_AUTH),
+    prefix: Value.Parse(S3VolumeStorageSchema.properties.prefix, 'apps/access-key'),
+  });
 });
 
 test('an undeployed config version does not redirect an existing volume', async () => {
@@ -212,7 +232,7 @@ test('deletion retains the deployment’s storage even after every release is su
   ]);
   expect((await desiredVolumes()).find((volume) => volume.appId === app.id)).toMatchObject({
     desiredState: 'absent',
-    storage: storage(ACCESS_KEY_AUTH),
+    storage: { ...storage(ACCESS_KEY_AUTH), prefix: 'apps/access-key' },
   });
   await sql.unsafe(`UPDATE nibrun.apps SET state = 'deleted' WHERE id = $1`, [app.id]);
   expect((await desiredVolumes()).some((volume) => volume.appId === app.id)).toBe(false);
@@ -237,6 +257,7 @@ test.each([
     await insertConfig({ slug, storage: undefined });
     const previousSecret = sealSecret({ key: TEST_SECRETS_KEY, plaintext: 'previous-environment' });
     await apps.update({
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       patch: {
@@ -264,9 +285,10 @@ test.each([
     await insertConfig({ slug, storage: configured });
     const current = await deployApp(slug);
     const currentColumns = await storedColumns(slug);
-    const volume = (await desiredVolumes()).find((one) => one.appId === appId);
+    const volume = (await desiredVolumes()).find((one) => one.appId === appId)!;
     await insertConfig({ slug, storage: { ...configured, bucket: 'not-deployed' } });
     const request = {
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       rollbackOf: Value.Parse(DeploymentIdSchema, previous.id),
@@ -299,8 +321,12 @@ test.each([
       environment_names: ['TOKEN'],
     });
     expect(rollback?.artifact_id).not.toBe(current.artifact_id);
-    expect(await storedColumns(slug)).toEqual(currentColumns);
-    expect((await desiredVolumes()).find((one) => one.appId === appId)).toEqual(volume);
+    const prefix = Value.Parse(S3VolumeStorageSchema.properties.prefix, `apps/${auth.kind}`);
+    expect(await storedColumns(slug)).toEqual({ ...currentColumns, volume_storage_prefix: prefix });
+    expect((await desiredVolumes()).find((one) => one.appId === appId)).toEqual({
+      ...volume,
+      storage: { ...configured, prefix },
+    });
     const environment = await sql.unsafe(
       `SELECT e.name, e.value FROM nibrun.app_config_environment e
      JOIN nibrun.deployments d ON d.config_id = e.config_id
@@ -320,18 +346,20 @@ test.each([
   const appId = Value.Parse(AppIdSchema, await createApp(slug));
   await insertConfig({ slug, storage: configured });
   const previous = await deployApp(slug);
+  const volume = (await desiredVolumes()).find((one) => one.appId === appId);
   await new AppsRepository(withTypes<Queries>(sql)).update({
+    client: OperationClient.Cli,
     appId,
     ownerId: OWNER_ID,
     patch: { name: undefined, args: ['newer'] },
   });
   await deployApp(slug);
-  const volume = (await desiredVolumes()).find((one) => one.appId === appId);
   const [before] = await sql.unsafe(
     'SELECT count(*) FROM nibrun.app_configs c JOIN nibrun.apps a ON a.id = c.app_id WHERE a.id = $1 AND a.owner_id = $2',
     [appId, OWNER_ID],
   );
   const rollback = await new DeploymentsRepository(withTypes<Queries>(sql)).insertRollback({
+    client: OperationClient.Cli,
     appId,
     ownerId: OWNER_ID,
     rollbackOf: Value.Parse(DeploymentIdSchema, previous.id),

@@ -32,6 +32,7 @@ export const AppsAppIdDeploymentsController = new Elysia()
   .post(
     '/apps/:appId/deployments',
     async function createDeployment({
+      operationClient,
       deploymentsService,
       params,
       body: bodyInput,
@@ -40,6 +41,7 @@ export const AppsAppIdDeploymentsController = new Elysia()
     }) {
       const body = Value.Parse(CreateDeploymentBodySchema, bodyInput);
       const input = {
+        client: operationClient,
         appId: Value.Parse(AppIdSchema, params.appId),
         ownerId: deploymentAccess.ownerId,
         source: body,

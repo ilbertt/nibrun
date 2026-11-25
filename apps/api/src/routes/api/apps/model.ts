@@ -14,6 +14,7 @@ import {
   MIN_HOSTNAMES,
   NewAppConfigSchema,
 } from '#lib/api/app.ts';
+import { VolumeStorageLocationSchema } from '#lib/api/customer-volume.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 
 // Which variables are set, never what they hold: the values are sealed in the database and only
@@ -63,6 +64,7 @@ export const AppResponseSchema = t.Composite([
   t.Object({
     config: PublicAppConfigSchema,
     hostnames: t.Array(AppHostnameResponseSchema, { minItems: MIN_HOSTNAMES }),
+    volumeStorage: t.Nullable(VolumeStorageLocationSchema),
     volumeUsage: t.Nullable(FilesystemUsageSchema),
     computeUsage: t.Nullable(ComputeUsageSchema),
     expiresAt: t.Nullable(TimestampSchema, {

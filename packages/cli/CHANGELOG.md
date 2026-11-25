@@ -2,6 +2,16 @@
 
 All notable changes to `nib` are documented in this file.
 
+## [2026.11.25-1]
+
+### 🚀 Features
+
+- *(api)* Identify dashboard and CLI requests (#1313)
+
+### 🚜 Refactor
+
+- *(runtime)* Keep only the nibrunner SQLite reader (#1295)
+
 ## [2026.11.19-3]
 
 ### 🚀 Features

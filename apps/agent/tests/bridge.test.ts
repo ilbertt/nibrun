@@ -51,12 +51,15 @@ import {
   POLL_SETTINGS_FIXTURE,
 } from '#tests/support/fixtures.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
+import { s3Storage } from '#tests/support/s3-storage.ts';
 import { serving, servingUnix } from '#tests/support/server.ts';
 import { sqliteQuery } from '#tests/support/sqlite-sessions.ts';
 
 const run = provided(platform);
 const SESSION_LIFETIME_MS = 300_000;
 const NEXT_DEPLOYMENT_ID = Value.Parse(DeploymentIdSchema, 'new-deployment');
+const PRIVATE_FILE_MODE = 0o600;
+const PERMISSION_BITS = 0o777;
 const SECOND_APP_ID = Value.Parse(AppIdSchema, 'second-app');
 
 function fixture(initialDesired: HostDesiredState) {
@@ -216,6 +219,33 @@ function fixture(initialDesired: HostDesiredState) {
     };
   });
 }
+
+test('the bridge writes customer bucket settings to the owner-only desired file', async () => {
+  await run(
+    Effect.gen(function* () {
+      const fs = yield* FileSystem.FileSystem;
+      const setup = yield* fixture(desiredState());
+      const storage = s3Storage({ region: 'auto' });
+      setup.world.desired = desiredState({ volumes: [desiredVolume({ storage })] });
+      const bridge = yield* setup.create.pipe(Effect.provide(artifactStore()));
+      const path = setup.config.desiredStateFile;
+      yield* bridge.pollOnce;
+      yield* readNibrunnerDesired({ path, hostId: HOST_ID }).pipe(
+        Effect.repeat({
+          schedule: Schedule.spaced('5 millis'),
+          until: (state) => state.volumes.length > 0,
+        }),
+        Effect.timeoutFail({
+          duration: '2 seconds',
+          onTimeout: () => new Error('Customer volume was not published'),
+        }),
+      );
+      const desired = yield* readNibrunnerDesired({ path, hostId: HOST_ID });
+      expect(desired.volumes[0]?.storage).toEqual({ ...storage, region: 'auto' });
+      expect((yield* fs.stat(path)).mode & PERMISSION_BITS).toBe(PRIVATE_FILE_MODE);
+    }),
+  );
+});
 
 function obsoleteCacheEntry(config: NibrunnerBridgeConfig) {
   return Effect.gen(function* () {

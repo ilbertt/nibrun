@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, mock, spyOn, test } from 'bun:test';
+import { OPERATION_CLIENT_HEADER } from '@repo/api-constants';
 import { Value } from '@sinclair/typebox/value';
 import { StatusMap } from 'elysia';
 import { UnauthorizedError } from '#lib/errors.ts';
@@ -31,7 +32,13 @@ afterEach(function restoreMocks() {
   mock.restore();
 });
 
-test('a verified app grant can deploy a binary through the existing service', async () => {
+test.each([
+  { claim: undefined, client: 'unknown' },
+  { claim: 'dashboard', client: 'dashboard' },
+  { claim: 'cli', client: 'cli' },
+  { claim: 'mcp', client: 'unknown' },
+  { claim: 'system', client: 'unknown' },
+])('a verified grant with HTTP client $claim records $client', async ({ claim, client }) => {
   spyOn(grants, 'authenticate').mockResolvedValue(githubDeploymentGrant());
   const created = Value.Parse(DeploymentResponseSchema, {
     id: 'deployment-1',
@@ -44,9 +51,15 @@ test('a verified app grant can deploy a binary through the existing service', as
     restartCount: 0,
   });
   const create = spyOn(deployments, 'createWithDeploymentGrant').mockResolvedValue(created);
-  const response = await sendJson({ method: 'POST', url: URL, headers: HEADERS, body: BODY });
+  const response = await sendJson({
+    method: 'POST',
+    url: URL,
+    headers: claim ? { ...HEADERS, [OPERATION_CLIENT_HEADER]: claim } : HEADERS,
+    body: BODY,
+  });
   expect(response.status).toBe(StatusMap.Created);
   expect(create).toHaveBeenCalledWith({
+    client,
     appId: GRANT_APP_ID,
     ownerId: GRANT_OWNER_ID,
     source: BODY,

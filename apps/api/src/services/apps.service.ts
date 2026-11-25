@@ -15,6 +15,7 @@ import {
   interpolableRuntimeValue,
   namesExtraPublicPortValues,
 } from '@repo/protocol/runtime-values';
+import { Value } from '@sinclair/typebox/value';
 import { schema } from '#db/queries.gen.ts';
 import {
   type App,
@@ -25,6 +26,10 @@ import {
   OWNED_APP_STATES,
   type OwnedAppState,
 } from '#lib/api/app.ts';
+import {
+  type VolumeStorageLocation,
+  VolumeStorageLocationSchema,
+} from '#lib/api/customer-volume.ts';
 import type { OwnerId } from '#lib/api/identifiers.ts';
 import {
   configWithDefaults,
@@ -42,6 +47,7 @@ import {
   NotFoundError,
   TooManyRequestsError,
 } from '#lib/errors.ts';
+import { type OperationAttribution, OperationClient } from '#lib/operation-client.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { REDACTED } from '#lib/redact-secrets.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
@@ -66,6 +72,7 @@ import { Service } from '#services/service.ts';
 export type PublicApp = Omit<App, 'config' | 'hostnames'> & {
   config: PublicAppConfig;
   hostnames: PublicAppHostname[];
+  volumeStorage: VolumeStorageLocation | null;
   /** `null` until a host has measured the filesystem, which it cannot while nothing mounts it. */
   volumeUsage: FilesystemUsage | null;
   computeUsage: ComputeUsage | null;
@@ -189,11 +196,12 @@ export class AppsService extends Service {
    * URL, and anyone is entitled to pick the same name — the id is what an app is known by here.
    */
   async create({
+    client,
     ownerId,
     isAnonymous,
     name,
     config,
-  }: {
+  }: OperationAttribution & {
     ownerId: OwnerId;
     isAnonymous: boolean;
     name: AppName;
@@ -219,6 +227,7 @@ export class AppsService extends Service {
       const slug = deriveAppSlug(name);
       try {
         const created = await this.appsRepo.create({
+          client,
           ownerId,
           name,
           slug,
@@ -329,12 +338,18 @@ export class AppsService extends Service {
    * The name moves and nothing else does: the slug was minted from the first name and is in
    * somebody's bookmarks by now, so the hostname stays.
    */
-  async update({ appId, ownerId, patch }: OwnedApp & { patch: AppPatch }): Promise<PublicApp> {
+  async update({
+    appId,
+    ownerId,
+    client,
+    patch,
+  }: OwnedApp & OperationAttribution & { patch: AppPatch }): Promise<PublicApp> {
     const { name, config } = patch;
     if (config) {
       await this.refuseValuesTheEditLeavesUngiven({ appId, ownerId, patch: config });
     }
     const app = await this.appsRepo.update({
+      client,
       appId,
       ownerId,
       patch: this.sealed(patch),
@@ -359,11 +374,13 @@ export class AppsService extends Service {
    * `deleting` is not a state there is a way back out of.
    */
   async setState({
+    client,
     appId,
     ownerId,
     state,
-  }: OwnedApp & { state: OwnedAppState }): Promise<PublicApp> {
+  }: OwnedApp & OperationAttribution & { state: OwnedAppState }): Promise<PublicApp> {
     const app = await this.appsRepo.updateState({
+      client,
       appId,
       ownerId,
       state,
@@ -563,9 +580,10 @@ export class AppsService extends Service {
    * first leaves one that cannot be described, and the whole listing fails on it rather than that
    * one app. `purgeApp` releases them once the app is `deleted` and nobody is being shown it.
    */
-  async delete({ appId, ownerId }: OwnedApp): Promise<PublicApp> {
+  async delete({ appId, ownerId, client }: OwnedApp & OperationAttribution): Promise<PublicApp> {
     const app = requireApp(
       await this.appsRepo.updateState({
+        client,
         appId,
         ownerId,
         state: 'deleting',
@@ -660,7 +678,7 @@ export class AppsService extends Service {
    */
   private async expireApp({ appId, ownerId }: OwnedApp): Promise<void> {
     try {
-      await this.delete({ appId, ownerId });
+      await this.delete({ appId, ownerId, client: OperationClient.System });
       this.logger.info('app expired', { appId, ownerId });
     } catch (error) {
       if (error instanceof NotFoundError) {
@@ -789,6 +807,13 @@ function toPublicApp({ app, hostnames }: AppWithHostnames): PublicApp {
     slug: app.slug,
     hostnames: hostnames.map(toAppHostname),
     config: toAppConfig(app),
+    volumeStorage:
+      app.volume_storage_bucket === null
+        ? null
+        : Value.Parse(VolumeStorageLocationSchema, {
+            bucket: app.volume_storage_bucket,
+            prefix: app.volume_storage_prefix,
+          }),
     volumeUsage: toVolumeUsage(app),
     computeUsage: toComputeUsage(app),
     expiresAt: app.expires_at === null ? null : toTimestamp(app.expires_at),

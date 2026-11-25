@@ -12,6 +12,7 @@ import type { ArtifactId, DeploymentGrantId, ImportId } from '#lib/api/identifie
 import { type PublicAppConfig, toAppConfig } from '#lib/app-config.ts';
 import { DeploymentLifecycle } from '#lib/deployments/lifecycle.ts';
 import { ConflictError, ForbiddenError, NotFoundError, UnauthorizedError } from '#lib/errors.ts';
+import type { OperationAttribution } from '#lib/operation-client.ts';
 import { isUniqueViolation } from '#lib/pg-errors.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import { validatedAppAccess } from '#lib/validate-app-access.ts';
@@ -101,7 +102,11 @@ export class DeploymentsService extends Service {
     source,
     isAnonymous,
     ...owned
-  }: OwnedApp & { isAnonymous: boolean; source: DeploymentSource }): Promise<PublicDeployment> {
+  }: OwnedApp &
+    OperationAttribution & {
+      isAnonymous: boolean;
+      source: DeploymentSource;
+    }): Promise<PublicDeployment> {
     if ('rollbackOf' in source) {
       if (isAnonymous) {
         throw new ForbiddenError(ONE_DEPLOYMENT);
@@ -128,13 +133,15 @@ export class DeploymentsService extends Service {
   }
 
   async createWithDeploymentGrant(
-    input: OwnedApp & { source: DeploymentSource; deploymentGrantId: DeploymentGrantId },
+    input: OwnedApp &
+      OperationAttribution & { source: DeploymentSource; deploymentGrantId: DeploymentGrantId },
   ): Promise<PublicDeployment> {
     if ('rollbackOf' in input.source || input.source.initialDataFrom !== undefined) {
       throw new ForbiddenError('Deployment credentials can only deploy a compiled binary.');
     }
     return await this.created(
       this.deploymentsRepo.insertWithDeploymentGrant({
+        client: input.client,
         appId: input.appId,
         ownerId: input.ownerId,
         artifactId: input.source.artifactId,

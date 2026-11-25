@@ -11,6 +11,7 @@ import type {
   Hostname,
   ObjectKey,
 } from '@repo/protocol';
+import { type AppConfigAction, setOperationContext } from '#db/operation-context.ts';
 import type { Queries } from '#db/queries.gen.ts';
 import { APP_STATES, type AppHostnameState, type AppName, type AppState } from '#lib/api/app.ts';
 import type { DnsLabel } from '#lib/api/dns-label.ts';
@@ -19,6 +20,7 @@ import { accessColumns } from '#lib/app-access.ts';
 import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
 import { CUSTOM_KIND } from '#lib/app-hostname.ts';
 import { BadRequestError, ConflictError } from '#lib/errors.ts';
+import type { OperationAttribution } from '#lib/operation-client.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
 import { requiresCustomDomain } from '#lib/validate-app-access.ts';
 import type { StoredVolumeStorage } from '#lib/volume-storage.ts';
@@ -31,7 +33,7 @@ export type ExpirableAppRow = Queries['SelectExpirableApps'];
 
 export type CreatedApp = { app: AppRow; hostnames: AppHostnameRow[] };
 
-export type NewApp = {
+export type NewApp = OperationAttribution & {
   ownerId: OwnerId;
   name: AppName;
   slug: DnsLabel;
@@ -70,7 +72,11 @@ type OwnedApp = { appId: AppId; ownerId: OwnerId };
  * something a suspend can call off, so the states an app may be moved *out of* are named by
  * whoever is asking rather than assumed here. An app in none of them is left exactly as it is.
  */
-export type StateChange = OwnedApp & { state: AppState; from: readonly AppState[] };
+export type StateChange = OwnedApp &
+  OperationAttribution & {
+    state: Exclude<AppState, 'deleted'>;
+    from: readonly AppState[];
+  };
 
 /**
  * What an owner may change about an app in one request: what they call it, and how it starts.
@@ -103,7 +109,9 @@ export abstract class AppsRepositoryContract {
     deploymentIds: readonly DeploymentId[];
     hostId: HostId;
   }): Promise<void>;
-  abstract update(input: OwnedApp & { patch: SealedAppPatch }): Promise<AppRow | null>;
+  abstract update(
+    input: OwnedApp & OperationAttribution & { patch: SealedAppPatch },
+  ): Promise<AppRow | null>;
   abstract updateState(input: StateChange): Promise<AppRow | null>;
   abstract stampDataInitialized(input: { appIds: readonly AppId[]; hostId: HostId }): Promise<void>;
   abstract finishDeletingVolume(input: { appId: AppId; hostId: HostId }): Promise<boolean>;
@@ -169,6 +177,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    * instead — after the profile's, so every stranger takes the two in the same order.
    */
   create({
+    client,
     ownerId,
     name,
     slug,
@@ -189,6 +198,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
 
       const columns = accessColumns(config.access);
       const audiences = columns.access_audiences && tx.array(columns.access_audiences, TEXT_ARRAY);
+      await setOperationContext({ tx, client });
       const [inserted] = await tx.InsertApp`
         INSERT INTO nibrun.apps (owner_id, name, slug) VALUES (${ownerId}, ${name}, ${slug})
         RETURNING id
@@ -257,6 +267,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
                c.health_check_unhealthy_threshold,
                c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
                c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+               storage.volume_storage_bucket, storage.volume_storage_prefix,
                u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
                u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
                d.expires_at
@@ -265,6 +276,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
           SELECT * FROM nibrun.app_configs_with_environment c
           WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
         ) c ON true
+        JOIN nibrun.app_configs storage ON storage.id = c.id
         LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
         LEFT JOIN nibrun.app_deadlines d ON d.app_id = a.id
         WHERE a.id = ${inserted.id} AND a.owner_id = ${ownerId}
@@ -291,6 +303,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
              c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+             storage.volume_storage_bucket, storage.volume_storage_prefix,
              u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
              u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
              d.expires_at
@@ -299,6 +312,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         SELECT * FROM nibrun.app_configs_with_environment c
         WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
       ) c ON true
+      JOIN nibrun.app_configs storage ON storage.id = c.id
       LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
       LEFT JOIN nibrun.app_deadlines d ON d.app_id = a.id
       WHERE a.owner_id = ${ownerId}
@@ -467,6 +481,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
              c.health_check_unhealthy_threshold,
              c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
              c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+             storage.volume_storage_bucket, storage.volume_storage_prefix,
              u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
              u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
              d.expires_at
@@ -475,6 +490,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         SELECT * FROM nibrun.app_configs_with_environment c
         WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
       ) c ON true
+      JOIN nibrun.app_configs storage ON storage.id = c.id
       LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
       LEFT JOIN nibrun.app_deadlines d ON d.app_id = a.id
       WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
@@ -493,14 +509,19 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
    * index is the rule. Written whether or not the name moved, because reconfiguring an app changes
    * the app and the new version lands in another table, so nothing else would move `updated_at`.
    */
-  update({ appId, ownerId, patch }: OwnedApp & { patch: SealedAppPatch }) {
+  update({
+    appId,
+    ownerId,
+    client,
+    patch,
+  }: OwnedApp & OperationAttribution & { patch: SealedAppPatch }) {
     return this.sql.begin(async (tx) => {
       const locked = await lockAppForMutation({ tx, appId, ownerId });
       if (!locked) {
         return null;
       }
 
-      await patchLockedApp({ tx, appId, ownerId, patch });
+      await patchLockedApp({ tx, appId, ownerId, client, patch });
       return await appAsChanged({ tx, appId, ownerId });
     });
   }
@@ -548,7 +569,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     appIds: readonly AppId[];
     hostId: HostId;
   }): Promise<void> {
-    // Untagged, as `updateState` is: `sql.array` is a clause the generator blanks out before it
+    // Untagged because `sql.array` is a clause the generator blanks out before it
     // parses the statement, and there is no row type to lose — this returns nothing.
     await this.sql`
       UPDATE nibrun.apps
@@ -686,23 +707,21 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     });
   }
 
-  updateState({ appId, ownerId, state, from }: StateChange) {
+  updateState({ appId, ownerId, state, from, client }: StateChange) {
     return this.sql.begin(async (tx) => {
-      if (!(await lockAppForMutation({ tx, appId, ownerId }))) {
+      const locked = await lockAppForMutation({ tx, appId, ownerId });
+      if (!locked || !from.includes(locked.state)) {
         return null;
       }
-      // Untagged for the reason `insertEnvironment` is: `sql.array` is a clause the generator
-      // blanks out before it parses the statement, and `state = ANY()` is not a predicate. There
-      // is no row type to lose — the only column is the id, and all this reads from it is
-      // whether the predicate matched anything.
-      const [updated] = await tx`
-        UPDATE nibrun.apps
-        SET state = ${state}
+      if (locked.state === state) {
+        return await appAsChanged({ tx, appId, ownerId });
+      }
+      await setOperationContext({ tx, client });
+      await tx.UpdateAppState`
+        UPDATE nibrun.apps SET state = ${state}
         WHERE id = ${appId} AND owner_id = ${ownerId}
-          AND state = ANY(${tx.array([...from], TEXT_ARRAY)})
-        RETURNING id
       `;
-      return updated ? await appAsChanged({ tx, appId, ownerId }) : null;
+      return await appAsChanged({ tx, appId, ownerId });
     });
   }
 }
@@ -711,11 +730,14 @@ export async function patchLockedApp({
   tx,
   appId,
   ownerId,
+  client,
   patch: { name, ...config },
-}: OwnedApp & { tx: TypedSQL<Queries>; patch: SealedAppPatch }) {
-  if (Object.keys(config).length > 0) {
-    await appendConfigVersion({ tx, appId, patch: config, storage: undefined });
-  }
+}: OwnedApp & OperationAttribution & { tx: TypedSQL<Queries>; patch: SealedAppPatch }) {
+  const configAction =
+    Object.keys(config).length > 0
+      ? await appendConfigVersion({ tx, appId, patch: config, storage: undefined })
+      : undefined;
+  await setOperationContext({ tx, client, configAction });
 
   await tx.TouchApp`
     UPDATE nibrun.live_apps a
@@ -739,7 +761,7 @@ export async function appendConfigVersion({
   appId: AppId;
   patch: SealedConfigPatch;
   storage: StoredVolumeStorage | undefined;
-}): Promise<string> {
+}): Promise<AppConfigAction | undefined> {
   const needsDomain = requiresCustomDomain(patch.access);
   const [current] = await tx.SelectCurrentAppConfig`
     /* @notNull environment_names */
@@ -777,7 +799,8 @@ export async function appendConfigVersion({
   ) {
     throw new BadRequestError(CLOUDFLARE_ACCESS_DOMAIN_HINT);
   }
-  const config = { ...previous, ...patch };
+  const { environment: environmentPatch, ...runtimePatch } = patch;
+  const config = { ...previous, ...runtimePatch };
   const columns = accessColumns(config.access);
   const audiences = columns.access_audiences && tx.array(columns.access_audiences, TEXT_ARRAY);
   const volumeStorage = storage ?? current;
@@ -809,7 +832,7 @@ export async function appendConfigVersion({
       ${config.restartPolicy.maxRestarts}, ${config.restartPolicy.initialBackoffMs},
       ${config.restartPolicy.maxBackoffMs}, ${config.restartPolicy.backoffFactor},
       ${config.restartPolicy.resetAfterMs},
-      ${volumeStorage.volume_storage_endpoint}, ${volumeStorage.volume_storage_bucket}, ${volumeStorage.volume_storage_prefix},
+      ${volumeStorage.volume_storage_endpoint}, ${volumeStorage.volume_storage_bucket}, rtrim(${volumeStorage.volume_storage_prefix}::text, '/'),
       ${volumeStorage.volume_storage_region}, ${volumeStorage.volume_storage_auth_kind}, ${volumeStorage.volume_storage_access_key_id},
       ${volumeStorage.volume_storage_secret_access_key}, ${volumeStorage.volume_storage_session_token},
       ${volumeStorage.volume_storage_encryption_password}
@@ -823,7 +846,7 @@ export async function appendConfigVersion({
   // Everything the patch said nothing about, which is every variable there is when it said
   // nothing at all. A name it sets or removes is left out of the copy: one row per name per
   // version, and for a name it sets that row is the one inserted below.
-  const environment = patch.environment ?? { set: {}, removed: [] };
+  const environment = environmentPatch ?? { set: {}, removed: [] };
   const edited = new Set([...Object.keys(environment.set), ...environment.removed]);
   await carryEnvironmentForward({
     tx,
@@ -832,7 +855,16 @@ export async function appendConfigVersion({
     names: current.environment_names.filter((name) => !edited.has(name)),
   });
   await insertEnvironment({ tx, configId: inserted.id, environment: environment.set });
-  return inserted.id;
+  if (!isDeepStrictEqual(previous, config)) {
+    return 'app.updated';
+  }
+  if (
+    Object.keys(environment.set).length > 0 ||
+    environment.removed.some((name) => current.environment_names.includes(name))
+  ) {
+    return 'app.environment.updated';
+  }
+  return undefined;
 }
 
 export async function lockApp({
@@ -854,12 +886,12 @@ export async function lockApp({
   return app;
 }
 
-export async function lockAppForMutation(input: Parameters<typeof lockApp>[0]): Promise<boolean> {
+export async function lockAppForMutation(input: Parameters<typeof lockApp>[0]) {
   const app = await lockApp(input);
   if (app?.volume_storage_migration_state === 'pending') {
     throw new ConflictError('Cannot change this app while its storage migration is pending.');
   }
-  return app !== undefined;
+  return app;
 }
 
 /**
@@ -915,8 +947,7 @@ async function strangersHold({
   tx: TypedSQL<Queries>;
   atLeast: number;
 }): Promise<boolean> {
-  // Untagged, as `updateState` is: there is no row type to lose, and the generator has no relation
-  // to read a lock's return through.
+  // The generator has no relation to infer the advisory lock's return type from.
   await tx`SELECT pg_advisory_xact_lock(hashtext('nibrun.anonymous_apps'))`;
   const [strangers] = await tx.SelectAnonymousAppsHeld`
     /* @notNull held */
@@ -959,6 +990,7 @@ async function appAsChanged({
            c.health_check_unhealthy_threshold,
            c.restart_max_restarts, c.restart_initial_backoff_ms, c.restart_max_backoff_ms,
            c.restart_backoff_factor, c.restart_reset_after_ms, c.environment_names,
+           storage.volume_storage_bucket, storage.volume_storage_prefix,
            u.volume_total_bytes, u.volume_used_bytes, u.volume_measured_at,
            u.memory_total_bytes, u.memory_used_bytes, u.cpu_share, u.compute_measured_at,
            d.expires_at
@@ -967,6 +999,7 @@ async function appAsChanged({
       SELECT * FROM nibrun.app_configs_with_environment c
       WHERE c.app_id = a.id ORDER BY c.id DESC LIMIT 1
     ) c ON true
+    JOIN nibrun.app_configs storage ON storage.id = c.id
     LEFT JOIN nibrun.app_usage u ON u.app_id = a.id
     LEFT JOIN nibrun.app_deadlines d ON d.app_id = a.id
     WHERE a.id = ${appId} AND a.owner_id = ${ownerId}

@@ -12,7 +12,7 @@ import type { ImportId, OwnerId } from '#lib/api/identifiers.ts';
 import type { Import } from '#lib/api/import.ts';
 import { isAppDataArchive, OPENING_BYTES } from '#lib/archive/app-data.ts';
 import { ArtifactTooLargeError, boundedTo } from '#lib/artifact-digest.ts';
-import { BadRequestError, NotFoundError } from '#lib/errors.ts';
+import { BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
 import { type RemoteFetchSlots, sourceRefusal } from '#lib/remote-fetch.ts';
 import { filenameFromUrl, withoutCredentials } from '#lib/remote-url.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
@@ -128,9 +128,7 @@ export class ImportsService extends Service {
     filename: Filename;
     sizeBytes: number;
   }): Promise<ImportUpload> {
-    if (!(await this.appsRepo.isOwnedBy({ appId, ownerId }))) {
-      throw new NotFoundError(NO_SUCH_APP);
-    }
+    await this.requireManagedVolume({ appId, ownerId });
     if (sizeBytes > MAX_IMPORT_SIZE_BYTES) {
       throw new BadRequestError(TOO_LARGE);
     }
@@ -164,9 +162,7 @@ export class ImportsService extends Service {
     url: string;
     sha256?: Sha256Digest | undefined;
   }): Promise<Import> {
-    if (!(await this.appsRepo.isOwnedBy({ appId, ownerId }))) {
-      throw new NotFoundError(NO_SUCH_APP);
-    }
+    await this.requireManagedVolume({ appId, ownerId });
     const filename = filenameFromUrl(url);
     if (filename === undefined) {
       throw new BadRequestError("The url has to end in the archive's own name: .../data.tar.gz");
@@ -176,6 +172,18 @@ export class ImportsService extends Service {
       return await this.fetchArchive({ appId, ownerId, url, filename, sha256 });
     } finally {
       this.fetchSlots.release(ownerId);
+    }
+  }
+
+  private async requireManagedVolume(input: { appId: AppId; ownerId: OwnerId }): Promise<void> {
+    const app = await this.appsRepo.findById(input);
+    if (!app) {
+      throw new NotFoundError(NO_SUCH_APP);
+    }
+    if (app.volume_storage_bucket !== null) {
+      throw new ConflictError(
+        'Initial data archives use nibrun storage and cannot be imported into a customer volume.',
+      );
     }
   }
 

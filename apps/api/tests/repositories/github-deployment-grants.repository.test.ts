@@ -12,6 +12,7 @@ import { configWithDefaults } from '#lib/app-config.ts';
 import { DEPLOYMENT_GRANT_LIFETIME_MS } from '#lib/deployment-grant-policy.ts';
 import { UnauthorizedError } from '#lib/errors.ts';
 import type { GitHubActionsOidcClaims } from '#lib/github-actions-oidc.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { GitHubDeploymentGrantsRepository } from '#repositories/github-deployment-grants.repository.ts';
@@ -78,6 +79,7 @@ function identity(): GitHubActionsOidcClaims {
 async function configuredApp(): Promise<AppId> {
   const slug = Value.Parse(DnsLabelSchema, `grant-${Bun.randomUUIDv7()}`);
   const created = await new AppsRepository(withTypes<Queries>(sql)).create({
+    client: OperationClient.Cli,
     ownerId: OWNER_ID,
     anonymousAppsAtMost: null,
     name: Value.Parse(AppNameSchema, 'Grant app'),
@@ -315,6 +317,7 @@ async function deploymentInput(appId: AppId) {
     [appId, new Bun.CryptoHasher('sha256').update('binary').digest('hex')],
   );
   return {
+    client: OperationClient.Cli,
     appId,
     ownerId: OWNER_ID,
     artifactId: Value.Parse(ArtifactIdSchema, artifact.id),
@@ -375,6 +378,7 @@ test('manual redeploys and rollbacks do not inherit a GitHub artifact origin', a
   const manual = await repository.insert(input);
   expect(manual.outcome === 'created' ? manual.row.github_repository : undefined).toBeNull();
   const rollback = await repository.insertRollback({
+    client: OperationClient.Cli,
     appId,
     ownerId: OWNER_ID,
     rollbackOf: github.row.id,
@@ -393,7 +397,10 @@ test('another app grant cannot attach provenance or supersede the existing deplo
     throw new Error('The current deployment must be created.');
   }
   expect(
-    await repository.insertWithDeploymentGrant({ ...input, deploymentGrantId: foreignGrant.id }),
+    await repository.insertWithDeploymentGrant({
+      ...input,
+      deploymentGrantId: foreignGrant.id,
+    }),
   ).toEqual({ outcome: 'no-grant' });
   expect(
     await repository.insertWithDeploymentGrant({
@@ -505,6 +512,13 @@ test('settings redeploys pin the latest binary and merge concurrent partial edit
     'superseded',
   ]);
   expect(history[1]).toMatchObject({ args: ['serve'], http_port: 8080, access_kind: 'jwt' });
+  const operations = await sql.unsafe<{ action: string }[]>(
+    'SELECT action FROM nibrun.operations WHERE app_id = $1 AND client = $2 ORDER BY id',
+    [appId, OperationClient.Mcp],
+  );
+  expect(operations.map(({ action }) => action)).toEqual(
+    history.slice(1).flatMap(() => ['app.updated', 'deployment.requested']),
+  );
 });
 
 test.each(['registered-client', 'https://claude.ai/oauth/mcp-oauth-client-metadata'])(
@@ -525,6 +539,12 @@ test.each(['registered-client', 'https://claude.ai/oauth/mcp-oauth-client-metada
     expect(deployed.row.initiated_by).toBe(DeploymentInitiator.Owner);
     const owned = { appId, ownerId: OWNER_ID, deploymentId: deployed.row.id };
     expect(deployed.row.mcp_client_id).toBe(clientId);
+    expect([
+      ...(await sql.unsafe(
+        'SELECT action, client FROM nibrun.operations WHERE deployment_id = $1',
+        [deployed.row.id],
+      )),
+    ]).toEqual([{ action: 'deployment.requested', client: 'mcp' }]);
     expect(deployed.row.mcp_chat_id).toBe('originating-chat');
     expect(deployed.row.github_repository).toBeNull();
     expect((await repository.findById(owned))?.mcp_client_id).toBe(clientId);
@@ -549,6 +569,7 @@ test.each(['registered-client', 'https://claude.ai/oauth/mcp-oauth-client-metada
     expect(manual.outcome === 'created' ? manual.row.mcp_client_id : undefined).toBeNull();
     expect(manual.outcome === 'created' ? manual.row.mcp_chat_id : undefined).toBeNull();
     const rollback = await repository.insertRollback({
+      client: OperationClient.Cli,
       appId,
       ownerId: OWNER_ID,
       rollbackOf: deployed.row.id,

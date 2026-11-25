@@ -2,18 +2,24 @@ import type { DesiredVolume, HostDesiredState } from '@repo/protocol';
 import { emptyDataArchive, localArtifactReference } from '#artifact.ts';
 import type { HostDesiredState as NibrunnerDesiredState } from '#desired.gen.ts';
 import { nibrunnerExportKey } from '#exports.ts';
-import { UnsupportedNibrunnerFeature } from '#failure.ts';
 import { nibrunnerInstance } from '#instance.ts';
 import { NIBRUNNER_DATA_DIRECTORY } from '#paths.ts';
 
 function nibrunnerVolume(volume: DesiredVolume): NibrunnerDesiredState['volumes'][number] {
-  if (volume.storage !== undefined) {
-    throw new UnsupportedNibrunnerFeature({ feature: 'per-volume storage' });
-  }
+  const storage = volume.storage;
   return {
     volumeId: volume.volumeId,
     appId: volume.appId,
     sizeBytes: volume.sizeBytes,
+    storage:
+      storage === undefined
+        ? null
+        : {
+            ...storage,
+            // Legacy nibrun prefixes included a final slash. ZeroFS expects path components.
+            prefix: storage.prefix.replace(/\/$/, ''),
+            region: storage.region ?? null,
+          },
     desiredState: volume.desiredState,
     initialContents: {
       ...localArtifactReference(volume.seed ?? emptyDataArchive()),

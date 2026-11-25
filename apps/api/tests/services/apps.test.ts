@@ -22,6 +22,7 @@ import { Value } from '@sinclair/typebox/value';
 import { SQL } from 'bun';
 import { schema } from '#db/queries.gen.ts';
 import type { NewAppConfig } from '#lib/api/app.ts';
+import { OperationClient } from '#lib/operation-client.ts';
 
 const HOST_ID = Value.Parse(HostIdSchema, 'reporting-host');
 
@@ -114,6 +115,8 @@ function appRow(slug: DnsLabel): AppRow {
     activation: 'always',
     idle_timeout_ms: MIN_IDLE_TIMEOUT_MS,
     config_id: 'config-1',
+    volume_storage_bucket: null,
+    volume_storage_prefix: null,
     volume_storage_migration_state: null,
     volume_storage_migration_message: null,
     volume_storage_migration_started_at: null,
@@ -504,6 +507,7 @@ function createApp({
   config?: NewAppConfig;
 }) {
   return serviceWith({ appsRepo }).create({
+    client: OperationClient.Cli,
     ownerId: OWNER_ID,
     isAnonymous: false,
     name: APP_NAME,
@@ -655,6 +659,7 @@ test('app creation and edits accept the policy through config, and the owner rea
   expect(created).not.toHaveProperty('access');
   appsRepo.owns = true;
   await serviceWith({ appsRepo }).update({
+    client: OperationClient.Cli,
     appId: APP_ID,
     ownerId: OWNER_ID,
     patch: { config: { access } },
@@ -668,6 +673,7 @@ test('owner edits retain a platform-enabled extra port', async () => {
   appsRepo.current = { ...DEFAULT_CONFIG, hasExtraPublicPort: true };
 
   const app = await serviceWith({ appsRepo }).update({
+    client: OperationClient.Cli,
     appId: APP_ID,
     ownerId: OWNER_ID,
     patch: { config: { access: { kind: 'public' }, args: ['serve'] } },
@@ -709,6 +715,7 @@ describe('a value may name the port an app has, and not one it has not', () => {
     appsRepo.current = { ...DEFAULT_CONFIG, hasExtraPublicPort: true };
 
     await serviceWith({ appsRepo }).update({
+      client: OperationClient.Cli,
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: {
@@ -725,6 +732,7 @@ describe('a value may name the port an app has, and not one it has not', () => {
 
     await expect(
       serviceWith({ appsRepo }).update({
+        client: OperationClient.Cli,
         appId: APP_ID,
         ownerId: OWNER_ID,
         patch: {
@@ -740,6 +748,7 @@ describe('a value may name the port an app has, and not one it has not', () => {
     appsRepo.owns = true;
 
     await serviceWith({ appsRepo }).update({
+      client: OperationClient.Cli,
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: { config: { access: { kind: 'public' }, environment: asPatch({ TOKEN: SECRET }) } },
@@ -756,6 +765,7 @@ describe('a config patch edits the environment rather than replacing it', () => 
     const service = serviceWith({ appsRepo });
 
     await service.update({
+      client: OperationClient.Cli,
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: { config: { access: { kind: 'public' }, args: ['serve'] } },
@@ -772,6 +782,7 @@ describe('a config patch edits the environment rather than replacing it', () => 
     const service = serviceWith({ appsRepo });
 
     await service.update({
+      client: OperationClient.Cli,
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: { config: { access: { kind: 'public' }, environment: asPatch({ TOKEN: SECRET }) } },
@@ -792,6 +803,7 @@ describe('a config patch edits the environment rather than replacing it', () => 
     const service = serviceWith({ appsRepo });
 
     await service.update({
+      client: OperationClient.Cli,
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: { config: { access: { kind: 'public' }, environment: asPatch({ TOKEN: null }) } },
@@ -806,6 +818,7 @@ describe('a config patch edits the environment rather than replacing it', () => 
     const service = serviceWith({ appsRepo });
 
     await service.update({
+      client: OperationClient.Cli,
       appId: APP_ID,
       ownerId: OWNER_ID,
       patch: {
@@ -832,6 +845,7 @@ describe('the placeholder a read returns cannot be set as a value', () => {
 
     await expect(
       service.update({
+        client: OperationClient.Cli,
         appId: APP_ID,
         ownerId: OWNER_ID,
         patch: {
@@ -853,6 +867,20 @@ describe('the placeholder a read returns cannot be set as a value', () => {
     ).rejects.toBeInstanceOf(BadRequestError);
     expect(appsRepo.offeredConfigs).toHaveLength(0);
   });
+});
+
+test('an owner can see the bucket and prefix assigned to their app', async () => {
+  const appsRepo = Object.assign(new StubAppsRepository({ failures: 0 }), {
+    findById() {
+      return Promise.resolve({
+        ...appRow(Value.Parse(DnsLabelSchema, APP_NAME)),
+        volume_storage_bucket: 'customer-data',
+        volume_storage_prefix: 'apps/customer',
+      });
+    },
+  });
+  const app = await serviceWith({ appsRepo }).get({ appId: APP_ID, ownerId: OWNER_ID });
+  expect(app.volumeStorage).toMatchObject({ bucket: 'customer-data', prefix: 'apps/customer' });
 });
 
 // A 403 would confirm the app exists to someone with no right to know it does.
@@ -920,11 +948,15 @@ describe('an app the caller does not own is one that does not exist', () => {
     const owned = { appId: APP_ID, ownerId: OWNER_ID };
 
     await expect(service.get(owned)).rejects.toBeInstanceOf(NotFoundError);
-    await expect(service.update({ ...owned, patch: {} })).rejects.toBeInstanceOf(NotFoundError);
-    await expect(service.delete(owned)).rejects.toBeInstanceOf(NotFoundError);
-    await expect(service.setState({ ...owned, state: 'suspended' })).rejects.toBeInstanceOf(
+    await expect(
+      service.update({ client: OperationClient.Cli, ...owned, patch: {} }),
+    ).rejects.toBeInstanceOf(NotFoundError);
+    await expect(service.delete({ ...owned, client: OperationClient.Cli })).rejects.toBeInstanceOf(
       NotFoundError,
     );
+    await expect(
+      service.setState({ client: OperationClient.Cli, ...owned, state: 'suspended' }),
+    ).rejects.toBeInstanceOf(NotFoundError);
   });
 });
 
@@ -936,7 +968,11 @@ describe('an app is renamed by patching its name, and stays where it is served',
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.owns = true;
 
-    const app = await serviceWith({ appsRepo }).update({ ...owned, patch: { name: NEW_NAME } });
+    const app = await serviceWith({ appsRepo }).update({
+      client: OperationClient.Cli,
+      ...owned,
+      patch: { name: NEW_NAME },
+    });
 
     expect(appsRepo.offeredPatches).toEqual([{ name: NEW_NAME }]);
     expect(app.name).toBe(NEW_NAME);
@@ -948,6 +984,7 @@ describe('an app is renamed by patching its name, and stays where it is served',
     appsRepo.owns = true;
 
     await serviceWith({ appsRepo }).update({
+      client: OperationClient.Cli,
       ...owned,
       patch: { config: { access: { kind: 'public' }, args: ['serve'] } },
     });
@@ -970,7 +1007,11 @@ describe('an app is suspended by saying so, and comes back the release it left a
       const appsRepo = new StubAppsRepository({ failures: 0 });
       appsRepo.owns = true;
 
-      const app = await serviceWith({ appsRepo }).setState({ ...owned, state });
+      const app = await serviceWith({ appsRepo }).setState({
+        client: OperationClient.Cli,
+        ...owned,
+        state,
+      });
 
       expect(app.state).toBe(state);
     });
@@ -984,7 +1025,11 @@ describe('an app is suspended by saying so, and comes back the release it left a
     appsRepo.deleting = [APP_ID];
 
     await expect(
-      serviceWith({ appsRepo }).setState({ ...owned, state: 'active' }),
+      serviceWith({ appsRepo }).setState({
+        client: OperationClient.Cli,
+        ...owned,
+        state: 'active',
+      }),
     ).rejects.toBeInstanceOf(ConflictError);
   });
 });
@@ -1003,7 +1048,11 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
     appsRepo.owns = true;
     appsRepo.deployedApps = [APP_ID];
 
-    const app = await serviceWith({ appsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
+    const app = await serviceWith({ appsRepo }).delete({
+      client: OperationClient.Cli,
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+    });
 
     expect(app.state).toBe('deleting');
     expect(appsRepo.deleted).toEqual([]);
@@ -1016,7 +1065,11 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
     appsRepo.owns = true;
     const exportsRepo = new StubExportCancellationRepository();
 
-    await serviceWith({ appsRepo, exportsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
+    await serviceWith({ appsRepo, exportsRepo }).delete({
+      client: OperationClient.Cli,
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+    });
 
     expect(exportsRepo.cancelled).toEqual([APP_ID]);
   });
@@ -1027,7 +1080,11 @@ describe('an app is deleted when its filesystem is gone, not when it is asked fo
     const exportsRepo = new StubExportCancellationRepository();
 
     await expect(
-      serviceWith({ appsRepo, exportsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID }),
+      serviceWith({ appsRepo, exportsRepo }).delete({
+        client: OperationClient.Cli,
+        appId: APP_ID,
+        ownerId: OWNER_ID,
+      }),
     ).rejects.toBeInstanceOf(NotFoundError);
     expect(exportsRepo.cancelled).toEqual([]);
   });
@@ -1319,6 +1376,7 @@ describe('an app keeps its hostnames until it is deleted rather than deleting', 
     hostnamesRepo.disposable.set(APP_ID, appHostnames());
 
     const app = await serviceWith({ appsRepo, hostnamesRepo, customHostnamesRepo: edge }).delete({
+      client: OperationClient.Cli,
       appId: APP_ID,
       ownerId: OWNER_ID,
     });
@@ -1337,7 +1395,7 @@ describe('an app keeps its hostnames until it is deleted rather than deleting', 
     hostnamesRepo.disposable.set(APP_ID, appHostnames());
     const apps = serviceWith({ appsRepo, hostnamesRepo, customHostnamesRepo: edge });
 
-    await apps.delete({ appId: APP_ID, ownerId: OWNER_ID });
+    await apps.delete({ client: OperationClient.Cli, appId: APP_ID, ownerId: OWNER_ID });
     appsRepo.purgeable.push(APP_ID);
     await apps.purgeDeleted();
 
@@ -1357,7 +1415,7 @@ describe('an app keeps its hostnames until it is deleted rather than deleting', 
     edge.failures.add(CLOUDFLARE_ID);
     const apps = serviceWith({ appsRepo, hostnamesRepo, customHostnamesRepo: edge });
 
-    await apps.delete({ appId: APP_ID, ownerId: OWNER_ID });
+    await apps.delete({ client: OperationClient.Cli, appId: APP_ID, ownerId: OWNER_ID });
     appsRepo.purgeable.push(APP_ID);
     await apps.purgeDeleted();
 
@@ -1514,7 +1572,11 @@ describe('an app with no filesystem to tear down is not left waiting for one', (
     const appsRepo = new StubAppsRepository({ failures: 0 });
     appsRepo.owns = true;
 
-    const app = await serviceWith({ appsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
+    const app = await serviceWith({ appsRepo }).delete({
+      client: OperationClient.Cli,
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+    });
 
     expect(app.state).toBe('deleted');
     expect(appsRepo.deleted).toEqual([APP_ID]);
@@ -1527,7 +1589,11 @@ describe('an app with no filesystem to tear down is not left waiting for one', (
     appsRepo.owns = true;
     appsRepo.deployedApps = [APP_ID];
 
-    const app = await serviceWith({ appsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
+    const app = await serviceWith({ appsRepo }).delete({
+      client: OperationClient.Cli,
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+    });
 
     expect(app.state).toBe('deleting');
     expect(appsRepo.deleted).toEqual([]);
@@ -1540,7 +1606,11 @@ describe('an app with no filesystem to tear down is not left waiting for one', (
     appsRepo.owns = true;
     const exportsRepo = new StubExportCancellationRepository();
 
-    await serviceWith({ appsRepo, exportsRepo }).delete({ appId: APP_ID, ownerId: OWNER_ID });
+    await serviceWith({ appsRepo, exportsRepo }).delete({
+      client: OperationClient.Cli,
+      appId: APP_ID,
+      ownerId: OWNER_ID,
+    });
 
     expect(exportsRepo.cancelled).toEqual([APP_ID]);
   });
@@ -1679,6 +1749,7 @@ test.each([false, true])(
   async (isAnonymous) => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
     const app = await serviceWith({ appsRepo }).create({
+      client: OperationClient.Cli,
       ownerId: OWNER_ID,
       isAnonymous,
       name: APP_NAME,
@@ -1718,6 +1789,7 @@ describe('strangers hold so many apps between them and no more', () => {
     const appsRepo = new StubAppsRepository({ failures: 0 });
 
     await serviceWith({ appsRepo }).create({
+      client: OperationClient.Cli,
       ownerId: OWNER_ID,
       isAnonymous: true,
       name: APP_NAME,
@@ -1739,7 +1811,12 @@ describe('strangers hold so many apps between them and no more', () => {
     appsRepo.strangersHold = MAX_ANONYMOUS_APPS;
 
     await expect(
-      serviceWith({ appsRepo }).create({ ownerId: OWNER_ID, isAnonymous: true, name: APP_NAME }),
+      serviceWith({ appsRepo }).create({
+        client: OperationClient.Cli,
+        ownerId: OWNER_ID,
+        isAnonymous: true,
+        name: APP_NAME,
+      }),
     ).rejects.toBeInstanceOf(TooManyRequestsError);
     // Nothing was written, so nothing is re-rolled.
     expect(appsRepo.offeredSlugs).toHaveLength(1);

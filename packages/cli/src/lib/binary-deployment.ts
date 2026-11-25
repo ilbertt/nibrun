@@ -1,4 +1,4 @@
-import { createPublicApiClient } from '@repo/api-client/public';
+import { createCliApiClient } from '#lib/api.ts';
 import type { DeploymentCredentialsContract } from '#lib/deployment-credentials.ts';
 import { DeploymentError, deploymentApiRequest } from '#lib/deployment-error.ts';
 
@@ -12,7 +12,7 @@ export type DeployBinaryInput = {
 };
 
 async function client(input: DeployBinaryInput) {
-  return createPublicApiClient({
+  return createCliApiClient({
     baseUrl: input.apiUrl,
     headers: { authorization: `Bearer ${await input.credentials.accessToken()}` },
   });

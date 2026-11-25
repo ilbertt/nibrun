@@ -3,7 +3,6 @@ import { ExportIdSchema, SecretStringSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import { emptyDataArchive } from '#artifact.ts';
 import { nibrunnerDesiredState } from '#desired-state.ts';
-import { UnsupportedNibrunnerFeature } from '#failure.ts';
 import {
   artifact,
   desiredCheckpoint,
@@ -18,6 +17,7 @@ test('an empty initialization archive creates data under /app/data without wrapp
   const desired = desiredState({ volumes: [desiredVolume()], instances: [desiredInstance()] });
   const converted = nibrunnerDesiredState({ desired, revision: 'revision-1' });
   const archive = emptyDataArchive();
+  expect(converted.volumes[0]?.storage).toBeNull();
   expect((await new Bun.Archive(archive.bytes).files()).size).toBe(0);
   expect(converted.volumes[0]?.initialContents).toEqual({
     digest: archive.digest,
@@ -57,14 +57,32 @@ test('host ownership, explicit volume deletion and checkpoint identity remain au
   expect(nibrunnerDesiredState({ desired: desiredState(), revision: 'empty' }).volumes).toEqual([]);
 });
 
-test('private storage is refused instead of falling back to another backend', () => {
-  const privateVolume = desiredVolume({ storage: s3Storage() });
-  expect(function translateStorage() {
-    nibrunnerDesiredState({
-      desired: desiredState({ volumes: [privateVolume] }),
-      revision: 'private',
+test.each([
+  { kind: 'anonymous' },
+  { kind: 'access-key', accessKeyId: 'access', secretAccessKey: 'secret' },
+  { kind: 'session', accessKeyId: 'access', secretAccessKey: 'secret', sessionToken: 'token' },
+])('a customer volume carries its $kind credentials through provisioning and deletion', (auth) => {
+  for (const desiredStateValue of ['present', 'absent'] as const) {
+    const storage = s3Storage({ prefix: 'apps/customer/', region: undefined, auth });
+    const volume = desiredVolume({ storage, desiredState: desiredStateValue });
+    const converted = nibrunnerDesiredState({
+      desired: desiredState({ volumes: [volume] }),
+      revision: 'customer',
     });
-  }).toThrow(UnsupportedNibrunnerFeature);
+    expect(converted.volumes[0]).toMatchObject({
+      storage: { ...storage, prefix: 'apps/customer', region: null },
+      desiredState: desiredStateValue,
+    });
+  }
+});
+
+test('a customer signing region is passed to the engine unchanged', () => {
+  const storage = s3Storage({ region: 'auto' });
+  const desired = desiredState({ volumes: [desiredVolume({ storage })] });
+  expect(nibrunnerDesiredState({ desired, revision: 'auto' }).volumes[0]?.storage).toEqual({
+    ...storage,
+    region: 'auto',
+  });
 });
 
 test('native exports retain configuration but use private local keys without the executable', () => {

@@ -43,6 +43,7 @@ function appResource(ownerId: OwnerId) {
         createdAt: timestamp,
       },
     ],
+    volumeStorage: null,
     volumeUsage: null,
     computeUsage: null,
     expiresAt: null,
@@ -114,6 +115,7 @@ test('ordinary app state changes keep their request and response behavior', asyn
   expect(response.status).toBe(StatusMap.OK);
   expect(await response.json()).toEqual(app);
   expect(setState).toHaveBeenCalledWith({
+    client: 'unknown',
     appId: APP_ID,
     ownerId: account.ownerId,
     state: 'suspended',
