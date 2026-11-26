@@ -77,6 +77,19 @@ http://{$API_HOSTNAME} {
 	}
 }
 
+:{$METRICS_INGEST_PORT} {
+	@write {
+		method POST
+		path /api/v1/write
+	}
+	handle @write {
+		reverse_proxy prometheus:9090
+	}
+	handle {
+		respond 404
+	}
+}
+
 http://{$DOZZLE_HOSTNAME} {
 	# Log streaming is a websocket; reverse_proxy upgrades it as-is, and the
 	# retries below sit before the upgrade, where a dial that never connected is
