@@ -179,3 +179,9 @@ Cloudflare Access is the only login. Grafana grants anonymous Viewer access insi
 proxy boundary, disables its login form and basic authentication, and creates no initial admin
 user. Production publishes no Grafana host port.
 The operations dashboard and data source are file-provisioned under `infra/grafana/`.
+
+Grafana queries VictoriaLogs over Docker networking through the signed VictoriaLogs data-source
+plugin. Its version is pinned in the container entrypoint and installed before Grafana starts,
+because `preinstall_disabled` also disables explicitly configured synchronous preinstalls.
+That flag keeps the other default plugins from being downloaded. The plugin requires
+VictoriaLogs 1.54.0 or newer. Keep the log store compatible when updating the plugin.
