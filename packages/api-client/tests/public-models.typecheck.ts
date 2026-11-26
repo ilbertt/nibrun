@@ -22,9 +22,7 @@ export type PublicModelAssertions = [
   Assert<Equal<NonNullable<CronListing['jobs'][number]['environment']>, Record<string, string>>>,
   Assert<Equal<NonNullable<NonNullable<AppPatch['config']>['httpPort']>, number>>,
   Assert<Equal<CreateConfig['access'], App['config']['access']>>,
-  Assert<
-    Equal<Exclude<PatchConfig, { volumeStorage: StorageInput }>['access'], App['config']['access']>
-  >,
+  Assert<Equal<PatchConfig['access'], App['config']['access'] | undefined>>,
   Assert<Equal<NonNullable<PatchConfig['volumeStorage']>, StorageInput>>,
   Assert<{ volumeStorage: StorageInput } extends PatchConfig ? true : false>,
   Assert<'prefix' extends keyof StorageInput ? false : true>,

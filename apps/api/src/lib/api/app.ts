@@ -88,25 +88,10 @@ export const NewAppConfigSchema = Type.Object(
 
 export type NewAppConfig = typeof NewAppConfigSchema.static;
 
-const configPatch = {
-  ...ownedConfig,
-  environment: Type.Optional(TenantEnvironmentPatchSchema),
-};
-
-const AppConfigPatchSchema = Type.Union([
-  Type.Object(
-    { ...configPatch, volumeStorage: Type.Optional(CustomerVolumeInputSchema) },
-    { additionalProperties: false },
-  ),
-  Type.Object(
-    {
-      ...configPatch,
-      access: Type.Optional(ownedConfig.access),
-      volumeStorage: CustomerVolumeInputSchema,
-    },
-    { additionalProperties: false },
-  ),
-]);
+const AppConfigPatchSchema = Type.Partial(
+  Type.Object({ ...NewAppConfigSchema.properties, environment: TenantEnvironmentPatchSchema }),
+  { additionalProperties: false, minProperties: 1 },
+);
 
 export type AppConfigPatch = typeof AppConfigPatchSchema.static;
 

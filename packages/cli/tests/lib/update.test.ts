@@ -45,9 +45,7 @@ test('the flags that were given are the whole of what the app is asked to change
     unset: ['STALE'],
   });
 
-  expect(patched).toEqual([
-    { config: { access: { kind: 'public' }, environment: { TOKEN: 'shh', STALE: null } } },
-  ]);
+  expect(patched).toEqual([{ config: { environment: { TOKEN: 'shh', STALE: null } } }]);
 });
 
 // The one flag here that is not about how the app starts: it rides the same patch, and the
@@ -63,9 +61,7 @@ test('a new name is sent with the rest of the edit', async () => {
     port: 8080,
   });
 
-  expect(patched).toEqual([
-    { name: 'Loud Badger', config: { access: { kind: 'public' }, httpPort: 8080 } },
-  ]);
+  expect(patched).toEqual([{ name: 'Loud Badger', config: { httpPort: 8080 } }]);
 });
 
 // Reading a bare `nib apps redeploy --env X=y` as "and start it bare" would take the app down on
@@ -80,7 +76,7 @@ test('arguments nobody named are not arguments cleared', async () => {
     port: 8080,
   });
 
-  expect(patched).toEqual([{ config: { access: { kind: 'public' }, httpPort: 8080 } }]);
+  expect(patched).toEqual([{ config: { httpPort: 8080 } }]);
 });
 
 test('a flag nobody passed says nothing about the port', async () => {
@@ -93,7 +89,7 @@ test('a flag nobody passed says nothing about the port', async () => {
     port: 8080,
   });
 
-  expect(patched).toEqual([{ config: { access: { kind: 'public' }, httpPort: 8080 } }]);
+  expect(patched).toEqual([{ config: { httpPort: 8080 } }]);
 });
 
 // The difference `--args ""` exists to make: an empty list is a binary asked to run bare, where
@@ -108,7 +104,7 @@ test('an empty list of arguments is arguments cleared', async () => {
     args: [],
   });
 
-  expect(patched).toEqual([{ config: { access: { kind: 'public' }, args: [] } }]);
+  expect(patched).toEqual([{ config: { args: [] } }]);
 });
 
 test('a name the shell would not accept as a variable is refused in this program own words', () => {

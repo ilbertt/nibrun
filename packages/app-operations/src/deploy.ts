@@ -116,7 +116,7 @@ export async function deploy({
   const app =
     target === null
       ? await createApp({ api, name: name ?? binaryName(binary), config: configPatch(edit) })
-      : await updateApp({ api, appId: target.app.id, currentApp: target.app, ...edit });
+      : await updateApp({ api, appId: target.app.id, ...edit });
   onStep?.({ kind: 'app', appId: app.id, name: app.name });
 
   const { artifact, reused } = await artifactFor({
