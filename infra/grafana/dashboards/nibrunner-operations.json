@@ -49,14 +49,15 @@
       "id": 1,
       "gridPos": {
         "h": 8,
-        "w": 12,
+        "w": 18,
         "x": 0,
         "y": 0
       }
     },
     {
-      "title": "Host metrics collection",
-      "type": "timeseries",
+      "title": "Metrics reporting",
+      "description": "Scrape status at the end of the selected time range. Reporting requires a successful scrape within two minutes; failed, missing or stale samples are not reporting.",
+      "type": "stat",
       "datasource": {
         "type": "prometheus",
         "uid": "nibrunner-prometheus"
@@ -64,28 +65,43 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "up{job=\"nibrunner\"}",
-          "legendFormat": "{{instance}}"
+          "expr": "min(up{job=\"nibrunner\"} * (time() - timestamp(up{job=\"nibrunner\"}) <= bool 120)) or vector(0)",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
-          "custom": {
-            "spanNulls": false
-          }
+          "unit": "none",
+          "noValue": "Not reporting",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "Not reporting", "color": "red" },
+                "1": { "text": "Reporting", "color": "green" }
+              }
+            }
+          ]
         }
       },
       "options": {
-        "tooltip": {
-          "mode": "multi"
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value",
+        "text": { "valueSize": 20 },
+        "reduceOptions": {
+          "calcs": ["last"],
+          "fields": "",
+          "values": false
         }
       },
       "id": 2,
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
+        "h": 3,
+        "w": 6,
+        "x": 18,
         "y": 0
       }
     },
