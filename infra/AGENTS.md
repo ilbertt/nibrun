@@ -179,3 +179,12 @@ Cloudflare Access is the only login. Grafana grants anonymous Viewer access insi
 proxy boundary, disables its login form and basic authentication, and creates no initial admin
 user. Production publishes no Grafana host port.
 The operations dashboard and data source are file-provisioned under `infra/grafana/`.
+
+The control-plane `docker-metrics` container uses Alloy's built-in cAdvisor exporter to send
+container CPU, memory, network and disk I/O metrics directly to Prometheus. It has no published
+ports and binds its diagnostic listener to loopback. Its privileged access and read-only host
+mounts are required for Docker and cgroup discovery. Only the Compose service label is collected;
+container environment metadata is not exported. The dashboard is provisioned with the others.
+Production enables the collector automatically; local Linux Docker hosts opt in with the
+`monitoring` profile. Its WAL lives on the persistent data volume. The deployment puts the
+configuration hash in a container label so config changes recreate the collector on deploy.
