@@ -73,7 +73,7 @@ DNS, every record **proxied** (orange cloud):
   same resources remain managed after the migration imports are removed.
 
 The control plane and nibrunner use Tunnels and need no origin certificates or Authenticated
-Origin Pulls. The control plane publishes only its VPC control and log-ingest listeners.
+Origin Pulls. The control plane publishes only its VPC control, log-ingest and metrics-ingest listeners.
 
 Terraform protects the Dozzle, VictoriaLogs and Umami public hostnames with Cloudflare Access,
 allowing only members of `cloudflare_account_id` with 24-hour sessions. The account must
@@ -164,3 +164,11 @@ Control-plane deploys prune unused Docker images, including tagged releases, bef
 and again after the health gate and Caddy reload. Images created within the last 24 hours stay
 cached for rollbacks; every image referenced by a container is preserved regardless of age.
 Cleanup never prunes volumes or removes persistent data.
+
+## Metrics
+
+Alloy scrapes nibrunner's loopback endpoint every 30 seconds and writes outbound to Prometheus
+on the control plane. Only the nibrunner security group can reach Caddy's metrics listener;
+it accepts `POST /api/v1/write` and exposes no query API. Nibrunner retains no inbound rules.
+Prometheus has a 512 MiB memory limit and stores up to 30 days or 2 GB of retained blocks on
+the persistent data volume; WAL and head chunks need additional disk space.

@@ -223,6 +223,36 @@ services:
     networks:
       - nibrun
 
+  prometheus:
+    image: prom/prometheus:v3.16.0
+    container_name: prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --config.auto-reload
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=30d
+      - --storage.tsdb.retention.size=2GB
+      - --web.enable-remote-write-receiver
+      - --query.max-concurrency=4
+      - --query.max-samples=5000000
+      - --query.timeout=15s
+    volumes:
+      - ./infra/prometheus:/etc/prometheus:ro
+      - prometheus-data:/prometheus
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT}:9090"
+    mem_limit: 512m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:9090/-/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: always
+    networks:
+      - nibrun
+
   # Every container's logs, read off the Docker socket, in local and prod alike.
   # Authentication belongs to the production Tunnel. Local access stays
   # loopback-only, and production removes the host port binding entirely.
@@ -298,4 +328,7 @@ volumes:
   minio-data:
     driver: local
   victorialogs-data:
+    driver: local
+
+  prometheus-data:
     driver: local
