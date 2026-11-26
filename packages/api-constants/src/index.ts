@@ -13,6 +13,7 @@ export { MCP_TOOL_NAMES } from '#mcp-tool-names.ts';
 export { HttpOperationClient, OPERATION_CLIENT_HEADER } from '#operation-client.ts';
 export {
   APP_QUOTA_EXCEEDED_CODE,
+  CUSTOM_BUCKETS_DISABLED_CODE,
   MAX_PAID_APPS_REQUEST,
   MAX_PAID_PORTS_REQUEST,
   MAX_PAID_RESOURCE_AMOUNT,
