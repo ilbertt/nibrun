@@ -19,7 +19,8 @@ import type { OwnerId } from '#lib/api/identifiers.ts';
 import { accessColumns } from '#lib/app-access.ts';
 import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
 import { CUSTOM_KIND } from '#lib/app-hostname.ts';
-import { BadRequestError, ConflictError, ForbiddenError } from '#lib/errors.ts';
+import { CustomBucketsDisabledError } from '#lib/custom-bucket-access.ts';
+import { BadRequestError, ConflictError } from '#lib/errors.ts';
 import type { OperationAttribution } from '#lib/operation-client.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
 import { requiresCustomDomain } from '#lib/validate-app-access.ts';
@@ -787,7 +788,7 @@ async function requireCustomBucketPermission({
     SELECT feature_custom_buckets_allowed FROM nibrun.profiles WHERE owner_id = ${ownerId} FOR SHARE
   `;
   if (!profile?.feature_custom_buckets_allowed) {
-    throw new ForbiddenError('Custom buckets are not enabled for this app owner.');
+    throw new CustomBucketsDisabledError();
   }
 }
 

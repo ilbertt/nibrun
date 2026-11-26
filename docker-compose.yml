@@ -145,9 +145,8 @@ services:
       - GITHUB_CLIENT_SECRET=${API_GITHUB_CLIENT_SECRET}
       - S3_ENDPOINT=http://minio:9000
       # Reads only. Writes arrive from the fleet through Caddy's ingest listener,
-      # and the api is what decides who may see an app — so this is the one thing
-      # on the compose network that queries the store, and nothing queries it
-      # from outside.
+      # and tenant reads go through the api's ownership checks. Grafana's
+      # operators query the store separately over Docker networking.
       #
       # Not in .env: unlike S3, the log store runs in this stack in production
       # too, at the same name and port, so there is no deployment for this to
@@ -188,20 +187,14 @@ services:
     networks:
       - nibrun
 
-  # Where the fleet's logs land: tenant output and each app host's own journal,
-  # pushed in over Caddy's log ingest listener. Nothing writes to it yet — the
-  # shippers are a later change; this gives them somewhere to write.
+  # Fleet tenant and host logs arrive through Caddy's private ingestion listener.
   #
   # Chosen over Loki because the fields worth filtering on here are app, instance
   # and deployment ids. Loki indexes labels and punishes their cardinality, so
   # instance and deployment would have to become structured metadata; this treats
   # every field as indexed and high cardinality as the ordinary case.
-  #
-  # No healthcheck: the image is scratch, so there is no shell and no HTTP client
-  # in the container to run one with. `/health` answers, but only from outside, so
-  # the deploy gates on the container staying up instead.
   victorialogs:
-    image: victoriametrics/victoria-logs:v1.53.0
+    image: victoriametrics/victoria-logs:v1.54.0
     container_name: victorialogs
     command:
       - -retentionPeriod=${VICTORIALOGS_RETENTION_PERIOD}
@@ -219,6 +212,12 @@ services:
     # compose network; neither goes through here.
     ports:
       - "127.0.0.1:${VICTORIALOGS_PORT}:9428"
+    healthcheck:
+      test: ["CMD", "/victoria-logs-prod", "-healthcheck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
     restart: always
     networks:
       - nibrun
@@ -253,9 +252,46 @@ services:
     networks:
       - nibrun
 
+  docker-metrics:
+    image: grafana/alloy:v1.22.0
+    container_name: docker-metrics
+    profiles: [monitoring]
+    privileged: true
+    cgroup: host
+    command:
+      - run
+      - --server.http.listen-addr=127.0.0.1:12345
+      - --server.http.enable-pprof=false
+      - --storage.path=/var/lib/alloy
+      - /etc/alloy/docker.alloy
+    labels:
+      nibrun.configuration: ${DOCKER_METRICS_CONFIG_SHA256:-local}
+    volumes:
+      - ./infra/alloy:/etc/alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /:/rootfs:ro
+      - /sys:/sys:ro
+      - /proc:/host/proc:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - docker-metrics-data:/var/lib/alloy
+    mem_limit: 256m
+    cpus: 0.5
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    restart: always
+    networks:
+      - nibrun
+
   grafana:
     image: grafana/grafana:13.3
     container_name: grafana
+    entrypoint:
+      - /bin/sh
+      - -ec
+      - |
+        grafana cli --pluginsDir "$$GF_PATHS_PLUGINS" plugins install victoriametrics-logs-datasource 0.34.0
+        exec /run.sh
     environment:
       - GF_SECURITY_DISABLE_INITIAL_ADMIN_CREATION=true
       - GF_USERS_ALLOW_SIGN_UP=false
@@ -371,4 +407,7 @@ volumes:
     driver: local
 
   grafana-data:
+    driver: local
+
+  docker-metrics-data:
     driver: local

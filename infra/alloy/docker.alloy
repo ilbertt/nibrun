@@ -1,0 +1,84 @@
+prometheus.exporter.cadvisor "docker" {
+	docker_host                  = "unix:///var/run/docker.sock"
+	docker_only                  = true
+	disable_root_cgroup_stats    = true
+	store_container_labels       = false
+	allowlisted_container_labels = ["com.docker.compose.service"]
+	enabled_metrics              = ["cpu", "memory", "network", "disk", "diskIO"]
+	housekeeping_interval        = "15s"
+	max_housekeeping_interval    = "30s"
+	storage_duration             = "1m"
+}
+
+discovery.relabel "docker" {
+	targets = prometheus.exporter.cadvisor.docker.targets
+
+	rule {
+		target_label = "job"
+		replacement  = "integrations/docker"
+	}
+}
+
+prometheus.exporter.unix "filesystems" {
+	set_collectors = ["filesystem"]
+	rootfs_path    = "/rootfs"
+	procfs_path    = "/host/proc"
+	sysfs_path     = "/sys"
+}
+
+discovery.relabel "filesystems" {
+	targets = prometheus.exporter.unix.filesystems.targets
+
+	rule {
+		target_label = "job"
+		replacement  = "integrations/docker-host"
+	}
+}
+
+prometheus.scrape "local" {
+	targets = array.concat(discovery.relabel.docker.output, discovery.relabel.filesystems.output)
+
+	scrape_interval = "30s"
+	scrape_timeout  = "10s"
+	forward_to      = [prometheus.relabel.local.receiver]
+}
+
+prometheus.relabel "local" {
+	forward_to = [prometheus.remote_write.local.receiver]
+
+	rule {
+		target_label = "instance"
+		replacement  = "control-plane"
+	}
+
+	rule {
+		source_labels = ["name"]
+		regex         = "/?(.+)"
+		target_label  = "container"
+	}
+
+	rule {
+		source_labels = ["container_label_com_docker_compose_service"]
+		regex         = "(.+)"
+		target_label  = "container"
+	}
+
+	rule {
+		action = "labeldrop"
+		regex  = "container_label_.*"
+	}
+}
+
+prometheus.remote_write "local" {
+	endpoint {
+		url = "http://prometheus:9090/api/v1/write"
+
+		queue_config {
+			max_shards = 2
+		}
+	}
+
+	wal {
+		max_keepalive_time = "2h"
+	}
+}

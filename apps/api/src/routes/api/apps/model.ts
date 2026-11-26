@@ -1,3 +1,4 @@
+import { CUSTOM_BUCKETS_DISABLED_CODE } from '@repo/api-constants';
 import {
   AppConfigSchema,
   AppHostnameSchema,
@@ -74,6 +75,11 @@ export const AppResponseSchema = t.Composite([
 ]);
 
 export const AppRequestErrorSchema = t.Object({ error: t.String() });
+
+export const AppForbiddenResponseSchema = t.Object({
+  ...AppRequestErrorSchema.properties,
+  code: t.Optional(t.Literal(CUSTOM_BUCKETS_DISABLED_CODE)),
+});
 
 export const ListAppsResponseSchema = t.Object({ apps: t.Array(AppResponseSchema) });
 
