@@ -21,7 +21,8 @@ prune_unused_images() {
   "${PG_BACKUP_BUCKET:?}" "${SSM_SECRET_PREFIX:?}" "${AWS_REGION:?}" \
   "${DATA_VOLUME_ID:?}" "${DOZZLE_HOSTNAME:?}" "${VICTORIALOGS_HOSTNAME:?}" \
   "${INTERNAL_PORT:?}" "${LOG_INGEST_PORT:?}" "${APP_HOST_DOMAIN:?}" \
-  "${API_CLOUDFLARE_ZONE_ID:?}" "${UMAMI_HOSTNAME:?}" "${METRICS_INGEST_PORT:?}" "${GRAFANA_HOSTNAME:?}"
+  "${API_CLOUDFLARE_ZONE_ID:?}" "${UMAMI_HOSTNAME:?}" "${METRICS_INGEST_PORT:?}" \
+  "${GRAFANA_HOSTNAME:?}" "${METRICS_HOSTNAME:?}" "${GRAFANA_PUBLIC_DASHBOARD_TOKEN:?}"
 
 # Per-deployment values no infrastructure resource feeds, still overridable from
 # the deploy so they never have to be edited here. The host port bindings are
@@ -141,6 +142,8 @@ METRICS_INGEST_PORT=${METRICS_INGEST_PORT}
 GRAFANA_HOSTNAME=${GRAFANA_HOSTNAME}
 GRAFANA_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
 GRAFANA_PORT=${GRAFANA_PORT}
+METRICS_HOSTNAME=${METRICS_HOSTNAME}
+GRAFANA_PUBLIC_DASHBOARD_TOKEN=${GRAFANA_PUBLIC_DASHBOARD_TOKEN}
 EOF
 
 compose="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
@@ -178,6 +181,10 @@ $compose up -d --wait --wait-timeout 180 umami
 log "Seeding Umami administrator, website and MCP key"
 UMAMI_MCP_API_KEY="$UMAMI_MCP_API_KEY" $compose exec -T -e UMAMI_MCP_API_KEY \
   umami node --input-type=module < seed-umami.mjs
+
+log "Provisioning Grafana before exposing the public dashboard"
+$compose up -d --wait --wait-timeout 180 grafana
+$compose run --rm --no-deps grafana-bootstrap
 
 log "Starting services (up -d --remove-orphans)"
 $compose up -d --remove-orphans

@@ -25,7 +25,8 @@
     "terraform-plan": "bun run src/terraform-plan.ts",
     "verify-public-images": "bun run src/verify-public-images.ts",
     "check:types": "bun run --bun tsc",
-    "test": "bun test tests"
+    "test": "bun test tests",
+    "seed-grafana": "bun run src/seed-grafana.ts"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
