@@ -92,6 +92,12 @@ fleet's VPC log-ingest listener do not pass through Access.
 Sign-in needs a GitHub OAuth App whose callback URL is
 `https://<api_hostname>/api/auth/callback/github`.
 
+To enable website sign-in with ChatGPT, register a confidential website client with
+OpenAI using `client_secret_basic` and the exact callback
+`https://<api_hostname>/api/auth/callback/chatgpt`. Set the `API_CHATGPT_CLIENT_ID`
+repository variable and `API_CHATGPT_CLIENT_SECRET` repository secret, then deploy.
+Leaving both empty hides the option.
+
 Umami uses the `UMAMI_HOSTNAME` repository variable (`umami.nibrun.com` for this deployment).
 Its admin credentials are seeded before the public proxy starts. Umami keeps its own login
 behind Access; it does not authenticate Cloudflare identities. Anonymous browsers load

@@ -64,6 +64,13 @@ resource "aws_ssm_parameter" "api_github_client_secret" {
   }
 }
 
+resource "aws_ssm_parameter" "api_chatgpt_client_secret" {
+  count = var.api_chatgpt_client_id != "" ? 1 : 0
+  name  = "${var.ssm_secret_prefix}/api_chatgpt_client_secret"
+  type  = "SecureString"
+  value = var.api_chatgpt_client_secret
+}
+
 # The token the api registers custom hostnames with. Here rather than in the
 # deploy's environment for the same reason the OAuth App secret is: RunCommand
 # keeps its parameters in command history, in the clear, for 30 days.

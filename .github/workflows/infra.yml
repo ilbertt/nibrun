@@ -78,6 +78,8 @@ jobs:
           TF_VAR_www_hostname: ${{ vars.WWW_HOSTNAME }}
           TF_VAR_api_github_client_id: ${{ vars.API_GITHUB_CLIENT_ID }}
           TF_VAR_api_github_client_secret: ${{ secrets.API_GITHUB_CLIENT_SECRET }}
+          TF_VAR_api_chatgpt_client_id: ${{ vars.API_CHATGPT_CLIENT_ID }}
+          TF_VAR_api_chatgpt_client_secret: ${{ secrets.API_CHATGPT_CLIENT_SECRET }}
           TF_VAR_cloudflare_account_id: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
           TF_VAR_cloudflare_terraform_api_token: ${{ secrets.CLOUDFLARE_TERRAFORM_API_TOKEN }}
         run: bun run --filter @repo/internal-scripts terraform-plan

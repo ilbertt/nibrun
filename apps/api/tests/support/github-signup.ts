@@ -19,6 +19,8 @@ Object.assign(process.env, {
   BETTER_AUTH_SECRET: Buffer.from(crypto.getRandomValues(new Uint8Array(SECRET_BYTES))).toString(
     'hex',
   ),
+  CHATGPT_CLIENT_ID: '',
+  CHATGPT_CLIENT_SECRET: '',
   GITHUB_CLIENT_ID: 'test',
   GITHUB_CLIENT_SECRET: 'test',
   S3_ENDPOINT: 'http://127.0.0.1:1',

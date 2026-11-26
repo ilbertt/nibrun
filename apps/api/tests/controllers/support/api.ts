@@ -14,6 +14,8 @@ Object.assign(process.env, {
   BASE_URL: TEST_API_ORIGIN,
   DATABASE_URL: 'postgres://nobody@127.0.0.1:1/none',
   BETTER_AUTH_SECRET: 'x'.repeat(BETTER_AUTH_SECRET_LENGTH),
+  CHATGPT_CLIENT_ID: '',
+  CHATGPT_CLIENT_SECRET: '',
   GITHUB_CLIENT_ID: 'test',
   GITHUB_CLIENT_SECRET: 'test',
   S3_ENDPOINT: 'http://127.0.0.1:1',

@@ -1,6 +1,8 @@
+import { SignInProvider } from '@repo/api-constants';
 import { Button } from '@repo/ui/components/button';
 import { GithubMark } from '@repo/ui/custom/github-mark';
-import { useLocation } from '@tanstack/react-router';
+import { Link, useLocation } from '@tanstack/react-router';
+import { useLoginProviders } from '#lib/hooks/use-login-providers.ts';
 import { useSignIn } from '#lib/hooks/use-sign-in.ts';
 
 /**
@@ -10,8 +12,24 @@ import { useSignIn } from '#lib/hooks/use-sign-in.ts';
  */
 export function KeepAppsButton({ size }: { size: 'sm' | 'lg' }) {
   const here = useLocation({ select: (location) => location.href });
-  const signIn = useSignIn({ callbackURL: here, reason: 'keep-app' });
+  const providers = useLoginProviders();
+  const signIn = useSignIn({
+    provider: SignInProvider.GitHub,
+    callbackURL: here,
+    reason: 'keep-app',
+  });
 
+  if (providers.length > 1) {
+    return (
+      <Button
+        variant={size === 'lg' ? 'default' : 'outline'}
+        size={size}
+        render={<Link to="/login" search={{ redirect: here, reason: 'keep-app' }} />}
+      >
+        Sign in to keep it
+      </Button>
+    );
+  }
   return (
     <Button
       variant={size === 'lg' ? 'default' : 'outline'}

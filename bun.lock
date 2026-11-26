@@ -147,6 +147,7 @@
     "packages/analytics": {
       "name": "@repo/analytics",
       "dependencies": {
+        "@repo/api-constants": "workspace:*",
         "@repo/global-constants": "workspace:*",
         "react": "catalog:",
       },

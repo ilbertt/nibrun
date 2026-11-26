@@ -1,10 +1,12 @@
 import { apiKey } from '@better-auth/api-key';
 import { cimd } from '@better-auth/cimd';
 import { mcp } from '@better-auth/mcp';
+import { SignInProvider } from '@repo/api-constants';
 import { Value } from '@sinclair/typebox/value';
 import { type BetterAuthOptions, betterAuth } from 'better-auth';
 import { anonymous, bearer, deviceAuthorization, jwt } from 'better-auth/plugins';
 import { type OwnerId, OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { chatGptLogin, discardChatGptTokens } from '#lib/auth/chatgpt.ts';
 import {
   protectShortLivedDeploymentTokens,
   shortLivedDeploymentTokenConfiguration,
@@ -49,14 +51,21 @@ export function createAuth({
     disabledPaths: ['/token'],
     hooks: { before: protectShortLivedDeploymentTokens },
     emailAndPassword: { enabled: true, disableSignUp: true },
+    databaseHooks: {
+      account: {
+        create: { before: discardChatGptTokens },
+        update: { before: discardChatGptTokens },
+      },
+    },
     socialProviders: {
-      github: {
+      [SignInProvider.GitHub]: {
         clientId: env.GITHUB_CLIENT_ID,
         clientSecret: env.GITHUB_CLIENT_SECRET,
       },
     },
     plugins: [
       apiKey([shortLivedDeploymentTokenConfiguration]),
+      chatGptLogin(env.CHATGPT_CLIENT),
       jwt({
         jwt: { issuer: OAUTH_ISSUER },
         jwks: { jwksPath: AUTH_JWKS_PATH },

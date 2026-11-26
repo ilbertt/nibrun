@@ -23,6 +23,7 @@ import { AppsAppIdTrustedWorkflowsController } from '#routes/api/apps/[appId]/tr
 import { AppsController } from '#routes/api/apps/controller.ts';
 import { AuthController } from '#routes/api/auth/controller.ts';
 import { HealthController } from '#routes/api/health/controller.ts';
+import { LoginProvidersController } from '#routes/api/login-providers/controller.ts';
 import { PaidRequestsRequestTypeController } from '#routes/api/paid-requests/[requestType]/controller.ts';
 import { SqliteConnectionsConnectionIdController } from '#routes/api/sqlite/connections/[connectionId]/controller.ts';
 import { SqliteConnectionsConnectionIdV2Controller } from '#routes/api/sqlite/connections/[connectionId]/v2/controller.ts';
@@ -31,6 +32,7 @@ import { SqliteConnectionsConnectionIdV2PipelineController } from '#routes/api/s
 export const ApiController = new Elysia({ prefix: RoutePrefix.Api })
   .use(PaidRequestsRequestTypeController)
   .use(AuthController)
+  .use(LoginProvidersController)
   .use(HealthController)
   .use(AppsController)
   .use(AppsAppIdController)

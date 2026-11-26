@@ -1,4 +1,5 @@
 import { trackEvent, trackingAllowed } from '@repo/analytics';
+import type { SignInProvider } from '@repo/api-constants';
 import { type UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
 import { authClient } from '#lib/auth.ts';
 import { useSessionIdentity } from '#lib/hooks/use-session-identity.ts';
@@ -15,12 +16,12 @@ import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 
 type SignInResult = Awaited<ReturnType<typeof authClient.signIn.social>>;
 
-// better-auth answers with the provider URL and the client follows it, so a
-// resolved mutation means the browser is already on its way to GitHub.
 export function useSignIn({
+  provider,
   callbackURL,
   reason,
 }: {
+  provider: SignInProvider;
   callbackURL: string;
   reason: SignInReason;
 }): UseMutationResult<SignInResult, unknown, void> {
@@ -32,17 +33,18 @@ export function useSignIn({
     mutationFn: async () => {
       if (trackingAllowed()) {
         rememberSignIn({
+          provider,
           reason: signInReason,
           identity,
           anonymousAppIds: cachedAnonymousApps(queryClient),
         });
         trackEvent({
           name: 'sign_in_started',
-          data: { identity_state: identity, reason: signInReason, provider: 'github' },
+          data: { identity_state: identity, reason: signInReason, provider },
         });
       }
       const result = await authClient.signIn.social({
-        provider: 'github',
+        provider,
         callbackURL: landing,
         ...(signInReason === 'mcp' ? { errorCallbackURL: `/login${window.location.search}` } : {}),
       });
@@ -58,7 +60,7 @@ export function useSignIn({
         data: {
           identity_state: identity,
           reason: signInReason,
-          provider: 'github',
+          provider,
           phase: 'start',
           ...signInFailureData(error),
         },

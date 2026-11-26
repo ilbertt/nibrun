@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
 import { StatusMap } from 'elysia';
 import { passwordAccount } from '#tests/controllers/support/accounts.ts';
-import { ORIGIN, sendJson } from '#tests/controllers/support/api.ts';
+import { ORIGIN, send, sendJson } from '#tests/controllers/support/api.ts';
 
 const { auth } = await import('#services/plugins.ts');
 
@@ -28,6 +28,18 @@ test('provisioned password accounts receive ordinary registered sessions', async
   expect(account?.password).toBeString();
   expect(account?.password).not.toBe(password);
   expect(auth.options.socialProviders?.github).toBeDefined();
+});
+
+test('a deployment without ChatGPT credentials offers only GitHub social login', async () => {
+  const response = await send({ url: `${ORIGIN}/api/login-providers` });
+  expect(response.status).toBe(StatusMap.OK);
+  expect(await response.json()).toEqual(['github']);
+  const result = await sendJson({
+    method: 'POST',
+    url: `${ORIGIN}/api/auth/sign-in/social`,
+    body: { provider: 'chatgpt', callbackURL: '/' },
+  });
+  expect(result.ok).toBe(false);
 });
 
 test('public password signup cannot create an account', async () => {

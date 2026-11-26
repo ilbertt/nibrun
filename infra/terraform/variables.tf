@@ -138,6 +138,22 @@ variable "api_github_client_secret" {
   }
 }
 
+variable "api_chatgpt_client_id" {
+  type    = string
+  default = ""
+}
+
+variable "api_chatgpt_client_secret" {
+  type      = string
+  sensitive = true
+  default   = ""
+
+  validation {
+    condition     = (trimspace(var.api_chatgpt_client_id) == "") == (trimspace(var.api_chatgpt_client_secret) == "")
+    error_message = "Configure both ChatGPT client credentials to enable sign-in."
+  }
+}
+
 # Where the two names in the app host zone that serve nothing send their visitors:
 # the apex, and the fallback origin. Nothing here provisions it — the marketing
 # site is a Worker of its own — so it enters as configuration, and has no default

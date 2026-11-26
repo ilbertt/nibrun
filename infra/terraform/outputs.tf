@@ -27,6 +27,10 @@ output "api_github_client_id" {
   value       = var.api_github_client_id
 }
 
+output "api_chatgpt_client_id" {
+  value = var.api_chatgpt_client_id
+}
+
 output "api_cloudflare_zone_id" {
   description = "Zone custom hostnames are registered in; the token used against it is read from SSM on the box."
   value       = data.cloudflare_zone.app_host.id

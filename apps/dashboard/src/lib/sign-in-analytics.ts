@@ -1,10 +1,12 @@
 import { type AnalyticsEventData, SIGN_IN_REASONS } from '@repo/analytics';
+import { SignInProvider } from '@repo/api-constants';
 import type { QueryClient } from '@tanstack/react-query';
 import { SessionIdentity } from '#lib/session-identity.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 export type SignInReason = AnalyticsEventData['sign_in_started']['reason'];
 export type PendingSignIn = {
+  provider: SignInProvider;
   reason: SignInReason;
   previous_identity_state: SessionIdentity | undefined;
   anonymous_app_ids: string[];
@@ -24,10 +26,12 @@ export function cachedAnonymousApps(queryClient: QueryClient): string[] {
 
 export function rememberSignIn({
   reason,
+  provider,
   identity,
   anonymousAppIds,
 }: {
   reason: SignInReason;
+  provider: SignInProvider;
   identity: SessionIdentity;
   anonymousAppIds: string[];
 }): void {
@@ -36,6 +40,7 @@ export function rememberSignIn({
       STORAGE_KEY,
       JSON.stringify({
         reason,
+        provider,
         previous_identity_state: identity,
         anonymous_app_ids: anonymousAppIds,
         expires_at: Date.now() + SIGN_IN_WINDOW_MINUTES * MILLISECONDS_PER_MINUTE,
@@ -74,6 +79,8 @@ export function consumeSignIn(
     const pending = JSON.parse(stored);
     if (
       !SIGN_IN_REASONS.includes(pending.reason) ||
+      (pending.provider !== undefined &&
+        !Object.values(SignInProvider).includes(pending.provider)) ||
       (pending.previous_identity_state !== undefined &&
         !Object.values(SessionIdentity).includes(pending.previous_identity_state)) ||
       typeof pending.expires_at !== 'number' ||
@@ -84,6 +91,7 @@ export function consumeSignIn(
     }
     return {
       reason: pending.reason,
+      provider: pending.provider ?? SignInProvider.GitHub,
       previous_identity_state: pending.previous_identity_state,
       expires_at: pending.expires_at,
       anonymous_app_ids: pending.anonymous_app_ids.filter((id: unknown) => typeof id === 'string'),

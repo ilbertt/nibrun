@@ -7,6 +7,8 @@ interface CustomProcessEnv {
   readonly TENANT_SECRETS_KEY: string;
   readonly GITHUB_CLIENT_ID: string;
   readonly GITHUB_CLIENT_SECRET: string;
+  readonly CHATGPT_CLIENT_ID?: string;
+  readonly CHATGPT_CLIENT_SECRET?: string;
   readonly S3_ENDPOINT: string;
   readonly VICTORIALOGS_ENDPOINT: string;
   readonly ARTIFACTS_BUCKET: string;
@@ -55,6 +57,7 @@ type Env = {
   TENANT_SECRETS_KEY: string;
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
+  CHATGPT_CLIENT: { clientId: string; clientSecret: string } | undefined;
   S3_ENDPOINT: URL;
   VICTORIALOGS_ENDPOINT: URL;
   ARTIFACTS_BUCKET: string;
@@ -69,6 +72,12 @@ type Env = {
   CLOUDFLARE_ZONE_ID: string;
 };
 
+function chatGptClient(): Env['CHATGPT_CLIENT'] {
+  const clientId = process.env.CHATGPT_CLIENT_ID;
+  const clientSecret = process.env.CHATGPT_CLIENT_SECRET;
+  return clientId && clientSecret ? { clientId, clientSecret } : undefined;
+}
+
 function loadEnv(): Env {
   return {
     PORT: Number(optional({ name: 'PORT', defaultValue: DEFAULT_PORT })),
@@ -78,6 +87,7 @@ function loadEnv(): Env {
     TENANT_SECRETS_KEY: required('TENANT_SECRETS_KEY'),
     GITHUB_CLIENT_ID: required('GITHUB_CLIENT_ID'),
     GITHUB_CLIENT_SECRET: required('GITHUB_CLIENT_SECRET'),
+    CHATGPT_CLIENT: chatGptClient(),
     S3_ENDPOINT: new URL(required('S3_ENDPOINT')),
     VICTORIALOGS_ENDPOINT: new URL(required('VICTORIALOGS_ENDPOINT')),
     ARTIFACTS_BUCKET: required('ARTIFACTS_BUCKET'),

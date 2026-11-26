@@ -143,6 +143,8 @@ services:
       - TENANT_SECRETS_KEY=${API_TENANT_SECRETS_KEY}
       - GITHUB_CLIENT_ID=${API_GITHUB_CLIENT_ID}
       - GITHUB_CLIENT_SECRET=${API_GITHUB_CLIENT_SECRET}
+      - CHATGPT_CLIENT_ID=${API_CHATGPT_CLIENT_ID:-}
+      - CHATGPT_CLIENT_SECRET=${API_CHATGPT_CLIENT_SECRET:-}
       - S3_ENDPOINT=http://minio:9000
       # Reads only. Writes arrive from the fleet through Caddy's ingest listener,
       # and tenant reads go through the api's ownership checks. Grafana's

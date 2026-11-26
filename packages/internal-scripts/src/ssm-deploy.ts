@@ -24,6 +24,7 @@ const onBoxEnv: Record<string, string> = {
   LOG_INGEST_PORT: requiredEnv('LOG_INGEST_PORT'),
   METRICS_INGEST_PORT: requiredEnv('METRICS_INGEST_PORT'),
   API_GITHUB_CLIENT_ID: requiredEnv('API_GITHUB_CLIENT_ID'),
+  API_CHATGPT_CLIENT_ID: optionalEnv('API_CHATGPT_CLIENT_ID') ?? '',
   ARTIFACTS_BUCKET: requiredEnv('ARTIFACTS_BUCKET'),
   EXPORTS_BUCKET: requiredEnv('EXPORTS_BUCKET'),
   IMPORTS_BUCKET: requiredEnv('IMPORTS_BUCKET'),
