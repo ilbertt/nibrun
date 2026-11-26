@@ -1,6 +1,6 @@
 import { describe, expect, spyOn, test } from 'bun:test';
 import { StatusMap } from 'elysia';
-import { ForbiddenError } from '#lib/errors.ts';
+import { CustomBucketsDisabledError } from '#lib/custom-bucket-access.ts';
 import { registeredAccount } from '#tests/controllers/support/accounts.ts';
 import { ORIGIN, type Route, routesUnder, sendJson } from '#tests/controllers/support/api.ts';
 
@@ -100,7 +100,7 @@ test.each([
       },
       encryptionPassword: 'file-password',
     };
-    const refusal = new ForbiddenError('Custom buckets are disabled.');
+    const refusal = new CustomBucketsDisabledError();
     const call = spyOn(AppsServicePlugin.decorator.appsService, operation).mockRejectedValue(
       refusal,
     );

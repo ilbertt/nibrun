@@ -207,6 +207,115 @@
         "x": 12,
         "y": 16
       }
+    },
+    {
+      "id": 7,
+      "title": "Container filesystem used",
+      "description": "Filesystem usage reported by cAdvisor. Use the host filesystem panels for overall capacity including persistent volumes, bind mounts, images and build cache.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (container) (container_fs_usage_bytes{job=\"integrations/docker\",container!=\"\"})",
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      }
+    },
+    {
+      "id": 8,
+      "title": "Host filesystem used (%)",
+      "description": "Allocated space on the host root, persistent /data, and separately mounted Docker storage filesystem. Reserved filesystem space is separate from allocated bytes.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "100 * (node_filesystem_size_bytes{job=\"integrations/docker-host\",mountpoint=~\"/|/data|/var/lib/docker\"} - node_filesystem_free_bytes{job=\"integrations/docker-host\",mountpoint=~\"/|/data|/var/lib/docker\"}) / node_filesystem_size_bytes{job=\"integrations/docker-host\",mountpoint=~\"/|/data|/var/lib/docker\"}",
+          "legendFormat": "{{mountpoint}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      }
+    },
+    {
+      "id": 9,
+      "title": "Host filesystem space",
+      "description": "Host root, persistent /data, and separately mounted Docker storage filesystem. Available space is what unprivileged processes can allocate; reserved blocks can make used plus available smaller than total capacity.",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_filesystem_size_bytes{job=\"integrations/docker-host\",mountpoint=~\"/|/data|/var/lib/docker\"} - node_filesystem_free_bytes{job=\"integrations/docker-host\",mountpoint=~\"/|/data|/var/lib/docker\"}",
+          "legendFormat": "{{mountpoint}} used"
+        },
+        {
+          "refId": "B",
+          "expr": "node_filesystem_avail_bytes{job=\"integrations/docker-host\",mountpoint=~\"/|/data|/var/lib/docker\"}",
+          "legendFormat": "{{mountpoint}} available"
+        },
+        {
+          "refId": "C",
+          "expr": "node_filesystem_size_bytes{job=\"integrations/docker-host\",mountpoint=~\"/|/data|/var/lib/docker\"}",
+          "legendFormat": "{{mountpoint}} capacity"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      }
     }
   ]
 }

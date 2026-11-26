@@ -17,6 +17,7 @@ import type { command as appsGithubworkflowsShowCmd } from './commands/apps/gith
 import type { command as appsListCmd } from './commands/apps/list.ts';
 import type { command as appsLogsCmd } from './commands/apps/logs.ts';
 import type { command as appsResumeCmd } from './commands/apps/resume.ts';
+import type { command as appsSetbucketCmd } from './commands/apps/set-bucket.ts';
 import type { command as appsSqliteCmd } from './commands/apps/sqlite.ts';
 import type { command as appsSqliteConnectionsCmd } from './commands/apps/sqlite/connections.ts';
 import type { command as appsSqliteConnectionsCreatePathCmd } from './commands/apps/sqlite/connections/create/[path].ts';
@@ -131,6 +132,12 @@ declare module '@parshjs/core' {
       rootOptions: InferForwardedOptions<typeof rootCmd.options>;
     };
     'apps resume': {
+      parents: {
+        'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
+      };
+      rootOptions: InferForwardedOptions<typeof rootCmd.options>;
+    };
+    'apps set-bucket': {
       parents: {
         'apps': { options: InferForwardedOptions<typeof appsCmd.options>; params: InferParams<typeof appsCmd.params> };
       };
@@ -347,6 +354,12 @@ export const commandTree: RuntimeNode = {
         'resume': {
           segment: { kind: 'literal', value: 'resume' },
           command: { path: 'apps resume', load: () => import('./commands/apps/resume.ts').then((m) => m.command) },
+          literalChildren: {},
+          paramChild: null,
+        },
+        'set-bucket': {
+          segment: { kind: 'literal', value: 'set-bucket' },
+          command: { path: 'apps set-bucket', load: () => import('./commands/apps/set-bucket.ts').then((m) => m.command) },
           literalChildren: {},
           paramChild: null,
         },

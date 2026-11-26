@@ -4,7 +4,7 @@ prometheus.exporter.cadvisor "docker" {
 	disable_root_cgroup_stats    = true
 	store_container_labels       = false
 	allowlisted_container_labels = ["com.docker.compose.service"]
-	enabled_metrics              = ["cpu", "memory", "network", "diskIO"]
+	enabled_metrics              = ["cpu", "memory", "network", "disk", "diskIO"]
 	housekeeping_interval        = "15s"
 	max_housekeeping_interval    = "30s"
 	storage_duration             = "1m"
@@ -17,23 +17,39 @@ discovery.relabel "docker" {
 		target_label = "job"
 		replacement  = "integrations/docker"
 	}
+}
+
+prometheus.exporter.unix "filesystems" {
+	set_collectors = ["filesystem"]
+	rootfs_path    = "/rootfs"
+	procfs_path    = "/host/proc"
+	sysfs_path     = "/sys"
+}
+
+discovery.relabel "filesystems" {
+	targets = prometheus.exporter.unix.filesystems.targets
+
+	rule {
+		target_label = "job"
+		replacement  = "integrations/docker-host"
+	}
+}
+
+prometheus.scrape "local" {
+	targets = array.concat(discovery.relabel.docker.output, discovery.relabel.filesystems.output)
+
+	scrape_interval = "30s"
+	scrape_timeout  = "10s"
+	forward_to      = [prometheus.relabel.local.receiver]
+}
+
+prometheus.relabel "local" {
+	forward_to = [prometheus.remote_write.local.receiver]
 
 	rule {
 		target_label = "instance"
 		replacement  = "control-plane"
 	}
-}
-
-prometheus.scrape "docker" {
-	targets = discovery.relabel.docker.output
-
-	scrape_interval = "30s"
-	scrape_timeout  = "10s"
-	forward_to      = [prometheus.relabel.docker.receiver]
-}
-
-prometheus.relabel "docker" {
-	forward_to = [prometheus.remote_write.local.receiver]
 
 	rule {
 		source_labels = ["name"]
