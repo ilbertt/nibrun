@@ -76,7 +76,7 @@ services:
 
   # The named Tunnel reaches Caddy without publishing a public host port.
   cloudflared:
-    image: cloudflare/cloudflared:2026.10.5
+    image: cloudflare/cloudflared:2026.11.2
     container_name: cloudflared
     restart: always
     read_only: true
