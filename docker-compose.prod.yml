@@ -57,7 +57,6 @@ services:
     environment:
       - API_HOSTNAME
       - DOZZLE_HOSTNAME
-      - VICTORIALOGS_HOSTNAME
       - UMAMI_HOSTNAME
       - GRAFANA_HOSTNAME
       - UMAMI_MCP_API_KEY=${UMAMI_MCP_API_KEY:?}
@@ -116,10 +115,11 @@ services:
       - GF_SECURITY_COOKIE_SECURE=true
       - GF_SECURITY_COOKIE_SAMESITE=strict
 
-  # Host port-forwards must not bypass the Tunnel's Access validation.
+  # The log store is reachable only through Docker networking and private ingest.
   victorialogs:
     ports: !reset []
 
+  # Host port-forwards must not bypass the Tunnel's Access validation.
   dozzle:
     ports: !reset []
     environment:

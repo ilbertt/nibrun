@@ -75,7 +75,7 @@ DNS, every record **proxied** (orange cloud):
 The control plane and nibrunner use Tunnels and need no origin certificates or Authenticated
 Origin Pulls. The control plane publishes only its VPC control, log-ingest and metrics-ingest listeners.
 
-Terraform protects the Grafana, Dozzle, VictoriaLogs and Umami public hostnames with Cloudflare Access,
+Terraform protects the Grafana, Dozzle and Umami public hostnames with Cloudflare Access,
 allowing only members of `cloudflare_account_id` with 24-hour sessions. The account must
 already have a Zero Trust organization and the Cloudflare identity provider configured.
 `CLOUDFLARE_TERRAFORM_API_TOKEN` needs **Access: Apps and Policies Write** and
@@ -84,7 +84,7 @@ derives the Tunnel's Access team name from the existing organization's auth doma
 protected route's accepted audience from its Access application. `cloudflared` rejects requests
 without a valid token before forwarding them to Caddy. Production publishes no host ports for
 these dashboards; local development keeps the loopback bindings.
-Access is the only login for Grafana, Dozzle and VictoriaLogs. Deployments no longer generate or read
+Access is the only login for Grafana and Dozzle. Deployments no longer generate or read
 their former password credentials. Terraform deletes the former SSM parameters and password
 generators when they are removed from configuration. The API's private log queries and the
 fleet's VPC log-ingest listener do not pass through Access.
@@ -203,3 +203,5 @@ VictoriaLogs 1.54.0 or newer. Keep the log store compatible when updating the pl
 The operations dashboard links to `nibrunner logs`, which provides a LogsQL search box and
 log details for the anonymous Viewer role. That role can query data sources but cannot open
 Explore, so a data source alone does not provide a usable log viewer.
+VictoriaLogs has no public hostname. Grafana and the API query it over Docker networking;
+fleet writes use the private ingest listener.

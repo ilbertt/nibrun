@@ -1,7 +1,6 @@
 locals {
   control_plane_access_hostnames = {
     dozzle  = var.dozzle_hostname
-    logs    = var.victorialogs_hostname
     umami   = var.umami_hostname
     grafana = var.grafana_hostname
   }

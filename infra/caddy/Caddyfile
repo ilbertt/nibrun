@@ -132,34 +132,6 @@ http://{$UMAMI_HOSTNAME} {
 	}
 }
 
-http://{$VICTORIALOGS_HOSTNAME} {
-	# Nothing is served at the bare hostname — the allowlist below starts at
-	# /select — so this is what makes typing the hostname land on the dashboard
-	# rather than a 404. A redirect, not a proxy: it publishes no new path.
-	# Temporary, so the destination can move without browsers having cached it.
-	@root path /
-	handle @root {
-		redir * /select/vmui/
-	}
-
-	# vmui is served from /select/vmui/ and loads every asset relative to it, and
-	# its queries are /select/logsql/*. So this is the whole dashboard and nothing
-	# else: /insert stays reachable only on the ingest listener above, and the
-	# version page, /metrics and /flags are not published at all.
-	@select path /select/*
-	handle @select {
-		reverse_proxy victorialogs:9428 {
-			header_up X-Forwarded-Proto https
-			lb_try_duration 30s
-			lb_try_interval 250ms
-		}
-	}
-
-	handle {
-		respond 404
-	}
-}
-
 http:// {
 	respond 404
 }

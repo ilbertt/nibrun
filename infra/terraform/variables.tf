@@ -88,16 +88,6 @@ variable "dozzle_hostname" {
   }
 }
 
-variable "victorialogs_hostname" {
-  type        = string
-  description = "Public hostname the fleet's logs are queried on. Terraform routes it through Cloudflare Tunnel."
-
-  validation {
-    condition     = trimspace(var.victorialogs_hostname) != ""
-    error_message = "victorialogs_hostname must not be empty."
-  }
-}
-
 # No default for the same reason api_hostname has none, and read the validation
 # below before choosing a value: user apps must not share a registrable domain
 # with the dashboard.
