@@ -54,6 +54,10 @@ beforeAll(async function startDatabase() {
       [ownerId, `${ownerId}@example.test`],
     );
   }
+  await sql.unsafe(
+    'UPDATE nibrun.profiles SET feature_custom_buckets_allowed = true WHERE owner_id = $1',
+    [OWNER_ID],
+  );
 }, DATABASE_START_TIMEOUT_MS);
 
 afterAll(async function stopDatabase() {
