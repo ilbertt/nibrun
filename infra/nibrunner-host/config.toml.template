@@ -57,6 +57,7 @@ origin_host = {{FALLBACK_ORIGIN_HOST}}
 redirect = {{FALLBACK_REDIRECT}}
 
 [metrics]
+outbound_monitoring = true
 listen_address = "127.0.0.1"
 port = 9100
 
