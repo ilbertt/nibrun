@@ -419,7 +419,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "histogram_quantile(0.95, sum by (le, phase) (rate(nibrunner_converge_seconds_bucket{job=\"nibrunner\",cause=\"change\",desired_state=\"running\"}[1h])))",
+          "expr": "histogram_quantile(0.95, sum by (le, phase) (rate(nibrunner_converge_seconds_bucket{job=\"nibrunner\",cause=\"change\",desired_state=~\"running|on-request\"}[1h])))",
           "legendFormat": "p95 {{phase}}"
         }
       ],
