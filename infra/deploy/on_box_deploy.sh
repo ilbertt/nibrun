@@ -21,7 +21,7 @@ prune_unused_images() {
   "${PG_BACKUP_BUCKET:?}" "${SSM_SECRET_PREFIX:?}" "${AWS_REGION:?}" \
   "${DATA_VOLUME_ID:?}" "${DOZZLE_HOSTNAME:?}" "${VICTORIALOGS_HOSTNAME:?}" \
   "${INTERNAL_PORT:?}" "${LOG_INGEST_PORT:?}" "${APP_HOST_DOMAIN:?}" \
-  "${API_CLOUDFLARE_ZONE_ID:?}" "${UMAMI_HOSTNAME:?}" "${METRICS_INGEST_PORT:?}"
+  "${API_CLOUDFLARE_ZONE_ID:?}" "${UMAMI_HOSTNAME:?}" "${METRICS_INGEST_PORT:?}" "${GRAFANA_HOSTNAME:?}"
 
 # Per-deployment values no infrastructure resource feeds, still overridable from
 # the deploy so they never have to be edited here. The host port bindings are
@@ -34,6 +34,7 @@ API_DB_NAME="${API_DB_NAME:-nibrun}"
 API_DB_PORT="${API_DB_PORT:-5432}"
 PGWEB_PORT="${PGWEB_PORT:-8081}"
 UMAMI_PORT="${UMAMI_PORT:-3003}"
+GRAFANA_PORT="${GRAFANA_PORT:-3004}"
 PROMETHEUS_PORT="${PROMETHEUS_PORT:-9090}"
 API_S3_PORT="${API_S3_PORT:-9000}"
 API_S3_CONSOLE_PORT="${API_S3_CONSOLE_PORT:-9001}"
@@ -46,7 +47,8 @@ VICTORIALOGS_RETENTION_PERIOD="${VICTORIALOGS_RETENTION_PERIOD:-30d}"
 # Postgres and the log store: production talks to real S3, so MinIO does not run
 # here and has no volume to back.
 log "Ensuring the persistent data volume is mounted and holds the data-bearing volumes"
-bash ensure_data_volume.sh volumes/postgres-data volumes/victorialogs-data volumes/umami-data volumes/prometheus-data
+bash ensure_data_volume.sh volumes/postgres-data volumes/victorialogs-data volumes/umami-data volumes/prometheus-data volumes/grafana-data
+chown 472:0 /data/volumes/grafana-data
 chown 65534:65534 /data/volumes/prometheus-data
 
 secret() {
@@ -135,6 +137,8 @@ VICTORIALOGS_RETENTION_PERIOD=${VICTORIALOGS_RETENTION_PERIOD}
 
 PROMETHEUS_PORT=${PROMETHEUS_PORT}
 METRICS_INGEST_PORT=${METRICS_INGEST_PORT}
+GRAFANA_HOSTNAME=${GRAFANA_HOSTNAME}
+GRAFANA_PORT=${GRAFANA_PORT}
 EOF
 
 compose="docker compose -f docker-compose.yml -f docker-compose.prod.yml"

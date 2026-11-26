@@ -72,6 +72,7 @@ jobs:
           TF_VAR_dozzle_hostname: ${{ vars.DOZZLE_HOSTNAME }}
           TF_VAR_victorialogs_hostname: ${{ vars.VICTORIALOGS_HOSTNAME }}
           TF_VAR_umami_hostname: ${{ vars.UMAMI_HOSTNAME }}
+          TF_VAR_grafana_hostname: ${{ vars.GRAFANA_HOSTNAME }}
           # Still APP_DOMAIN on purpose: the repository variable is read outside this repo
           # too, so it is not ours alone to rename.
           TF_VAR_app_host_domain: ${{ vars.APP_DOMAIN }}

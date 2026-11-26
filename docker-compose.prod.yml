@@ -59,6 +59,7 @@ services:
       - DOZZLE_HOSTNAME
       - VICTORIALOGS_HOSTNAME
       - UMAMI_HOSTNAME
+      - GRAFANA_HOSTNAME
       - UMAMI_MCP_API_KEY=${UMAMI_MCP_API_KEY:?}
       - INTERNAL_PORT
       # Without this the Caddyfile's `:{$LOG_INGEST_PORT}` site address expands
@@ -104,6 +105,13 @@ services:
 
   prometheus:
     ports: !reset []
+
+  grafana:
+    ports: !reset []
+    environment:
+      - GF_SERVER_ROOT_URL=https://${GRAFANA_HOSTNAME}
+      - GF_SECURITY_COOKIE_SECURE=true
+      - GF_SECURITY_COOKIE_SAMESITE=strict
 
   # Host port-forwards must not bypass the Tunnel's Access validation.
   victorialogs:
@@ -188,3 +196,9 @@ volumes:
       type: none
       o: bind
       device: /data/volumes/prometheus-data
+
+  grafana-data:
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/volumes/grafana-data

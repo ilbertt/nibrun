@@ -1,0 +1,523 @@
+{
+  "uid": "nibrunner-operations",
+  "title": "nibrunner operations",
+  "description": "Private host, app, request and lifecycle metrics.",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "timezone": "utc",
+  "tags": ["nibrunner"],
+  "refresh": "1m",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "title": "Apps by state",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (state) (nibrunner_app_state{job=\"nibrunner\"})",
+          "legendFormat": "{{state}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 1,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "title": "Host metrics collection",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"nibrunner\"}",
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 2,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      }
+    },
+    {
+      "title": "Host memory available",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nibrunner_host_memory_available_bytes{job=\"nibrunner\"}",
+          "legendFormat": "{{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "spanNulls": false
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 3,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      }
+    },
+    {
+      "title": "Host capacity and allocatable",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nibrunner_host_capacity{job=\"nibrunner\"}",
+          "legendFormat": "{{instance}} capacity {{resource}}"
+        },
+        {
+          "refId": "B",
+          "expr": "nibrunner_host_allocatable{job=\"nibrunner\"}",
+          "legendFormat": "{{instance}} allocatable {{resource}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 4,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      }
+    },
+    {
+      "title": "Slots",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nibrunner_slots{job=\"nibrunner\"}",
+          "legendFormat": "{{instance}} {{of}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 5,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      }
+    },
+    {
+      "title": "Conntrack entries",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nibrunner_conntrack_entries{job=\"nibrunner\"}",
+          "legendFormat": "{{instance}} {{of}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 6,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      }
+    },
+    {
+      "title": "Requests by proxy outcome",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (rate(nibrunner_proxy_requests_total{job=\"nibrunner\"}[5m]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "spanNulls": false
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 7,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      }
+    },
+    {
+      "title": "Customer responses by status class",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (class) (rate(nibrunner_app_requests_total{job=\"nibrunner\"}[5m]))",
+          "legendFormat": "{{class}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "spanNulls": false
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 8,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      }
+    },
+    {
+      "title": "Requests by app",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (app) (rate(nibrunner_app_requests_total{job=\"nibrunner\"}[5m]))",
+          "legendFormat": "{{app}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "spanNulls": false
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 9,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      }
+    },
+    {
+      "title": "App memory",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nibrunner_app_memory_used_bytes{job=\"nibrunner\"}",
+          "legendFormat": "{{app}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "custom": {
+            "spanNulls": false
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 10,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      }
+    },
+    {
+      "title": "Wake phases",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, phase, outcome) (rate(nibrunner_wake_phase_seconds_bucket{job=\"nibrunner\"}[1h])))",
+          "legendFormat": "p95 {{phase}} {{outcome}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "spanNulls": false
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 11,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      }
+    },
+    {
+      "title": "Deployment phases",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, phase) (rate(nibrunner_converge_seconds_bucket{job=\"nibrunner\",cause=\"change\",desired_state=\"running\"}[1h])))",
+          "legendFormat": "p95 {{phase}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "spanNulls": false
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 12,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      }
+    },
+    {
+      "title": "App failures",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (reason) (increase(nibrunner_app_failures_total{job=\"nibrunner\"}[1h]))",
+          "legendFormat": "{{reason}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 13,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 48
+      }
+    },
+    {
+      "title": "Host convergence",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nibrunner_host_converged{job=\"nibrunner\"}",
+          "legendFormat": "{{instance}} converged"
+        },
+        {
+          "refId": "B",
+          "expr": "nibrunner_host_isolated{job=\"nibrunner\"}",
+          "legendFormat": "{{instance}} isolated"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "spanNulls": false
+          }
+        }
+      },
+      "options": {
+        "tooltip": {
+          "mode": "multi"
+        }
+      },
+      "id": 14,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 48
+      }
+    }
+  ]
+}
