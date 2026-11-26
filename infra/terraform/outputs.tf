@@ -9,10 +9,6 @@ output "dozzle_hostname" {
   value = var.dozzle_hostname
 }
 
-output "victorialogs_hostname" {
-  value = var.victorialogs_hostname
-}
-
 output "umami_hostname" {
   value = var.umami_hostname
 }

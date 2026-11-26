@@ -70,7 +70,6 @@ jobs:
           TF_VAR_region: ${{ env.AWS_REGION }}
           TF_VAR_api_hostname: ${{ vars.API_HOSTNAME }}
           TF_VAR_dozzle_hostname: ${{ vars.DOZZLE_HOSTNAME }}
-          TF_VAR_victorialogs_hostname: ${{ vars.VICTORIALOGS_HOSTNAME }}
           TF_VAR_umami_hostname: ${{ vars.UMAMI_HOSTNAME }}
           TF_VAR_grafana_hostname: ${{ vars.GRAFANA_HOSTNAME }}
           # Still APP_DOMAIN on purpose: the repository variable is read outside this repo
