@@ -5,7 +5,7 @@
   "schemaVersion": 41,
   "version": 1,
   "editable": false,
-  "timezone": "utc",
+  "timezone": "browser",
   "tags": ["nibrunner"],
   "refresh": "1m",
   "time": {
