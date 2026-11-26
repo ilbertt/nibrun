@@ -60,6 +60,8 @@ services:
       - VICTORIALOGS_HOSTNAME
       - UMAMI_HOSTNAME
       - GRAFANA_HOSTNAME
+      - METRICS_HOSTNAME
+      - GRAFANA_PUBLIC_DASHBOARD_TOKEN
       - UMAMI_MCP_API_KEY=${UMAMI_MCP_API_KEY:?}
       - INTERNAL_PORT
       # Without this the Caddyfile's `:{$LOG_INGEST_PORT}` site address expands
@@ -112,6 +114,22 @@ services:
       - GF_SERVER_ROOT_URL=https://${GRAFANA_HOSTNAME}
       - GF_SECURITY_COOKIE_SECURE=true
       - GF_SECURITY_COOKIE_SAMESITE=strict
+
+  grafana-bootstrap:
+    image: node:26-alpine
+    profiles: [setup]
+    environment:
+      - GRAFANA_ADMIN_PASSWORD
+      - GRAFANA_PUBLIC_DASHBOARD_TOKEN
+    command: ["node", "/seed-grafana.mjs"]
+    volumes:
+      - ./seed-grafana.mjs:/seed-grafana.mjs:ro
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    restart: "no"
+    networks:
+      - nibrun
 
   # Host port-forwards must not bypass the Tunnel's Access validation.
   victorialogs:

@@ -178,3 +178,13 @@ Grafana queries Prometheus over Docker networking and has its own persistent vol
 The hostname requires Cloudflare Access and Grafana login; the initial `admin` password is
 the `grafana_admin_password` SSM parameter. Production publishes no Grafana host port.
 The operations dashboard and data source are file-provisioned under `infra/grafana/`.
+
+`METRICS_HOSTNAME` is the public aggregate dashboard. Its Tunnel route has no Access gate;
+Caddy permits only the configured externally shared dashboard, its fixed panel queries and
+static assets. Anonymous Grafana access stays disabled. Public panels use only the aggregate
+recording rules in `infra/prometheus/public-rules.yml`, with no tenant or host identities.
+Annotations and time selection are disabled. Failed scrapes produce gaps, not zero activity.
+This measures nibrunner activity, not uptime. `seed-grafana` reconciles public sharing before
+Caddy reloads; keep its admin password synchronized with the SSM parameter if changing it.
+The public share token is a stable Terraform-generated identifier, not a secret. Removing the
+metrics hostname from the Tunnel revokes public access without interrupting collection.

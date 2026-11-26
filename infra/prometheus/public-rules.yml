@@ -1,0 +1,23 @@
+groups:
+  - name: nibrunner-public
+    rules:
+      - record: nibrun_public:apps
+        expr: sum by (state) (nibrunner_app_state{job="nibrunner",state=~"running|sleeping"}) and on() (sum(up{job="nibrunner"}) > 0)
+      - record: nibrun_public:requests_per_second
+        expr: sum(rate(nibrunner_proxy_requests_total{job="nibrunner",outcome=~"served|unreachable|refused"}[5m])) and on() (sum(up{job="nibrunner"}) > 0)
+      - record: nibrun_public:unreachable_requests_per_second
+        expr: sum(rate(nibrunner_proxy_requests_total{job="nibrunner",outcome="unreachable"}[5m])) and on() (sum(up{job="nibrunner"}) > 0)
+      - record: nibrun_public:response_seconds_p50
+        expr: histogram_quantile(0.50, sum by (le) (rate(nibrunner_proxy_request_duration_seconds_bucket{job="nibrunner"}[5m]))) and on() (sum(up{job="nibrunner"}) > 0)
+      - record: nibrun_public:response_seconds_p95
+        expr: histogram_quantile(0.95, sum by (le) (rate(nibrunner_proxy_request_duration_seconds_bucket{job="nibrunner"}[5m]))) and on() (sum(up{job="nibrunner"}) > 0)
+      - record: nibrun_public:wake_seconds_p50
+        expr: histogram_quantile(0.50, sum by (le) (rate(nibrunner_wake_duration_seconds_bucket{job="nibrunner"}[1h]))) and on() (sum(up{job="nibrunner"}) > 0)
+      - record: nibrun_public:wake_seconds_p95
+        expr: histogram_quantile(0.95, sum by (le) (rate(nibrunner_wake_duration_seconds_bucket{job="nibrunner"}[1h]))) and on() (sum(up{job="nibrunner"}) > 0)
+      - record: nibrun_public:wakes_per_hour
+        expr: sum(increase(nibrunner_wake_duration_seconds_count{job="nibrunner"}[1h])) and on() (sum(up{job="nibrunner"}) > 0)
+      - record: nibrun_public:deployment_seconds_p95
+        expr: histogram_quantile(0.95, sum by (le) (rate(nibrunner_converge_seconds_bucket{job="nibrunner",phase="total",cause="change",desired_state="running"}[1h]))) and on() (sum(up{job="nibrunner"}) > 0)
+      - record: nibrun_public:last_successful_scrape_timestamp_seconds
+        expr: max(timestamp(up{job="nibrunner"} == 1))

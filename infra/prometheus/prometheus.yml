@@ -1,4 +1,6 @@
 global:
   scrape_interval: 30s
   evaluation_interval: 30s
+rule_files:
+  - /etc/prometheus/public-rules.yml
 scrape_configs: []
