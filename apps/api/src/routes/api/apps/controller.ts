@@ -5,7 +5,7 @@ import { AppQuotaExceededResponseSchema } from '#lib/api/app-quota.ts';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { AuthCaller } from '#lib/auth/caller.ts';
 import {
-  AppRequestErrorSchema,
+  AppForbiddenResponseSchema,
   AppResponseSchema,
   CreateAppRequestSchema,
   ListAppsResponseSchema,
@@ -45,7 +45,7 @@ export const AppsController = new Elysia()
       response: {
         [StatusMap.Created]: publicSchema(AppResponseSchema),
         [StatusMap.Forbidden]: publicSchema(
-          t.Union([AppQuotaExceededResponseSchema, AppRequestErrorSchema]),
+          t.Union([AppQuotaExceededResponseSchema, AppForbiddenResponseSchema]),
         ),
       },
     },

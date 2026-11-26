@@ -6,7 +6,7 @@ import {
   MIN_PAID_APPS_REQUEST,
   MIN_PAID_PORTS_REQUEST,
 } from '@repo/api-constants';
-import { SHARED_OPTIONS } from '#config.ts';
+import { PAID_REQUEST_TYPE_FLAG, SHARED_OPTIONS } from '#config.ts';
 import { requireSignedIn } from '#lib/credentials.ts';
 import { createOutput } from '#lib/output.ts';
 import {
@@ -31,7 +31,7 @@ import {
 export const command = defineCommand('paid-request', {
   description: 'Tell us which paid features you need. Repeat to update your request.',
   options: {
-    type: {
+    [PAID_REQUEST_TYPE_FLAG]: {
       schema: PAID_REQUEST_TYPE_SCHEMA,
       description: `Type of paid request. Supported types: ${PAID_REQUEST_TYPE_SCHEMA.options.join(', ')}.`,
     },
