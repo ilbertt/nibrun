@@ -180,6 +180,21 @@ proxy boundary, disables its login form and basic authentication, and creates no
 user. Production publishes no Grafana host port.
 The operations dashboard and data source are file-provisioned under `infra/grafana/`.
 
+The control-plane `docker-metrics` container uses Alloy's built-in cAdvisor exporter to send
+container CPU, memory, network, filesystem usage and disk I/O metrics directly to Prometheus.
+It has no published ports and binds its diagnostic listener to loopback. Its privileged access
+and read-only host mounts are required for Docker and cgroup discovery. Only the Compose service label is collected;
+container environment metadata is not exported. The dashboard is provisioned with the others.
+Production enables the collector automatically; local Linux Docker hosts opt in with the
+`monitoring` profile. Its WAL lives on the persistent data volume. The deployment puts the
+configuration hash in a container label so config changes recreate the collector on deploy.
+
+Disk-space panels distinguish cAdvisor's per-container filesystem usage from host filesystem
+capacity. A filesystem-only Unix exporter reports the host root, persistent data filesystem
+and separately mounted Docker storage through read-only host mounts. The host panels include
+data held in persistent volumes and bind mounts; per-container filesystem usage is not a total
+of all storage owned by a service.
+
 Grafana queries VictoriaLogs over Docker networking through the signed VictoriaLogs data-source
 plugin. Its version is pinned in the container entrypoint and installed before Grafana starts,
 because `preinstall_disabled` also disables explicitly configured synchronous preinstalls.

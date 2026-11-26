@@ -103,6 +103,9 @@ services:
     networks:
       - nibrun
 
+  docker-metrics:
+    profiles: !reset []
+
   prometheus:
     ports: !reset []
 
@@ -202,3 +205,9 @@ volumes:
       type: none
       o: bind
       device: /data/volumes/grafana-data
+
+  docker-metrics-data:
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/volumes/docker-metrics-data
