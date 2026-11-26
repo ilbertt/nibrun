@@ -1,0 +1,19 @@
+prometheus.scrape "nibrunner" {
+  targets = [{ "__address__" = "127.0.0.1:9100", "instance" = "nibrunner-primary" }]
+  job_name = "nibrunner"
+  scrape_interval = "30s"
+  scrape_timeout = "10s"
+  forward_to = [prometheus.remote_write.control_plane.receiver]
+}
+
+prometheus.remote_write "control_plane" {
+  endpoint {
+    url = {{METRICS_REMOTE_WRITE_URL}}
+    queue_config {
+      max_shards = 2
+    }
+  }
+  wal {
+    max_keepalive_time = "2h"
+  }
+}

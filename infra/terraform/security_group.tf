@@ -20,6 +20,14 @@ resource "aws_security_group" "instance" {
   }
 
 
+  ingress {
+    description     = "Metrics writes from nibrunner"
+    from_port       = var.metrics_ingest_port
+    to_port         = var.metrics_ingest_port
+    protocol        = "tcp"
+    security_groups = [aws_security_group.nibrunner_host.id]
+  }
+
   egress {
     description      = "All outbound"
     from_port        = 0

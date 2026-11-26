@@ -5,7 +5,11 @@ import { Elysia, StatusMap } from 'elysia';
 import { AppPatchSchema } from '#lib/api/app.ts';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { AuthCaller } from '#lib/auth/caller.ts';
-import { AppRequestErrorSchema, AppResponseSchema } from '#routes/api/apps/model.ts';
+import {
+  AppForbiddenResponseSchema,
+  AppRequestErrorSchema,
+  AppResponseSchema,
+} from '#routes/api/apps/model.ts';
 import { AppsServicePlugin, AuthPlugin, loggerPlugin } from '#services/plugins.ts';
 
 export const AppsAppIdController = new Elysia()
@@ -43,7 +47,7 @@ export const AppsAppIdController = new Elysia()
       body: publicSchema(AppPatchSchema),
       response: {
         [StatusMap.OK]: publicSchema(AppResponseSchema),
-        [StatusMap.Forbidden]: publicSchema(AppRequestErrorSchema),
+        [StatusMap.Forbidden]: publicSchema(AppForbiddenResponseSchema),
         [StatusMap.Conflict]: publicSchema(AppRequestErrorSchema),
       },
     },

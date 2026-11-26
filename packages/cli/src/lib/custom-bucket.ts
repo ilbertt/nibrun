@@ -1,7 +1,10 @@
 import type { AppPatch } from '@repo/api-client/models';
 import type { PublicApiClient } from '@repo/api-client/public';
 import { unwrap } from '@repo/api-client/unwrap';
+import { CUSTOM_BUCKETS_DISABLED_CODE } from '@repo/api-constants';
 import { z } from 'zod';
+import { command as paidRequest } from '#commands/paid-request.ts';
+import { PAID_REQUEST_TYPE_FLAG, PROGRAM_NAME, SHARED_OPTIONS } from '#config.ts';
 import { UsageError } from '#lib/errors.ts';
 import { defineOutput } from '#lib/output.ts';
 
@@ -38,7 +41,14 @@ export async function setCustomBucket({
   const volumeStorage = await readBucketConfig(path);
   const reply = await api.api.apps({ appId }).patch({ config: { volumeStorage } });
   if (reply.error?.status === FORBIDDEN_STATUS) {
-    throw new UsageError(reply.error.value.error);
+    const { code, error } = reply.error.value;
+    if (code === CUSTOM_BUCKETS_DISABLED_CODE) {
+      const type = paidRequest.options[PAID_REQUEST_TYPE_FLAG].schema.enum['custom-bucket'];
+      throw new UsageError(
+        `${error} Or run \`${PROGRAM_NAME} ${paidRequest.path} --${PAID_REQUEST_TYPE_FLAG} ${type} --${SHARED_OPTIONS.app.name} <app-name-or-slug>\`.`,
+      );
+    }
+    throw new UsageError(error);
   }
   const stored = unwrap(reply).volumeStorage;
   if (!stored) {

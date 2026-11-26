@@ -45,6 +45,16 @@ const aptConfiguration = await Bun.file(join(hostDirectory, 'apt.conf')).text();
 const storageEnvironmentInstaller = await Bun.file(
   join(hostDirectory, 'deploy/install_storage_environment.sh'),
 ).text();
+const metricsConfiguration = (
+  await Bun.file(join(hostDirectory, 'metrics.alloy.template')).text()
+).replaceAll(
+  '{{METRICS_REMOTE_WRITE_URL}}',
+  JSON.stringify(requiredEnv('METRICS_REMOTE_WRITE_URL')),
+);
+const metricsInstaller = await Bun.file(join(hostDirectory, 'deploy/install_metrics.sh')).text();
+const metricsUnit = await Bun.file(
+  join(hostDirectory, 'systemd/nibrun-nibrunner-metrics.service'),
+).text();
 const tunnelInstaller = await Bun.file(join(hostDirectory, 'deploy/install_tunnel.sh')).text();
 const tunnelUnit = await Bun.file(
   join(hostDirectory, 'systemd/nibrun-nibrunner-tunnel.service'),
@@ -80,6 +90,9 @@ const script = [
   writeRemoteFile({ name: 'on_box_deploy.sh', content: installer }),
   writeRemoteFile({ name: 'apt.conf', content: aptConfiguration }),
   writeRemoteFile({ name: 'install_storage_environment.sh', content: storageEnvironmentInstaller }),
+  writeRemoteFile({ name: 'install_metrics.sh', content: metricsInstaller }),
+  writeRemoteFile({ name: 'metrics.alloy', content: metricsConfiguration }),
+  writeRemoteFile({ name: 'nibrun-nibrunner-metrics.service', content: metricsUnit }),
   writeRemoteFile({ name: 'install_tunnel.sh', content: tunnelInstaller }),
   writeRemoteFile({ name: 'nibrun-nibrunner-tunnel.service', content: tunnelUnit }),
   writeRemoteFile({ name: 'install_bridge.sh', content: bridgeInstaller }),
@@ -104,6 +117,7 @@ const script = [
   'bash on_box_deploy.sh',
   'bash install_bridge.sh',
   'bash install_tunnel.sh',
+  'bash install_metrics.sh',
   'NIBRUNNER_DEPLOY',
 ].join('\n');
 

@@ -6,6 +6,8 @@ import packageJson from '../package.json' with { type: 'json' };
 
 export const PROGRAM_NAME = 'nib';
 
+export const PAID_REQUEST_TYPE_FLAG = 'type';
+
 export const PROGRAM_VERSION = packageJson.version;
 
 export const DEFAULT_API_URL = DASHBOARD_SITE.url;

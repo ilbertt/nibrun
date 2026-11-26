@@ -1,8 +1,9 @@
 locals {
   control_plane_access_hostnames = {
-    dozzle = var.dozzle_hostname
-    logs   = var.victorialogs_hostname
-    umami  = var.umami_hostname
+    dozzle  = var.dozzle_hostname
+    logs    = var.victorialogs_hostname
+    umami   = var.umami_hostname
+    grafana = var.grafana_hostname
   }
   umami_website_id = jsondecode(file("${path.module}/../../packages/analytics/src/umami.json")).websiteId
   umami_public_paths = {
