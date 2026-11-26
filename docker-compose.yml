@@ -252,6 +252,37 @@ services:
     networks:
       - nibrun
 
+  docker-metrics:
+    image: grafana/alloy:v1.22.0
+    container_name: docker-metrics
+    profiles: [monitoring]
+    privileged: true
+    cgroup: host
+    command:
+      - run
+      - --server.http.listen-addr=127.0.0.1:12345
+      - --server.http.enable-pprof=false
+      - --storage.path=/var/lib/alloy
+      - /etc/alloy/docker.alloy
+    labels:
+      nibrun.configuration: ${DOCKER_METRICS_CONFIG_SHA256:-local}
+    volumes:
+      - ./infra/alloy:/etc/alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /:/rootfs:ro
+      - /sys:/sys:ro
+      - /proc:/host/proc:ro
+      - /var/lib/docker:/var/lib/docker:ro
+      - docker-metrics-data:/var/lib/alloy
+    mem_limit: 256m
+    cpus: 0.5
+    depends_on:
+      prometheus:
+        condition: service_healthy
+    restart: always
+    networks:
+      - nibrun
+
   grafana:
     image: grafana/grafana:13.3
     container_name: grafana
@@ -376,4 +407,7 @@ volumes:
     driver: local
 
   grafana-data:
+    driver: local
+
+  docker-metrics-data:
     driver: local

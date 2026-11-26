@@ -1,0 +1,66 @@
+{
+  "uid": "nibrunner-logs",
+  "title": "nibrunner logs",
+  "description": "Application output and host logs, searchable with LogsQL.",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "timezone": "browser",
+  "tags": ["nibrunner", "logs"],
+  "refresh": "30s",
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "links": [
+    {
+      "title": "Operations",
+      "type": "link",
+      "url": "/d/nibrunner-operations",
+      "keepTime": true
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "query",
+        "label": "LogsQL query",
+        "description": "Use * for all logs, a message search, or field filters such as SOURCE:=\"tenant\" or appId:=\"your-app-id\".",
+        "type": "textbox",
+        "query": "*",
+        "current": { "text": "*", "value": "*" },
+        "options": [{ "text": "*", "value": "*", "selected": true }]
+      }
+    ]
+  },
+  "annotations": { "list": [] },
+  "panels": [
+    {
+      "id": 1,
+      "title": "Logs",
+      "description": "Latest matching entries in the selected time range. Expand a line to inspect its fields.",
+      "type": "logs",
+      "datasource": {
+        "type": "victoriametrics-logs-datasource",
+        "uid": "victorialogs"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "${query:raw}",
+          "queryType": "instant",
+          "editorMode": "code",
+          "direction": "desc"
+        }
+      ],
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "enableLogDetails": true,
+        "sortOrder": "Descending",
+        "dedupStrategy": "none"
+      },
+      "gridPos": { "h": 20, "w": 24, "x": 0, "y": 0 }
+    }
+  ]
+}
