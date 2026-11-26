@@ -130,7 +130,7 @@ test('config versions require an explicit access kind', async () => {
   expect([...columns]).toEqual([{ is_nullable: 'NO', column_default: null }]);
 });
 
-test('a new JWT-protected app stores its full access policy on creation', async () => {
+test('JWT access survives creation and partial app updates', async () => {
   const slug = Value.Parse(DnsLabelSchema, 'private-heron');
   const access = {
     kind: 'jwt',
@@ -151,6 +151,18 @@ test('a new JWT-protected app stores its full access policy on creation', async 
     }),
   );
   expect(appAccess(app)).toEqual(access);
+  for (const edit of [
+    { args: ['serve'] },
+    { environment: { set: sealed({ TOKEN: 'value' }), removed: [] } },
+  ]) {
+    const updated = await repo.update({
+      client: OperationClient.Cli,
+      appId: app.id,
+      ownerId: OWNER_ID,
+      patch: { name: undefined, ...edit },
+    });
+    expect(appAccess(updated!)).toEqual(access);
+  }
 });
 
 test('Cloudflare Access needs a registered domain to enable or change the policy', async () => {

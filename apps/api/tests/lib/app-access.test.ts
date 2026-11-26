@@ -29,14 +29,22 @@ test('creation and patch accept the same JWT policy and reject missing identity 
   );
 });
 
-test('config requires access while name-only requests omit config', () => {
+test('creation requires access in config and a patch accepts any supplied setting', () => {
   for (const body of [{}, { config: { access: jwt } }]) {
     expect(Value.Check(CreateAppRequestSchema, { name: 'reports', ...body })).toBe(true);
     expect(Value.Check(AppPatchSchema, { name: 'reports', ...body })).toBe(true);
   }
-  for (const body of [{ access: jwt }, { config: {} }, { config: { args: ['serve'] } }]) {
+  for (const body of [{ access: jwt }, { config: {} }, { config: { unknown: true } }]) {
     expect(Value.Check(CreateAppRequestSchema, { name: 'reports', ...body })).toBe(false);
     expect(Value.Check(AppPatchSchema, body)).toBe(false);
+  }
+  for (const config of [
+    { args: ['serve'] },
+    { environment: { TOKEN: null } },
+    { httpPort: 8080 },
+  ]) {
+    expect(Value.Check(AppPatchSchema, { config })).toBe(true);
+    expect(Value.Check(CreateAppRequestSchema, { name: 'reports', config })).toBe(false);
   }
 });
 
