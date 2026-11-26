@@ -6,28 +6,18 @@ import { DeploymentInitiator } from '#lib/api/deployment-initiator.ts';
 import type { ArtifactId, OwnerId } from '#lib/api/identifiers.ts';
 import type { VolumeStorageMigrationState } from '#lib/api/volume-storage-migration.ts';
 import { ConflictError } from '#lib/errors.ts';
-import type { StoredVolumeStorage } from '#lib/volume-storage.ts';
+import type { VolumeStorageDestination } from '#lib/volume-storage.ts';
 import { appendConfigVersion, lockApp } from '#repositories/apps.repository.ts';
 import { supersedeLiveDeployment } from '#repositories/deployments.repository.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type VolumeStorageMigrationRow = Queries['SelectVolumeStorageMigration'];
 export type UnstartedVolumeStorageMigrationRow = Queries['SelectUnstartedVolumeStorageMigrations'];
-export type VolumeStorageMigrationDestination = Omit<
-  StoredVolumeStorage,
-  'volume_storage_prefix'
-> & {
-  [Key in
-    | 'volume_storage_endpoint'
-    | 'volume_storage_bucket'
-    | 'volume_storage_auth_kind'
-    | 'volume_storage_encryption_password']: NonNullable<StoredVolumeStorage[Key]>;
-};
 type OwnedApp = { appId: AppId; ownerId: OwnerId };
 type MigrationAttempt = OwnedApp & { configId: string };
 type TransactionInput = OwnedApp & { tx: TypedSQL<Queries> };
 export type RequestVolumeStorageMigrationInput = OwnedApp & {
-  destination: VolumeStorageMigrationDestination;
+  destination: VolumeStorageDestination;
 };
 export type AbortVolumeStorageMigrationInput = MigrationAttempt & {
   state: Extract<VolumeStorageMigrationState, 'failed' | 'cancelled'>;

@@ -1,6 +1,8 @@
 import type { AppId, Filename, ObjectKey, Sha256Digest } from '@repo/protocol';
 import type { Queries } from '#db/queries.gen.ts';
 import type { ImportId, OwnerId } from '#lib/api/identifiers.ts';
+import { requireManagedImportStorage } from '#lib/volume-storage.ts';
+import { lockApp } from '#repositories/apps.repository.ts';
 import { Repository } from '#repositories/repository.ts';
 
 export type ImportRow = Queries['SelectImportById'];
@@ -46,7 +48,7 @@ export abstract class ImportsRepositoryContract {
  * that returns one carries it. A row without it names bytes that may never arrive.
  */
 export class ImportsRepository extends Repository implements ImportsRepositoryContract {
-  async insertPending({
+  insertPending({
     appId,
     ownerId,
     originalFileName,
@@ -55,14 +57,29 @@ export class ImportsRepository extends Repository implements ImportsRepositoryCo
     ownerId: OwnerId;
     originalFileName: Filename;
   }): Promise<PendingImportRow | null> {
-    const [row] = await this.sql.InsertPendingImport`
-      INSERT INTO nibrun.imports (app_id, original_file_name)
-      SELECT a.id, ${originalFileName}
-      FROM nibrun.live_apps a
-      WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
-      RETURNING id, app_id, original_file_name, created_at
-    `;
-    return row ?? null;
+    return this.sql.begin(async (tx) => {
+      if (!(await lockApp({ tx, appId, ownerId }))) {
+        return null;
+      }
+      const [current] = await tx.SelectImportVolumeStorage`
+        SELECT c.volume_storage_bucket FROM nibrun.app_configs c
+        JOIN nibrun.apps a ON a.id = c.app_id
+        WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+        ORDER BY c.id DESC LIMIT 1
+      `;
+      if (!current) {
+        return null;
+      }
+      requireManagedImportStorage(current.volume_storage_bucket);
+      const [row] = await tx.InsertPendingImport`
+        INSERT INTO nibrun.imports (app_id, original_file_name)
+        SELECT a.id, ${originalFileName}
+        FROM nibrun.live_apps a
+        WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+        RETURNING id, app_id, original_file_name, created_at
+      `;
+      return row ?? null;
+    });
   }
 
   /**

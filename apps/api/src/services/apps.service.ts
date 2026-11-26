@@ -53,6 +53,7 @@ import { REDACTED } from '#lib/redact-secrets.ts';
 import { sealEnvironment, type TenantSecretsKey } from '#lib/tenant-secrets.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
 import { requiresCustomDomain, validatedAppAccess } from '#lib/validate-app-access.ts';
+import { sealVolumeStorage } from '#lib/volume-storage.ts';
 import { toVolumeStorageMigration } from '#lib/volume-storage-migration.ts';
 import type {
   AppHostnameRow,
@@ -223,6 +224,9 @@ export class AppsService extends Service {
       environment: sealEnvironment({ key: this.secretsKey, environment }),
     };
 
+    const storage =
+      config?.volumeStorage &&
+      sealVolumeStorage({ storage: config.volumeStorage, key: this.secretsKey });
     for (let attempt = 0; attempt < MAX_SLUG_ATTEMPTS; attempt++) {
       const slug = deriveAppSlug(name);
       try {
@@ -233,6 +237,7 @@ export class AppsService extends Service {
           slug,
           hostname: platformHostname({ slug, appHostDomain: this.appHostDomain }),
           config: appConfig,
+          storage,
           anonymousAppsAtMost: isAnonymous ? MAX_ANONYMOUS_APPS : null,
         });
         if (created.outcome !== 'created') {
@@ -299,8 +304,14 @@ export class AppsService extends Service {
     if (!config) {
       return { name };
     }
-    const { environment, access, ...runtime } = config;
-    const rest = { ...runtime, access: validatedAppAccess(access) };
+    const { environment, access, volumeStorage, ...runtime } = config;
+    const rest = {
+      ...runtime,
+      ...(access && { access: validatedAppAccess(access) }),
+      ...(volumeStorage && {
+        storage: sealVolumeStorage({ storage: volumeStorage, key: this.secretsKey }),
+      }),
+    };
     if (environment === undefined) {
       return { ...rest, name };
     }
