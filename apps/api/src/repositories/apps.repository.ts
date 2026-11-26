@@ -101,6 +101,7 @@ export const LIVE_APP_STATES: readonly AppState[] = APP_STATES.filter(
 
 export abstract class AppsRepositoryContract {
   abstract create(input: NewApp): Promise<AppCreation>;
+  abstract requireCustomBucketAccess(input: OwnedApp): Promise<boolean>;
   abstract appsAllowed(input: { ownerId: OwnerId }): Promise<number | null>;
   abstract listByOwner(input: { ownerId: OwnerId }): Promise<AppRow[]>;
   abstract findById(input: OwnedApp): Promise<AppRow | null>;
@@ -141,6 +142,17 @@ const ACTIVE_STATE: AppHostnameState = 'active';
 const NONE_LEFT = 0;
 
 export class AppsRepository extends Repository implements AppsRepositoryContract {
+  requireCustomBucketAccess({ appId, ownerId }: OwnedApp): Promise<boolean> {
+    return this.sql.begin(async (tx) => {
+      const app = await lockApp({ tx, appId, ownerId });
+      if (!app) {
+        return false;
+      }
+      await requireAssignableVolume({ tx, appId, ownerId });
+      return true;
+    });
+  }
+
   async isOwnedBy({ appId, ownerId }: OwnedApp): Promise<boolean> {
     const [row] = await this.sql.SelectAppOwnership`
       SELECT a.id

@@ -27,6 +27,7 @@ import {
   type OwnedAppState,
 } from '#lib/api/app.ts';
 import {
+  type CustomerVolumeInput,
   type VolumeStorageLocation,
   VolumeStorageLocationSchema,
 } from '#lib/api/customer-volume.ts';
@@ -41,6 +42,7 @@ import { type PublicAppHostname, platformHostname, toAppHostname } from '#lib/ap
 import { AppQuotaExceededError } from '#lib/app-quota.ts';
 import { deriveAppSlug } from '#lib/app-slug.ts';
 import type { AccountLink } from '#lib/auth/better-auth.ts';
+import { issueBucketSetup, readBucketSetup } from '#lib/bucket-setup.ts';
 import {
   BadRequestError,
   ConflictError,
@@ -334,6 +336,33 @@ export class AppsService extends Service {
     const byApp = Map.groupBy(hostnames, (row) => row.app_id);
 
     return apps.map((app) => toPublicApp({ app, hostnames: byApp.get(app.id) ?? [] }));
+  }
+
+  async requireBucketSetup(input: OwnedApp): Promise<void> {
+    if (!(await this.appsRepo.requireCustomBucketAccess(input))) {
+      throw new NotFoundError('App not found.');
+    }
+  }
+
+  async prepareBucketSetup({ storage, ...app }: OwnedApp & { storage: CustomerVolumeInput }) {
+    await this.requireBucketSetup(app);
+    return issueBucketSetup({ ...app, storage, key: this.secretsKey });
+  }
+
+  async applyBucketSetup({
+    setupCode,
+    ...app
+  }: OwnedApp & { setupCode: string }): Promise<VolumeStorageLocation> {
+    const volumeStorage = readBucketSetup({ ...app, setupCode, key: this.secretsKey });
+    const updated = await this.update({
+      ...app,
+      client: OperationClient.Mcp,
+      patch: { config: { volumeStorage } },
+    });
+    if (!updated.volumeStorage) {
+      throw new Error('The assigned volume storage could not be read.');
+    }
+    return updated.volumeStorage;
   }
 
   async get({ appId, ownerId }: OwnedApp): Promise<PublicApp> {

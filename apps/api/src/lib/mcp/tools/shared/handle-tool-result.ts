@@ -1,4 +1,6 @@
 import type { CallToolResult, InputRequiredResult } from '@modelcontextprotocol/server';
+import { InvalidBucketSetupError } from '#lib/bucket-setup.ts';
+import { CustomBucketsDisabledError } from '#lib/custom-bucket-access.ts';
 import { createLogger } from '#lib/logger.ts';
 
 const logger = createLogger('mcp:tools');
@@ -21,6 +23,9 @@ export function handleToolResult<Args extends unknown[], Output extends Structur
         structuredContent: result,
       };
     } catch (error) {
+      if (error instanceof CustomBucketsDisabledError || error instanceof InvalidBucketSetupError) {
+        return { isError: true, content: [{ type: 'text', text: error.message }] };
+      }
       logger.error(`${callback.name} failed`, error);
       return {
         isError: true,

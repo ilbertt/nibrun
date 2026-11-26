@@ -21,6 +21,7 @@ import { Route as authLoginPasswordRouteImport } from './routes/(auth)/login_/pa
 import { Route as dashboardAppsIndexRouteImport } from './routes/(dashboard)/apps/index'
 import { Route as dashboardAppsAppIdRouteRouteImport } from './routes/(dashboard)/apps/$appId/route'
 import { Route as dashboardAppsAppIdIndexRouteImport } from './routes/(dashboard)/apps/$appId/index'
+import { Route as dashboardAppsAppIdBucketSetupRouteImport } from './routes/(dashboard)/apps/$appId/bucket-setup'
 import { Route as dashboardAppsAppIdCronsRouteImport } from './routes/(dashboard)/apps/$appId/crons'
 import { Route as dashboardAppsAppIdDomainsRouteImport } from './routes/(dashboard)/apps/$appId/domains'
 import { Route as dashboardAppsAppIdFilesRouteImport } from './routes/(dashboard)/apps/$appId/files'
@@ -84,6 +85,12 @@ const dashboardAppsAppIdIndexRoute = dashboardAppsAppIdIndexRouteImport.update({
   path: '/',
   getParentRoute: () => dashboardAppsAppIdRouteRoute,
 } as any)
+const dashboardAppsAppIdBucketSetupRoute =
+  dashboardAppsAppIdBucketSetupRouteImport.update({
+    id: '/bucket-setup',
+    path: '/bucket-setup',
+    getParentRoute: () => dashboardAppsAppIdRouteRoute,
+  } as any)
 const dashboardAppsAppIdCronsRoute = dashboardAppsAppIdCronsRouteImport.update({
   id: '/crons',
   path: '/crons',
@@ -116,6 +123,7 @@ export interface FileRoutesByFullPath {
   '/apps/$appId': typeof dashboardAppsAppIdRouteRouteWithChildren
   '/login/password': typeof authLoginPasswordRoute
   '/apps/': typeof dashboardAppsIndexRoute
+  '/apps/$appId/bucket-setup': typeof dashboardAppsAppIdBucketSetupRoute
   '/apps/$appId/crons': typeof dashboardAppsAppIdCronsRoute
   '/apps/$appId/domains': typeof dashboardAppsAppIdDomainsRoute
   '/apps/$appId/files': typeof dashboardAppsAppIdFilesRoute
@@ -131,6 +139,7 @@ export interface FileRoutesByTo {
   '/': typeof dashboardIndexRoute
   '/login/password': typeof authLoginPasswordRoute
   '/apps': typeof dashboardAppsIndexRoute
+  '/apps/$appId/bucket-setup': typeof dashboardAppsAppIdBucketSetupRoute
   '/apps/$appId/crons': typeof dashboardAppsAppIdCronsRoute
   '/apps/$appId/domains': typeof dashboardAppsAppIdDomainsRoute
   '/apps/$appId/files': typeof dashboardAppsAppIdFilesRoute
@@ -150,6 +159,7 @@ export interface FileRoutesById {
   '/(dashboard)/apps/$appId': typeof dashboardAppsAppIdRouteRouteWithChildren
   '/(auth)/login_/password': typeof authLoginPasswordRoute
   '/(dashboard)/apps/': typeof dashboardAppsIndexRoute
+  '/(dashboard)/apps/$appId/bucket-setup': typeof dashboardAppsAppIdBucketSetupRoute
   '/(dashboard)/apps/$appId/crons': typeof dashboardAppsAppIdCronsRoute
   '/(dashboard)/apps/$appId/domains': typeof dashboardAppsAppIdDomainsRoute
   '/(dashboard)/apps/$appId/files': typeof dashboardAppsAppIdFilesRoute
@@ -168,6 +178,7 @@ export interface FileRouteTypes {
     | '/apps/$appId'
     | '/login/password'
     | '/apps/'
+    | '/apps/$appId/bucket-setup'
     | '/apps/$appId/crons'
     | '/apps/$appId/domains'
     | '/apps/$appId/files'
@@ -183,6 +194,7 @@ export interface FileRouteTypes {
     | '/'
     | '/login/password'
     | '/apps'
+    | '/apps/$appId/bucket-setup'
     | '/apps/$appId/crons'
     | '/apps/$appId/domains'
     | '/apps/$appId/files'
@@ -201,6 +213,7 @@ export interface FileRouteTypes {
     | '/(dashboard)/apps/$appId'
     | '/(auth)/login_/password'
     | '/(dashboard)/apps/'
+    | '/(dashboard)/apps/$appId/bucket-setup'
     | '/(dashboard)/apps/$appId/crons'
     | '/(dashboard)/apps/$appId/domains'
     | '/(dashboard)/apps/$appId/files'
@@ -301,6 +314,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof dashboardAppsAppIdIndexRouteImport
       parentRoute: typeof dashboardAppsAppIdRouteRoute
     }
+    '/(dashboard)/apps/$appId/bucket-setup': {
+      id: '/(dashboard)/apps/$appId/bucket-setup'
+      path: '/bucket-setup'
+      fullPath: '/apps/$appId/bucket-setup'
+      preLoaderRoute: typeof dashboardAppsAppIdBucketSetupRouteImport
+      parentRoute: typeof dashboardAppsAppIdRouteRoute
+    }
     '/(dashboard)/apps/$appId/crons': {
       id: '/(dashboard)/apps/$appId/crons'
       path: '/crons'
@@ -351,6 +371,7 @@ const authRouteRouteWithChildren = authRouteRoute._addFileChildren(
 )
 
 interface dashboardAppsAppIdRouteRouteChildren {
+  dashboardAppsAppIdBucketSetupRoute: typeof dashboardAppsAppIdBucketSetupRoute
   dashboardAppsAppIdCronsRoute: typeof dashboardAppsAppIdCronsRoute
   dashboardAppsAppIdDomainsRoute: typeof dashboardAppsAppIdDomainsRoute
   dashboardAppsAppIdFilesRoute: typeof dashboardAppsAppIdFilesRoute
@@ -360,6 +381,7 @@ interface dashboardAppsAppIdRouteRouteChildren {
 
 const dashboardAppsAppIdRouteRouteChildren: dashboardAppsAppIdRouteRouteChildren =
   {
+    dashboardAppsAppIdBucketSetupRoute: dashboardAppsAppIdBucketSetupRoute,
     dashboardAppsAppIdCronsRoute: dashboardAppsAppIdCronsRoute,
     dashboardAppsAppIdDomainsRoute: dashboardAppsAppIdDomainsRoute,
     dashboardAppsAppIdFilesRoute: dashboardAppsAppIdFilesRoute,

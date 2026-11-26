@@ -102,6 +102,8 @@ where they enter the values directly under **Environment variables**. Wait for t
 then deploy using that `appId`. Native file binding can still be used for the binary; direct
 uploads use the prepared artifact as described below.
 
+To configure a custom bucket, call `set_app_bucket` with the app ID. Give the owner the private setup URL for their S3 credentials and ZeroFS password. When they return the setup code, call the tool again with the same app ID and the code. The next deployment applies the configuration. If access is disabled, relay the tool’s request instructions.
+
 To change a deployed app’s startup arguments, HTTP port, or HTTP access, call `update_app` with
 its `appId` and a `config` containing the fields to change. For example, `{"httpPort":8080}`
 redeploys the latest binary on port 8080. Pass `{"args":[]}` to clear startup arguments.

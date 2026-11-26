@@ -34,13 +34,7 @@ export type VolumeStorageDestination = Omit<StoredVolumeStorage, 'volume_storage
 
 const MIN_PASSWORD_BYTES = 8;
 
-export function sealVolumeStorage({
-  storage,
-  key,
-}: {
-  storage: CustomerVolumeInput;
-  key: TenantSecretsKey;
-}): VolumeStorageDestination {
+export function validatedVolumeStorage(storage: CustomerVolumeInput): CustomerVolumeInput {
   const url = URL.parse(storage.endpoint);
   if (
     url?.protocol !== 'https:' ||
@@ -62,9 +56,20 @@ export function sealVolumeStorage({
       'Use a ZeroFS encryption password of at least eight bytes, different from the example password.',
     );
   }
+  return { ...storage, endpoint: url.href.replace(/\/+$/, '') };
+}
+
+export function sealVolumeStorage({
+  storage: input,
+  key,
+}: {
+  storage: CustomerVolumeInput;
+  key: TenantSecretsKey;
+}): VolumeStorageDestination {
+  const storage = validatedVolumeStorage(input);
   const { auth } = storage;
   return {
-    volume_storage_endpoint: url.href.replace(/\/+$/, ''),
+    volume_storage_endpoint: storage.endpoint,
     volume_storage_bucket: storage.bucket,
     volume_storage_region: storage.region ?? null,
     volume_storage_auth_kind: auth.kind,

@@ -16,7 +16,9 @@ import { Value } from '@sinclair/typebox/value';
 import { StatusMap } from 'elysia';
 import { exportJWK, generateKeyPair, type JWTPayload, SignJWT } from 'jose';
 import { ArtifactSchema } from '#lib/api/artifact.ts';
+import { VolumeStorageLocationSchema } from '#lib/api/customer-volume.ts';
 import { SqliteConnectionSchema } from '#lib/api/sqlite-connection.ts';
+import { CustomBucketsDisabledError } from '#lib/custom-bucket-access.ts';
 import { BadRequestError, ForbiddenError, NotFoundError } from '#lib/errors.ts';
 import { DIRECTORY_READ_TIMEOUT_MS } from '#lib/filesystem/timeouts.ts';
 import { DeploymentTargetSchema } from '#lib/mcp/tools/shared/deployment-target.ts';
@@ -151,7 +153,7 @@ function accessToken({
 }: {
   claims?: Record<string, unknown>;
   type?: string;
-} = {}) {
+} = {}): Promise<string> {
   return new SignJWT(claims)
     .setProtectedHeader({ alg: 'EdDSA', kid: jwk.kid, typ: type })
     .sign(key.privateKey);
@@ -464,6 +466,7 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
       MCP_TOOL_NAMES.listFiles,
       MCP_TOOL_NAMES.queryDatabase,
       MCP_TOOL_NAMES.updateApp,
+      MCP_TOOL_NAMES.setAppBucket,
     ]);
     expect(result.tools[0]).toMatchObject({
       name: MCP_TOOL_NAMES.listApps,
@@ -493,6 +496,45 @@ describe.each(PROTOCOL_VERSIONS)('MCP %s', (protocolVersion) => {
     expect(output.currentDeployment.anyOf[0].required).toEqual(DeploymentResponseSchema.required);
     expect(output.currentDeployment.anyOf).toContainEqual({ type: 'null' });
     expect(JSON.stringify(result.tools[1].outputSchema)).not.toContain('"nullable"');
+  });
+
+  test('custom bucket setup binds both calls to the connected owner and reports only the saved location', async () => {
+    const appId = ARTIFACT.appId;
+    const token = await accessToken();
+    const check = spyOn(appsService, 'requireBucketSetup').mockResolvedValue(undefined);
+    const location = { bucket: 'test-bucket', prefix: 'apps/test' };
+    const apply = spyOn(appsService, 'applyBucketSetup').mockResolvedValue(
+      Value.Parse(VolumeStorageLocationSchema, location),
+    );
+    async function call(args: Record<string, string>) {
+      return (
+        await rpcBody(
+          await rpc({
+            method: 'tools/call',
+            token,
+            protocolVersion,
+            params: { name: MCP_TOOL_NAMES.setAppBucket, arguments: args },
+          }),
+        )
+      ).result;
+    }
+    expect((await call({ appId })).structuredContent).toEqual({
+      state: 'awaiting_setup',
+      setupUrl: new URL(`/apps/${appId}/bucket-setup`, MCP_RESOURCE).href,
+    });
+    expect(check).toHaveBeenCalledWith({ appId, ownerId });
+    expect(apply).not.toHaveBeenCalled();
+    expect((await call({ appId, setupCode: 'sealed-code' })).structuredContent).toEqual({
+      state: 'configured',
+      volumeStorage: location,
+    });
+    expect(apply).toHaveBeenCalledWith({ appId, ownerId, setupCode: 'sealed-code' });
+    const disabled = new CustomBucketsDisabledError();
+    check.mockRejectedValue(disabled);
+    expect(await call({ appId })).toMatchObject({
+      isError: true,
+      content: [{ type: 'text', text: disabled.message }],
+    });
   });
 
   test('updates only the supplied settings for the authenticated owner and client', async () => {

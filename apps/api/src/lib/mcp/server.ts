@@ -10,6 +10,7 @@ import { registerListFilesTool } from '#lib/mcp/tools/list-files.ts';
 import { registerPrepareDeployTool } from '#lib/mcp/tools/prepare-deploy.ts';
 import { registerQueryDatabaseTool } from '#lib/mcp/tools/query-database.ts';
 import { registerReadLogsTool } from '#lib/mcp/tools/read-logs.ts';
+import { registerSetAppBucketTool } from '#lib/mcp/tools/set-app-bucket.ts';
 import { registerUpdateAppTool } from '#lib/mcp/tools/update-app.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { ArtifactsService } from '#services/artifacts.service.ts';
@@ -62,6 +63,7 @@ export function createMcpServerHandler({
       });
       registerQueryDatabaseTool({ server, sqliteService, ownerId });
       registerUpdateAppTool({ server, deploymentsService, ownerId, clientId });
+      registerSetAppBucketTool({ server, appsService, ownerId });
       return server;
     },
     {

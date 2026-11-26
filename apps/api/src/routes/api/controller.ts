@@ -2,6 +2,7 @@ import { Elysia } from 'elysia';
 import { RoutePrefix } from '#lib/routes/prefixes.ts';
 import { AppsAppIdArtifactsArtifactIdController } from '#routes/api/apps/[appId]/artifacts/[artifactId]/controller.ts';
 import { AppsAppIdArtifactsController } from '#routes/api/apps/[appId]/artifacts/controller.ts';
+import { AppsAppIdBucketSetupController } from '#routes/api/apps/[appId]/bucket-setup/controller.ts';
 import { AppsAppIdController } from '#routes/api/apps/[appId]/controller.ts';
 import { AppsAppIdDeploymentTokensController } from '#routes/api/apps/[appId]/deployment-tokens/controller.ts';
 import { AppsAppIdDeploymentsDeploymentIdController } from '#routes/api/apps/[appId]/deployments/[deploymentId]/controller.ts';
@@ -34,6 +35,7 @@ export const ApiController = new Elysia({ prefix: RoutePrefix.Api })
   .use(HealthController)
   .use(AppsController)
   .use(AppsAppIdController)
+  .use(AppsAppIdBucketSetupController)
   .use(AppsAppIdDeploymentTokensController)
   .use(AppsAppIdArtifactsController)
   .use(AppsAppIdArtifactsArtifactIdController)

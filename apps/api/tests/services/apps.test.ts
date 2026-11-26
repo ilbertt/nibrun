@@ -249,6 +249,10 @@ class StubAppsRepository implements AppsRepositoryContract {
     });
   }
 
+  requireCustomBucketAccess(): Promise<boolean> {
+    return Promise.resolve(this.owns);
+  }
+
   appsAllowed(): Promise<number | null> {
     return Promise.resolve(this.allowed);
   }
