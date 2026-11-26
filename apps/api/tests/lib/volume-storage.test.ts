@@ -2,8 +2,10 @@ import { expect, test } from 'bun:test';
 import { AppIdSchema } from '@repo/protocol';
 import { Value } from '@sinclair/typebox/value';
 import type { Queries } from '#db/queries.gen.ts';
+import { CustomerVolumeInputSchema } from '#lib/api/customer-volume.ts';
+import { BadRequestError } from '#lib/errors.ts';
 import { readSecretsKey, sealedFromStore, sealSecret } from '#lib/tenant-secrets.ts';
-import { toVolumeStorage } from '#lib/volume-storage.ts';
+import { sealVolumeStorage, toVolumeStorage } from '#lib/volume-storage.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
 const SECRETS_KEY_BYTES = 32;
@@ -50,4 +52,22 @@ test('unreadable secret columns fail closed without falling back to shared stora
       secretsKey: TEST_SECRETS_KEY,
     }),
   ).toThrow(ERROR);
+});
+
+test.each([
+  { endpoint: 'https://127.0.0.1' },
+  { endpoint: 'https://user:pass@objects.example.com' },
+  { endpoint: 'https://objects.example.com/?secret=hidden' },
+  { endpoint: 'https://objects.example.com/#fragment' },
+  { encryptionPassword: 'short' },
+  { encryptionPassword: 'CHANGEME' },
+])('refuses bucket settings the host cannot use', (change) => {
+  const storage = Value.Parse(CustomerVolumeInputSchema, {
+    endpoint: 'https://objects.example.com',
+    bucket: 'customer-bucket',
+    auth: { kind: 'anonymous' },
+    encryptionPassword: 'strong-password',
+    ...change,
+  });
+  expect(() => sealVolumeStorage({ storage, key: TEST_SECRETS_KEY })).toThrow(BadRequestError);
 });

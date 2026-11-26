@@ -41,7 +41,7 @@ export type SealedEnvironmentPatch = {
 // What a repository takes, as against what an owner sent. Every one of these is a record of
 // strings, so the branding on `TenantEnvironment` and `SealedSecret` is the only thing standing
 // between a plaintext value, a `[redacted]` placeholder and the ciphertext that may be stored.
-export type SealedConfigPatch = Partial<Omit<AppConfigPatch, 'environment'>> & {
+export type SealedConfigPatch = Omit<AppConfigPatch, 'environment' | 'volumeStorage'> & {
   environment?: SealedEnvironmentPatch | undefined;
 };
 

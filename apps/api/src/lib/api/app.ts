@@ -7,6 +7,7 @@ import {
 } from '@repo/protocol';
 import { type Brand, type BrandedSchema, stringEnum } from '@repo/typebox-extensions';
 import { type TString, Type } from '@sinclair/typebox';
+import { CustomerVolumeInputSchema } from '#lib/api/customer-volume.ts';
 import { DnsLabelSchema } from '#lib/api/dns-label.ts';
 import { TenantEnvironmentPatchSchema } from '#lib/api/environment.ts';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
@@ -77,15 +78,19 @@ export const RuntimeSettingsPatchSchema = Type.Partial(Type.Object(ownedConfig),
 export type RuntimeSettingsPatch = typeof RuntimeSettingsPatchSchema.static;
 
 export const NewAppConfigSchema = Type.Object(
-  { ...ownedConfig, environment: Type.Optional(AppConfigSchema.properties.environment) },
+  {
+    ...ownedConfig,
+    environment: Type.Optional(AppConfigSchema.properties.environment),
+    volumeStorage: Type.Optional(CustomerVolumeInputSchema),
+  },
   { additionalProperties: false },
 );
 
 export type NewAppConfig = typeof NewAppConfigSchema.static;
 
-const AppConfigPatchSchema = Type.Object(
-  { ...ownedConfig, environment: Type.Optional(TenantEnvironmentPatchSchema) },
-  { additionalProperties: false },
+const AppConfigPatchSchema = Type.Partial(
+  Type.Object({ ...NewAppConfigSchema.properties, environment: TenantEnvironmentPatchSchema }),
+  { additionalProperties: false, minProperties: 1 },
 );
 
 export type AppConfigPatch = typeof AppConfigPatchSchema.static;

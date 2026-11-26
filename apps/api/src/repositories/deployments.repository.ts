@@ -24,6 +24,7 @@ import { CUSTOM_KIND } from '#lib/app-hostname.ts';
 import { ConflictError } from '#lib/errors.ts';
 import { HOST_REPORT_MAX_AGE_MS } from '#lib/host-readiness.ts';
 import { type OperationAttribution, OperationClient } from '#lib/operation-client.ts';
+import { requireManagedImportStorage } from '#lib/volume-storage.ts';
 import { lockAppForMutation, patchLockedApp } from '#repositories/apps.repository.ts';
 import { Repository } from '#repositories/repository.ts';
 
@@ -732,13 +733,17 @@ async function seedRefusal({
   CreatedDeployment | undefined
 > {
   const [app] = await tx.SelectAppAwaitingData`
-    SELECT a.id
+    SELECT c.volume_storage_bucket
     FROM nibrun.live_apps a
+    JOIN LATERAL (
+      SELECT volume_storage_bucket FROM nibrun.app_configs WHERE app_id = a.id ORDER BY id DESC LIMIT 1
+    ) c ON true
     WHERE a.id = ${appId} AND a.owner_id = ${ownerId} AND a.data_initialized_at IS NULL
   `;
   if (!app) {
     return { outcome: 'data-exists' };
   }
+  requireManagedImportStorage(app.volume_storage_bucket);
   const [usable] = await tx.SelectUsableImport`
     SELECT im.id
     FROM nibrun.imports im

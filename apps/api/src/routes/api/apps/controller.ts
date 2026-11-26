@@ -1,10 +1,11 @@
 import { publicSchema } from '@repo/typebox-extensions';
 import { Value } from '@sinclair/typebox/value';
-import { Elysia, StatusMap } from 'elysia';
+import { Elysia, StatusMap, t } from 'elysia';
 import { AppQuotaExceededResponseSchema } from '#lib/api/app-quota.ts';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { AuthCaller } from '#lib/auth/caller.ts';
 import {
+  AppRequestErrorSchema,
   AppResponseSchema,
   CreateAppRequestSchema,
   ListAppsResponseSchema,
@@ -43,7 +44,9 @@ export const AppsController = new Elysia()
       body: publicSchema(CreateAppRequestSchema),
       response: {
         [StatusMap.Created]: publicSchema(AppResponseSchema),
-        [StatusMap.Forbidden]: publicSchema(AppQuotaExceededResponseSchema),
+        [StatusMap.Forbidden]: publicSchema(
+          t.Union([AppQuotaExceededResponseSchema, AppRequestErrorSchema]),
+        ),
       },
     },
   );

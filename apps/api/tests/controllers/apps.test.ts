@@ -1,6 +1,10 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import { StatusMap } from 'elysia';
+import { ForbiddenError } from '#lib/errors.ts';
+import { registeredAccount } from '#tests/controllers/support/accounts.ts';
 import { ORIGIN, type Route, routesUnder, sendJson } from '#tests/controllers/support/api.ts';
+
+const { AppsServicePlugin } = await import('#services/plugins.ts');
 
 const APPS_URL = `${ORIGIN}/api/apps`;
 const APP_URL = `${APPS_URL}/app-1`;
@@ -72,32 +76,87 @@ describe('nothing under /api/apps answers a caller with no session', () => {
   });
 });
 
+test.each([
+  {
+    method: 'POST',
+    url: APPS_URL,
+    operation: 'create',
+    fields: { name: 'bucket-app' },
+    config: { access: { kind: 'public' } },
+  },
+  { method: 'PATCH', url: APP_URL, operation: 'update', fields: {}, config: {} },
+] as const)(
+  '$method accepts bucket credentials and returns the permission refusal without their values',
+  async ({ method, url, operation, fields, config }) => {
+    const account = await registeredAccount();
+    const volumeStorage = {
+      endpoint: 'https://objects.example.com',
+      bucket: 'customer-data',
+      auth: {
+        kind: 'session',
+        accessKeyId: 'access',
+        secretAccessKey: 'secret',
+        sessionToken: 'token',
+      },
+      encryptionPassword: 'file-password',
+    };
+    const refusal = new ForbiddenError('Custom buckets are disabled.');
+    const call = spyOn(AppsServicePlugin.decorator.appsService, operation).mockRejectedValue(
+      refusal,
+    );
+    try {
+      const response = await sendJson({
+        method,
+        url,
+        headers: { cookie: account.cookie },
+        body: { ...fields, config: { ...config, volumeStorage } },
+      });
+      expect(response.status).toBe(StatusMap.Forbidden);
+      expect(await response.json()).toEqual(refusal.response);
+      expect(call).toHaveBeenCalledWith(
+        expect.objectContaining({
+          ownerId: account.ownerId,
+          ...(operation === 'update'
+            ? { patch: { config: { volumeStorage } } }
+            : { config: { ...config, volumeStorage } }),
+        }),
+      );
+    } finally {
+      call.mockRestore();
+    }
+  },
+);
+
 // Elysia raises its own 422 for a schema violation; `elysiaErrorHandler` rewrites it, and a
 // client reading the status would otherwise see two different codes for one kind of mistake.
 describe('a malformed request is a bad request', () => {
   test.each([
     { method: 'POST', url: APPS_URL, fields: { name: 'test-app' } },
     { method: 'PATCH', url: APP_URL, fields: {} },
-  ] as const)('app owners cannot assign a bucket with $method', async ({ method, url, fields }) => {
-    const response = await sendJson({
-      method,
-      url,
-      body: {
-        ...fields,
-        config: {
-          access: { kind: 'public' },
-          volumeStorage: {
-            endpoint: 'https://objects.example.test',
-            bucket: 'customer-data',
-            region: null,
-            auth: { kind: 'anonymous' },
-            encryptionPassword: 'test-password',
+  ] as const)(
+    'app owners cannot supply a bucket prefix with $method',
+    async ({ method, url, fields }) => {
+      const response = await sendJson({
+        method,
+        url,
+        body: {
+          ...fields,
+          config: {
+            access: { kind: 'public' },
+            volumeStorage: {
+              endpoint: 'https://objects.example.test',
+              bucket: 'customer-data',
+              prefix: 'another-app',
+              auth: { kind: 'anonymous' },
+              encryptionPassword: 'test-password',
+            },
           },
         },
-      },
-    });
-    expect(response.status).toBe(StatusMap['Bad Request']);
-  });
+      });
+      expect(response.status).toBe(StatusMap['Bad Request']);
+      expect(await response.text()).not.toContain('test-password');
+    },
+  );
 
   test('creating an app without naming it', async () => {
     const response = await sendJson({ method: 'POST', url: APPS_URL, body: { config: {} } });

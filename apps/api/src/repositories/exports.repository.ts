@@ -65,9 +65,13 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
       }
       const [volume] = await tx.SelectExportVolumeStorage`
         SELECT c.volume_storage_endpoint
-        FROM nibrun.deployments d JOIN nibrun.app_configs c ON c.id = d.config_id
-        WHERE d.app_id = ${appId}
-        ORDER BY d.id DESC LIMIT 1
+        FROM nibrun.app_configs c JOIN nibrun.apps a ON a.id = c.app_id
+        WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+          AND c.id IN (
+            (SELECT id FROM nibrun.app_configs WHERE app_id = a.id ORDER BY id DESC LIMIT 1),
+            (SELECT config_id FROM nibrun.deployments WHERE app_id = a.id ORDER BY id DESC LIMIT 1)
+          ) AND c.volume_storage_endpoint IS NOT NULL
+        LIMIT 1
       `;
       if (volume?.volume_storage_endpoint != null) {
         throw new ConflictError('Host exports are unavailable for apps using a customer bucket.');

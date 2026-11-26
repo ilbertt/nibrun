@@ -19,11 +19,15 @@ import type { OwnerId } from '#lib/api/identifiers.ts';
 import { accessColumns } from '#lib/app-access.ts';
 import { type SealedConfigPatch, type StoredAppConfig, toAppConfig } from '#lib/app-config.ts';
 import { CUSTOM_KIND } from '#lib/app-hostname.ts';
-import { BadRequestError, ConflictError } from '#lib/errors.ts';
+import { BadRequestError, ConflictError, ForbiddenError } from '#lib/errors.ts';
 import type { OperationAttribution } from '#lib/operation-client.ts';
 import type { SealedEnvironment } from '#lib/tenant-secrets.ts';
 import { requiresCustomDomain } from '#lib/validate-app-access.ts';
-import type { StoredVolumeStorage } from '#lib/volume-storage.ts';
+import {
+  MANAGED_VOLUME_STORAGE,
+  type StoredVolumeStorage,
+  type VolumeStorageDestination,
+} from '#lib/volume-storage.ts';
 import type { AppHostnameRow } from '#repositories/app-hostnames.repository.ts';
 import { Repository, TEXT_ARRAY } from '#repositories/repository.ts';
 
@@ -39,6 +43,7 @@ export type NewApp = OperationAttribution & {
   slug: DnsLabel;
   hostname: Hostname;
   config: StoredAppConfig;
+  storage?: VolumeStorageDestination | undefined;
   // How many apps without an account behind them may be live at once, platform-wide, where this
   // is one; null where the owner has an identity and the number is not theirs to count against.
   anonymousAppsAtMost: number | null;
@@ -84,6 +89,7 @@ export type StateChange = OwnedApp &
  * and read back together.
  */
 export type SealedAppPatch = SealedConfigPatch & {
+  storage?: VolumeStorageDestination;
   name: AppName | undefined;
 };
 
@@ -183,6 +189,7 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
     slug,
     hostname,
     config,
+    storage,
     anonymousAppsAtMost,
   }: NewApp): Promise<AppCreation> {
     return this.sql.begin(async (tx): Promise<AppCreation> => {
@@ -196,8 +203,6 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         return { outcome: 'at-capacity' };
       }
 
-      const columns = accessColumns(config.access);
-      const audiences = columns.access_audiences && tx.array(columns.access_audiences, TEXT_ARRAY);
       await setOperationContext({ tx, client });
       const [inserted] = await tx.InsertApp`
         INSERT INTO nibrun.apps (owner_id, name, slug) VALUES (${ownerId}, ${name}, ${slug})
@@ -207,35 +212,15 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
         throw new Error('Inserting into nibrun.apps returned no row.');
       }
 
-      const [insertedConfig] = await tx.InsertAppConfig`
-        /* @notNull id */
-        INSERT INTO nibrun.app_configs (
-          access_kind, access_header, access_format, access_issuer, access_audiences, access_jwks_url,
-          app_id, http_port, has_extra_public_port, args, vcpu_count, memory_mib,
-          health_check_path, health_check_interval_ms, health_check_timeout_ms,
-          health_check_grace_period_ms, health_check_healthy_threshold,
-          health_check_unhealthy_threshold,
-          restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
-          restart_backoff_factor, restart_reset_after_ms
-        )
-        VALUES (
-          ${columns.access_kind}, ${columns.access_header}, ${columns.access_format}, ${columns.access_issuer},
-          ${audiences}, ${columns.access_jwks_url},
-          ${inserted.id}, ${config.httpPort}, ${config.hasExtraPublicPort},
-          ${tx.array(config.args, TEXT_ARRAY)},
-          ${config.resources.vcpuCount}, ${config.resources.memoryMib},
-          ${config.healthCheck.path ?? null}, ${config.healthCheck.intervalMs},
-          ${config.healthCheck.timeoutMs}, ${config.healthCheck.gracePeriodMs},
-          ${config.healthCheck.healthyThreshold}, ${config.healthCheck.unhealthyThreshold},
-          ${config.restartPolicy.maxRestarts}, ${config.restartPolicy.initialBackoffMs},
-          ${config.restartPolicy.maxBackoffMs}, ${config.restartPolicy.backoffFactor},
-          ${config.restartPolicy.resetAfterMs}
-        )
-        RETURNING id
-      `;
-      if (!insertedConfig) {
-        throw new Error('Inserting into nibrun.app_configs returned no row.');
+      if (storage) {
+        await requireCustomBucketPermission({ tx, ownerId });
       }
+      const insertedConfig = await insertConfig({
+        tx,
+        appId: inserted.id,
+        config,
+        volumeStorage: storage && assignedStorage({ storage, appId: inserted.id }),
+      });
 
       await insertEnvironment({
         tx,
@@ -726,16 +711,130 @@ export class AppsRepository extends Repository implements AppsRepositoryContract
   }
 }
 
+function assignedStorage({
+  appId,
+  storage,
+}: {
+  appId: AppId;
+  storage: VolumeStorageDestination;
+}): StoredVolumeStorage {
+  return { ...storage, volume_storage_prefix: `apps/${appId}` };
+}
+
+async function insertConfig({
+  tx,
+  appId,
+  config,
+  volumeStorage = MANAGED_VOLUME_STORAGE,
+}: {
+  tx: TypedSQL<Queries>;
+  appId: AppId;
+  config: Omit<StoredAppConfig, 'environment'>;
+  volumeStorage: StoredVolumeStorage | undefined;
+}) {
+  const columns = accessColumns(config.access);
+  const audiences = columns.access_audiences && tx.array(columns.access_audiences, TEXT_ARRAY);
+
+  const [inserted] = await tx.InsertAppConfig`
+    /* @notNull id */
+    INSERT INTO nibrun.app_configs (
+      access_kind, access_header, access_format, access_issuer, access_audiences, access_jwks_url,
+      app_id, http_port, has_extra_public_port, args, vcpu_count, memory_mib,
+      health_check_path, health_check_interval_ms, health_check_timeout_ms,
+      health_check_grace_period_ms, health_check_healthy_threshold,
+      health_check_unhealthy_threshold,
+      restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
+      restart_backoff_factor, restart_reset_after_ms,
+      volume_storage_endpoint, volume_storage_bucket, volume_storage_prefix,
+      volume_storage_region, volume_storage_auth_kind, volume_storage_access_key_id,
+      volume_storage_secret_access_key, volume_storage_session_token,
+      volume_storage_encryption_password
+    )
+    VALUES (
+      ${columns.access_kind}, ${columns.access_header}, ${columns.access_format}, ${columns.access_issuer},
+      ${audiences}, ${columns.access_jwks_url},
+      ${appId}, ${config.httpPort}, ${config.hasExtraPublicPort},
+      ${tx.array(config.args, TEXT_ARRAY)},
+      ${config.resources.vcpuCount}, ${config.resources.memoryMib},
+      ${config.healthCheck.path ?? null}, ${config.healthCheck.intervalMs},
+      ${config.healthCheck.timeoutMs}, ${config.healthCheck.gracePeriodMs},
+      ${config.healthCheck.healthyThreshold}, ${config.healthCheck.unhealthyThreshold},
+      ${config.restartPolicy.maxRestarts}, ${config.restartPolicy.initialBackoffMs},
+      ${config.restartPolicy.maxBackoffMs}, ${config.restartPolicy.backoffFactor},
+      ${config.restartPolicy.resetAfterMs},
+      ${volumeStorage.volume_storage_endpoint}, ${volumeStorage.volume_storage_bucket}, rtrim(${volumeStorage.volume_storage_prefix}::text, '/'),
+      ${volumeStorage.volume_storage_region}, ${volumeStorage.volume_storage_auth_kind}, ${volumeStorage.volume_storage_access_key_id},
+      ${volumeStorage.volume_storage_secret_access_key}, ${volumeStorage.volume_storage_session_token},
+      ${volumeStorage.volume_storage_encryption_password}
+    )
+    RETURNING id
+  `;
+  if (!inserted) {
+    throw new Error('Inserting into nibrun.app_configs returned no row.');
+  }
+
+  return inserted;
+}
+
+async function requireCustomBucketPermission({
+  tx,
+  ownerId,
+}: {
+  tx: TypedSQL<Queries>;
+  ownerId: OwnerId;
+}) {
+  const [profile] = await tx.SelectCustomBucketPermission`
+    SELECT feature_custom_buckets_allowed FROM nibrun.profiles WHERE owner_id = ${ownerId} FOR SHARE
+  `;
+  if (!profile?.feature_custom_buckets_allowed) {
+    throw new ForbiddenError('Custom buckets are not enabled for this app owner.');
+  }
+}
+
+async function requireAssignableVolume({
+  tx,
+  appId,
+  ownerId,
+}: OwnedApp & { tx: TypedSQL<Queries> }) {
+  await requireCustomBucketPermission({ tx, ownerId });
+  const [app] = await tx.SelectBucketAssignmentState`
+    SELECT a.state, c.volume_storage_bucket,
+           (a.data_initialized_at IS NULL AND d.initial_data_import_id IS NOT NULL) AS importing,
+           EXISTS (SELECT 1 FROM nibrun.exports e WHERE e.app_id = a.id AND e.state IN ('pending', 'preparing')) AS exporting
+    FROM nibrun.apps a
+    LEFT JOIN nibrun.latest_app_deployments latest ON latest.app_id = a.id
+    LEFT JOIN nibrun.deployments d ON d.id = latest.deployment_id
+    LEFT JOIN nibrun.app_configs c ON c.id = d.config_id
+    WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
+  `;
+  if (!app || app.state === 'deleting' || app.volume_storage_bucket !== null) {
+    throw new ConflictError(
+      'A custom bucket can only be assigned to a live app using managed storage.',
+    );
+  }
+  if (app.exporting || app.importing) {
+    throw new ConflictError('Wait for the current data transfer before assigning a custom bucket.');
+  }
+}
+
 export async function patchLockedApp({
   tx,
   appId,
   ownerId,
   client,
-  patch: { name, ...config },
+  patch: { name, storage, ...config },
 }: OwnedApp & OperationAttribution & { tx: TypedSQL<Queries>; patch: SealedAppPatch }) {
+  if (storage) {
+    await requireAssignableVolume({ tx, appId, ownerId });
+  }
   const configAction =
-    Object.keys(config).length > 0
-      ? await appendConfigVersion({ tx, appId, patch: config, storage: undefined })
+    storage || Object.keys(config).length > 0
+      ? await appendConfigVersion({
+          tx,
+          appId,
+          patch: config,
+          storage: storage && assignedStorage({ storage, appId }),
+        })
       : undefined;
   await setOperationContext({ tx, client, configAction });
 
@@ -801,47 +900,7 @@ export async function appendConfigVersion({
   }
   const { environment: environmentPatch, ...runtimePatch } = patch;
   const config = { ...previous, ...runtimePatch };
-  const columns = accessColumns(config.access);
-  const audiences = columns.access_audiences && tx.array(columns.access_audiences, TEXT_ARRAY);
-  const volumeStorage = storage ?? current;
-
-  const [inserted] = await tx.InsertPatchedAppConfig`
-    /* @notNull id */
-    INSERT INTO nibrun.app_configs (
-      access_kind, access_header, access_format, access_issuer, access_audiences, access_jwks_url,
-      app_id, http_port, has_extra_public_port, args, vcpu_count, memory_mib,
-      health_check_path, health_check_interval_ms, health_check_timeout_ms,
-      health_check_grace_period_ms, health_check_healthy_threshold,
-      health_check_unhealthy_threshold,
-      restart_max_restarts, restart_initial_backoff_ms, restart_max_backoff_ms,
-      restart_backoff_factor, restart_reset_after_ms,
-      volume_storage_endpoint, volume_storage_bucket, volume_storage_prefix,
-      volume_storage_region, volume_storage_auth_kind, volume_storage_access_key_id,
-      volume_storage_secret_access_key, volume_storage_session_token,
-      volume_storage_encryption_password
-    )
-    VALUES (
-      ${columns.access_kind}, ${columns.access_header}, ${columns.access_format}, ${columns.access_issuer},
-      ${audiences}, ${columns.access_jwks_url},
-      ${appId}, ${config.httpPort}, ${config.hasExtraPublicPort},
-      ${tx.array(config.args, TEXT_ARRAY)},
-      ${config.resources.vcpuCount}, ${config.resources.memoryMib},
-      ${config.healthCheck.path ?? null}, ${config.healthCheck.intervalMs},
-      ${config.healthCheck.timeoutMs}, ${config.healthCheck.gracePeriodMs},
-      ${config.healthCheck.healthyThreshold}, ${config.healthCheck.unhealthyThreshold},
-      ${config.restartPolicy.maxRestarts}, ${config.restartPolicy.initialBackoffMs},
-      ${config.restartPolicy.maxBackoffMs}, ${config.restartPolicy.backoffFactor},
-      ${config.restartPolicy.resetAfterMs},
-      ${volumeStorage.volume_storage_endpoint}, ${volumeStorage.volume_storage_bucket}, rtrim(${volumeStorage.volume_storage_prefix}::text, '/'),
-      ${volumeStorage.volume_storage_region}, ${volumeStorage.volume_storage_auth_kind}, ${volumeStorage.volume_storage_access_key_id},
-      ${volumeStorage.volume_storage_secret_access_key}, ${volumeStorage.volume_storage_session_token},
-      ${volumeStorage.volume_storage_encryption_password}
-    )
-    RETURNING id
-  `;
-  if (!inserted) {
-    throw new Error('Inserting into nibrun.app_configs returned no row.');
-  }
+  const inserted = await insertConfig({ tx, appId, config, volumeStorage: storage ?? current });
 
   // Everything the patch said nothing about, which is every variable there is when it said
   // nothing at all. A name it sets or removes is left out of the copy: one row per name per
@@ -855,7 +914,7 @@ export async function appendConfigVersion({
     names: current.environment_names.filter((name) => !edited.has(name)),
   });
   await insertEnvironment({ tx, configId: inserted.id, environment: environment.set });
-  if (!isDeepStrictEqual(previous, config)) {
+  if (storage || !isDeepStrictEqual(previous, config)) {
     return 'app.updated';
   }
   if (

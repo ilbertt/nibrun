@@ -12,10 +12,11 @@ import type { ImportId, OwnerId } from '#lib/api/identifiers.ts';
 import type { Import } from '#lib/api/import.ts';
 import { isAppDataArchive, OPENING_BYTES } from '#lib/archive/app-data.ts';
 import { ArtifactTooLargeError, boundedTo } from '#lib/artifact-digest.ts';
-import { BadRequestError, ConflictError, NotFoundError } from '#lib/errors.ts';
+import { BadRequestError, NotFoundError } from '#lib/errors.ts';
 import { type RemoteFetchSlots, sourceRefusal } from '#lib/remote-fetch.ts';
 import { filenameFromUrl, withoutCredentials } from '#lib/remote-url.ts';
 import { toTimestamp } from '#lib/timestamp.ts';
+import { requireManagedImportStorage } from '#lib/volume-storage.ts';
 import type { AppsRepositoryContract } from '#repositories/apps.repository.ts';
 import type { ArtifactStorageRepositoryContract } from '#repositories/artifact-storage.repository.ts';
 import type {
@@ -180,11 +181,7 @@ export class ImportsService extends Service {
     if (!app) {
       throw new NotFoundError(NO_SUCH_APP);
     }
-    if (app.volume_storage_bucket !== null) {
-      throw new ConflictError(
-        'Initial data archives use nibrun storage and cannot be imported into a customer volume.',
-      );
-    }
+    requireManagedImportStorage(app.volume_storage_bucket);
   }
 
   private async fetchArchive({

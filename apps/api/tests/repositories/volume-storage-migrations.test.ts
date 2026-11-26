@@ -14,14 +14,12 @@ import { ArtifactIdSchema, OwnerIdSchema } from '#lib/api/identifiers.ts';
 import { ConflictError } from '#lib/errors.ts';
 import { OperationClient } from '#lib/operation-client.ts';
 import { openSecret, sealSecret } from '#lib/tenant-secrets.ts';
+import type { VolumeStorageDestination } from '#lib/volume-storage.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
 import { ExportsRepository } from '#repositories/exports.repository.ts';
-import {
-  type VolumeStorageMigrationDestination,
-  VolumeStorageMigrationsRepository,
-} from '#repositories/volume-storage-migrations.repository.ts';
+import { VolumeStorageMigrationsRepository } from '#repositories/volume-storage-migrations.repository.ts';
 import { startTestDatabase, stopTestDatabase } from '#tests/support/database.ts';
 import { registerHost } from '#tests/support/hosts.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
@@ -72,7 +70,7 @@ function sealed(plaintext: string) {
   return sealSecret({ key: TEST_SECRETS_KEY, plaintext });
 }
 
-function destination(auth: S3VolumeAuth): VolumeStorageMigrationDestination {
+function destination(auth: S3VolumeAuth): VolumeStorageDestination {
   return {
     volume_storage_endpoint: 'https://objects.example.test',
     volume_storage_bucket: 'customer-data',

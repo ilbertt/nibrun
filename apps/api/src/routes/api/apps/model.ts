@@ -73,6 +73,8 @@ export const AppResponseSchema = t.Composite([
   }),
 ]);
 
+export const AppRequestErrorSchema = t.Object({ error: t.String() });
+
 export const ListAppsResponseSchema = t.Object({ apps: t.Array(AppResponseSchema) });
 
 // A name, not a URL: the hostname is derived from it once and never follows a rename.

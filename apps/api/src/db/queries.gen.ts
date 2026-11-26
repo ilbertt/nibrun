@@ -273,11 +273,6 @@ export interface IInsertAppResult {
     id: IAppsColumns["id"];
 }
 
-/** Result of query `InsertAppConfig`. */
-export interface IInsertAppConfigResult {
-    id: string;
-}
-
 /** Result of query `InsertAppHostname`. */
 export interface IInsertAppHostnameResult {
     hostname: IAppHostnamesColumns["hostname"];
@@ -558,6 +553,24 @@ export interface IDeleteAppUsageByAppResult {
 export interface IUpdateAppStateResult {
 }
 
+/** Result of query `InsertAppConfig`. */
+export interface IInsertAppConfigResult {
+    id: string;
+}
+
+/** Result of query `SelectCustomBucketPermission`. */
+export interface ISelectCustomBucketPermissionResult {
+    feature_custom_buckets_allowed: IProfilesColumns["feature_custom_buckets_allowed"];
+}
+
+/** Result of query `SelectBucketAssignmentState`. */
+export interface ISelectBucketAssignmentStateResult {
+    state: IAppsColumns["state"];
+    volume_storage_bucket: IAppConfigsColumns["volume_storage_bucket"];
+    importing: boolean | null;
+    exporting: boolean | null;
+}
+
 /** Result of query `TouchApp`. */
 export interface ITouchAppResult {
 }
@@ -602,11 +615,6 @@ export interface ISelectCurrentAppConfigResult {
     volume_storage_session_token: IAppConfigsColumns["volume_storage_session_token"];
     /** Sealed with TENANT_SECRETS_KEY. */
     volume_storage_encryption_password: IAppConfigsColumns["volume_storage_encryption_password"];
-}
-
-/** Result of query `InsertPatchedAppConfig`. */
-export interface IInsertPatchedAppConfigResult {
-    id: string;
 }
 
 /** Result of query `SelectAppForUpdate`. */
@@ -1071,7 +1079,7 @@ export interface ISelectDeploymentHeldByAppResult {
 
 /** Result of query `SelectAppAwaitingData`. */
 export interface ISelectAppAwaitingDataResult {
-    id: IAppsColumns["id"];
+    volume_storage_bucket: IAppConfigsColumns["volume_storage_bucket"];
 }
 
 /** Result of query `SelectUsableImport`. */
@@ -1205,6 +1213,11 @@ export interface ISelectValidGitHubDeploymentGrantResult {
 /** Result of query `SelectHealthPing`. */
 export interface ISelectHealthPingResult {
     ok: number | null;
+}
+
+/** Result of query `SelectImportVolumeStorage`. */
+export interface ISelectImportVolumeStorageResult {
+    volume_storage_bucket: IAppConfigsColumns["volume_storage_bucket"];
 }
 
 /** Result of query `InsertPendingImport`. */
@@ -1452,7 +1465,6 @@ export interface Queries {
     SelectAppOwnership: ISelectAppOwnershipResult;
     SelectAppsAllowed: ISelectAppsAllowedResult;
     InsertApp: IInsertAppResult;
-    InsertAppConfig: IInsertAppConfigResult;
     InsertAppHostname: IInsertAppHostnameResult;
     SelectCreatedApp: ISelectCreatedAppResult;
     SelectAppsByOwner: ISelectAppsByOwnerResult;
@@ -1473,9 +1485,11 @@ export interface Queries {
     DeleteArtifactsByApp: IDeleteArtifactsByAppResult;
     DeleteAppUsageByApp: IDeleteAppUsageByAppResult;
     UpdateAppState: IUpdateAppStateResult;
+    InsertAppConfig: IInsertAppConfigResult;
+    SelectCustomBucketPermission: ISelectCustomBucketPermissionResult;
+    SelectBucketAssignmentState: ISelectBucketAssignmentStateResult;
     TouchApp: ITouchAppResult;
     SelectCurrentAppConfig: ISelectCurrentAppConfigResult;
-    InsertPatchedAppConfig: IInsertPatchedAppConfigResult;
     SelectAppForUpdate: ISelectAppForUpdateResult;
     SelectProfileForAppCreate: ISelectProfileForAppCreateResult;
     SelectAppsLeft: ISelectAppsLeftResult;
@@ -1525,6 +1539,7 @@ export interface Queries {
     InsertGitHubDeploymentGrant: IInsertGitHubDeploymentGrantResult;
     SelectValidGitHubDeploymentGrant: ISelectValidGitHubDeploymentGrantResult;
     SelectHealthPing: ISelectHealthPingResult;
+    SelectImportVolumeStorage: ISelectImportVolumeStorageResult;
     InsertPendingImport: IInsertPendingImportResult;
     CompleteImport: ICompleteImportResult;
     DeleteImport: IDeleteImportResult;

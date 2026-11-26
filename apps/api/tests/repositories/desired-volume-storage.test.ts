@@ -5,6 +5,7 @@ import {
   AppIdSchema,
   DeploymentIdSchema,
   type HostId,
+  HostnameSchema,
   HttpPortSchema,
   type S3VolumeAuth,
   type S3VolumeStorage,
@@ -13,9 +14,14 @@ import {
 import { Value } from '@sinclair/typebox/value';
 import type { SQL } from 'bun';
 import { type Queries, schema } from '#db/queries.gen.ts';
+import { AppNameSchema } from '#lib/api/app.ts';
+import { DnsLabelSchema } from '#lib/api/dns-label.ts';
 import { OwnerIdSchema } from '#lib/api/identifiers.ts';
+import { configWithDefaults } from '#lib/app-config.ts';
+import { ConflictError, ForbiddenError } from '#lib/errors.ts';
 import { OperationClient } from '#lib/operation-client.ts';
 import { openSecret, sealSecret } from '#lib/tenant-secrets.ts';
+import { sealVolumeStorage } from '#lib/volume-storage.ts';
 import { AgentRepository } from '#repositories/agent.repository.ts';
 import { AppsRepository } from '#repositories/apps.repository.ts';
 import { DeploymentsRepository } from '#repositories/deployments.repository.ts';
@@ -422,6 +428,92 @@ test('custom bucket assignments require the app owner’s grant and survive its 
   }
   await insertConfig({ slug, storage: undefined });
   await expect(insertConfig(assignment)).rejects.toMatchObject({ errno: '42501' });
+});
+
+test('creating an app with a customer bucket checks its owner and allocates its prefix atomically', async () => {
+  const repo = new AppsRepository(withTypes<Queries>(sql));
+  const ownerId = Value.Parse(OwnerIdSchema, 'bucket-create-owner');
+  await sql.unsafe(
+    `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+     VALUES ($1, $1, $2, true, now(), now())`,
+    [ownerId, `${ownerId}@example.test`],
+  );
+  const input = {
+    client: OperationClient.Cli,
+    name: Value.Parse(AppNameSchema, 'bucket-create'),
+    slug: Value.Parse(DnsLabelSchema, 'bucket-create'),
+    hostname: Value.Parse(HostnameSchema, 'bucket-create.apps.test'),
+    ownerId,
+    anonymousAppsAtMost: null,
+    config: { ...configWithDefaults(), environment: {} },
+    storage: sealVolumeStorage({ storage: storage(ACCESS_KEY_AUTH), key: TEST_SECRETS_KEY }),
+  };
+  await expect(repo.create(input)).rejects.toBeInstanceOf(ForbiddenError);
+  expect(await repo.listByOwner({ ownerId })).toEqual([]);
+  await sql.unsafe(
+    'UPDATE nibrun.profiles SET feature_custom_buckets_allowed = true WHERE owner_id = $1',
+    [ownerId],
+  );
+  const result = await repo.create(input);
+  if (result.outcome !== 'created') {
+    throw new Error('Expected app creation.');
+  }
+  expect(result.app.volume_storage_prefix).toBe(`apps/${result.app.id}`);
+  expect(result.app.volume_storage_bucket).toBe('customer-bucket');
+  expect(result.app).not.toHaveProperty('volume_storage_encryption_password');
+});
+
+test('a bucket patch to a deployed app preserves its deployed volume until redeployment', async () => {
+  const repo = new AppsRepository(withTypes<Queries>(sql));
+  const slug = 'bucket-update';
+  const appId = Value.Parse(AppIdSchema, await createApp(slug));
+  await insertConfig({ slug, storage: undefined });
+  await deployApp(slug);
+  const requested = storage(ACCESS_KEY_AUTH);
+  const assignment = {
+    appId,
+    ownerId: OWNER_ID,
+    client: OperationClient.Cli,
+    patch: {
+      name: undefined,
+      storage: sealVolumeStorage({ storage: requested, key: TEST_SECRETS_KEY }),
+    },
+  };
+  const wrongOwner = Value.Parse(OwnerIdSchema, 'different-owner');
+  expect(await repo.update({ ...assignment, ownerId: wrongOwner })).toBeNull();
+  await sql.unsafe(
+    'UPDATE nibrun.profiles SET feature_custom_buckets_allowed = false WHERE owner_id = $1',
+    [OWNER_ID],
+  );
+  try {
+    await expect(repo.update(assignment)).rejects.toBeInstanceOf(ForbiddenError);
+  } finally {
+    await sql.unsafe(
+      'UPDATE nibrun.profiles SET feature_custom_buckets_allowed = true WHERE owner_id = $1',
+      [OWNER_ID],
+    );
+  }
+  const exports = new ExportsRepository(withTypes<Queries>(sql));
+  const exportRequest = { appId, ownerId: OWNER_ID, expiresAt: new Date() };
+  const pending = await exports.request(exportRequest);
+  expect(pending).not.toBeNull();
+  await expect(repo.update(assignment)).rejects.toBeInstanceOf(ConflictError);
+  await exports.failInFlight({ appId, message: 'test complete' });
+  const prefix = Value.Parse(S3VolumeStorageSchema.properties.prefix, `apps/${appId}`);
+  expect(await repo.update(assignment)).toMatchObject({
+    volume_storage_bucket: requested.bucket,
+    volume_storage_prefix: prefix,
+  });
+  await expect(exports.request(exportRequest)).rejects.toBeInstanceOf(ConflictError);
+  expect(
+    (await desiredVolumes()).find((volume) => volume.appId === appId)?.storage,
+  ).toBeUndefined();
+  await deployApp(slug);
+  expect((await desiredVolumes()).find((volume) => volume.appId === appId)?.storage).toEqual({
+    ...requested,
+    prefix,
+  });
+  await expect(repo.update(assignment)).rejects.toBeInstanceOf(ConflictError);
 });
 
 async function createApp(slug: string) {
