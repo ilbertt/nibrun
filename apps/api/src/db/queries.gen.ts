@@ -2311,6 +2311,7 @@ export interface IProfilesColumns {
     quota_apps_max_count: number;
     /** How long an app of this owner's is kept before it is deleted; null keeps it until the owner does. */
     app_lifetime_seconds: number | null;
+    feature_custom_buckets_allowed: boolean;
 }
 
 /** Schema of `profiles`. */
@@ -3107,7 +3108,8 @@ export const schema = {
             created_at: { _columnName: "created_at", _foreignKeys: {} },
             updated_at: { _columnName: "updated_at", _foreignKeys: {} },
             quota_apps_max_count: { _columnName: "quota_apps_max_count", _foreignKeys: {} },
-            app_lifetime_seconds: { _columnName: "app_lifetime_seconds", _foreignKeys: {} }
+            app_lifetime_seconds: { _columnName: "app_lifetime_seconds", _foreignKeys: {} },
+            feature_custom_buckets_allowed: { _columnName: "feature_custom_buckets_allowed", _foreignKeys: {} }
         },
         _indexes: {
             profiles_owner_id_key: { _indexName: "profiles_owner_id_key" },

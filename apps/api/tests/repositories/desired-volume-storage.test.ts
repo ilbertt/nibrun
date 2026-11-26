@@ -44,6 +44,10 @@ beforeAll(async function startDatabase() {
     `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
      VALUES ('owner', 'owner', 'owner@example.test', true, now(), now())`,
   );
+  await sql.unsafe(
+    'UPDATE nibrun.profiles SET feature_custom_buckets_allowed = true WHERE owner_id = $1',
+    [OWNER_ID],
+  );
   await createApp(SHARED_APP);
   await insertConfig({ slug: SHARED_APP, storage: undefined });
   await deployApp(SHARED_APP);
@@ -376,6 +380,48 @@ test.each([
   expect(after.count).toBe(before.count);
   expect(rollback?.args).toEqual([]);
   expect((await desiredVolumes()).find((one) => one.appId === appId)).toEqual(volume);
+});
+
+test('custom bucket assignments require the app owner’s grant and survive its revocation', async () => {
+  const ownerId = 'bucket-permission-owner';
+  const slug = 'bucket-permission';
+  await sql.unsafe(
+    `INSERT INTO auth."user" (id, name, email, "emailVerified", "createdAt", "updatedAt")
+     VALUES ($1, $1, $2, true, now(), now())`,
+    [ownerId, `${ownerId}@example.test`],
+  );
+  await sql.unsafe('INSERT INTO nibrun.apps (owner_id, name, slug) VALUES ($1, $2, $2)', [
+    ownerId,
+    slug,
+  ]);
+  const configured = storage(ACCESS_KEY_AUTH);
+  const assignment = { slug, storage: configured };
+  await insertConfig({ slug, storage: undefined });
+  await expect(insertConfig(assignment)).rejects.toMatchObject({ errno: '42501' });
+  await sql.unsafe(
+    'UPDATE nibrun.profiles SET feature_custom_buckets_allowed = true WHERE owner_id = $1',
+    [ownerId],
+  );
+  await insertConfig(assignment);
+  await sql.unsafe(
+    'UPDATE nibrun.profiles SET feature_custom_buckets_allowed = false WHERE owner_id = $1',
+    [ownerId],
+  );
+  await insertConfig(assignment);
+  for (const changed of [
+    { bucket: 'another-bucket' },
+    { endpoint: 'https://another.example.test' },
+    { prefix: 'another-prefix/' },
+  ]) {
+    await expect(
+      insertConfig({
+        slug,
+        storage: Value.Parse(S3VolumeStorageSchema, { ...configured, ...changed }),
+      }),
+    ).rejects.toMatchObject({ errno: '42501' });
+  }
+  await insertConfig({ slug, storage: undefined });
+  await expect(insertConfig(assignment)).rejects.toMatchObject({ errno: '42501' });
 });
 
 async function createApp(slug: string) {
