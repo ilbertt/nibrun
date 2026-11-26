@@ -160,6 +160,11 @@ an exact patch tag requires an explicit bump to receive the next patch release. 
 use `--pull` to refresh their base images. Guest-image and runtime toolchain digests remain
 pinned separately because they are inputs to reproducible artifacts.
 
+The control-plane deploy starts a temporary replica on the same Tunnel before replacing
+`cloudflared`. Each connector must pass its tunnel readiness check before the deploy
+stops the other. If the primary fails to become ready, the replica stays up through the
+next deploy. Long-lived connections can still close when their connector finishes draining.
+
 Control-plane deploys prune unused Docker images, including tagged releases, before pulling
 and again after the health gate and Caddy reload. Images created within the last 24 hours stay
 cached for rollbacks; every image referenced by a container is preserved regardless of age.

@@ -62,6 +62,8 @@ const remoteScript = `
 set -euo pipefail
 timeout 600 bash -c 'until [ -f /opt/nibrun-bootstrap.done ]; do echo waiting for instance bootstrap; sleep 5; done'
 mkdir -p /opt/nibrun
+exec 9>/opt/nibrun/deploy.lock
+flock -w 600 9
 aws s3 cp ${quote(bundleUrl)} /tmp/bundle.tar.gz
 tar xzf /tmp/bundle.tar.gz --overwrite -C /opt/nibrun
 cd /opt/nibrun

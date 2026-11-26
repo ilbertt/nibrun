@@ -8,7 +8,7 @@ import { repoRoot } from '#shared/paths.ts';
 
 const COMPOSE_FILES = ['docker-compose.yml', 'docker-compose.prod.yml'];
 // Shell, not TypeScript: these run on the box, which has no Bun.
-const ON_BOX_SCRIPTS = ['on_box_deploy.sh', 'ensure_data_volume.sh'];
+const ON_BOX_SCRIPTS = ['on_box_deploy.sh', 'ensure_data_volume.sh', 'upgrade_cloudflared.sh'];
 // Ships as a directory because that is how it is mounted: the proxy reads
 // through the directory, so replacing a file in it cannot leave the running
 // container on the old inode. Holds the Caddyfile and generated authentication rules.

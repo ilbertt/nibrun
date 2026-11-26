@@ -141,7 +141,7 @@ GRAFANA_HOSTNAME=${GRAFANA_HOSTNAME}
 GRAFANA_PORT=${GRAFANA_PORT}
 EOF
 
-compose="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+export COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
 
 # `compose up` reports a taken port as a docker-proxy bind failure minutes in,
 # costing a CI round trip to learn what the box knew before it started. The edge
@@ -169,16 +169,19 @@ require_free_port METRICS_INGEST_PORT "${METRICS_INGEST_PORT}"
 prune_unused_images
 
 log "Pulling images"
-$compose pull
+docker compose pull
 
 log "Starting Umami before exposing its public route"
-$compose up -d --wait --wait-timeout 180 umami
+docker compose up -d --wait --wait-timeout 180 umami
 log "Seeding Umami administrator, website and MCP key"
-UMAMI_MCP_API_KEY="$UMAMI_MCP_API_KEY" $compose exec -T -e UMAMI_MCP_API_KEY \
+UMAMI_MCP_API_KEY="$UMAMI_MCP_API_KEY" docker compose exec -T -e UMAMI_MCP_API_KEY \
   umami node --input-type=module < seed-umami.mjs
 
+log "Checking for a tunnel connector upgrade"
+bash upgrade_cloudflared.sh
+
 log "Starting services (up -d --remove-orphans)"
-$compose up -d --remove-orphans
+docker compose up -d --pull never --remove-orphans
 
 # Gate the deploy on container health: every long-running service must report a
 # `healthy` healthcheck, and one-shot services (migrations) must have exited 0.
@@ -199,13 +202,13 @@ while :; do
       unhealthy="${unhealthy}${name}: state=${state}\n"
     fi
   done <<EOF
-$($compose ps -a --format '{{.Name}}|{{.State}}|{{.Health}}|{{.ExitCode}}')
+$(docker compose ps -a --format '{{.Name}}|{{.State}}|{{.Health}}|{{.ExitCode}}')
 EOF
   [ -z "$unhealthy" ] && { log "All containers healthy"; break; }
   if [ "$SECONDS" -ge "$deadline" ]; then
     log "Containers not healthy after timeout:"
     printf '%b' "$unhealthy"
-    $compose ps -a --format 'table {{.Name}}\t{{.Status}}'
+    docker compose ps -a --format 'table {{.Name}}\t{{.Status}}'
     exit 1
   fi
   sleep 5
@@ -221,14 +224,14 @@ done
 # without it Caddy compares the two configs, finds them identical and skips the
 # reload — leaving the old certificate served until something restarts it.
 log "Reloading Caddy"
-$compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --force
+docker compose exec -T caddy caddy reload --config /etc/caddy/Caddyfile --force
 
 prune_unused_images
 
 log "Compose service status"
-$compose ps -a --format 'table {{.Name}}\t{{.Status}}'
+docker compose ps -a --format 'table {{.Name}}\t{{.Status}}'
 
 log "Image versions"
-$compose images
+docker compose images
 
 log "Deploy finished"

@@ -75,9 +75,11 @@ services:
       - nibrun
 
   # The named Tunnel reaches Caddy without publishing a public host port.
-  cloudflared:
+  cloudflared: &tunnel-connector
     image: cloudflare/cloudflared:latest
     container_name: cloudflared
+    # Allow cloudflared's 30-second request drain to finish before Docker sends SIGKILL.
+    stop_grace_period: 40s
     restart: always
     read_only: true
     cap_drop: [ALL]
@@ -102,6 +104,11 @@ services:
       start_period: 30s
     networks:
       - nibrun
+
+  cloudflared-upgrade:
+    <<: *tunnel-connector
+    container_name: cloudflared-upgrade
+    profiles: [tunnel-upgrade]
 
   prometheus:
     ports: !reset []
