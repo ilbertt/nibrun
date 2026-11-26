@@ -9,12 +9,6 @@ type ResourceChange = {
   change: { actions: string[] };
 };
 
-// Remove these exceptions after the standalone log endpoint retirement is deployed.
-const RETIRED_PUBLIC_LOG_RESOURCES = [
-  'cloudflare_dns_record.control_plane["logs.nibrun.com"]',
-  'cloudflare_zero_trust_access_application.control_plane["logs"]',
-];
-
 export function terraform(args: string[]) {
   return $`terraform ${args}`.cwd(terraformDir);
 }
@@ -38,13 +32,12 @@ export function terraformInit() {
 export async function failOnUnexpectedDestroys(planFile: string) {
   const plan = await terraform(['show', '-json', planFile]).quiet().json();
 
-  const allowed = new Set([
-    ...RETIRED_PUBLIC_LOG_RESOURCES,
-    ...(optionalEnv('ALLOWED_TERRAFORM_DESTROY_ADDRESSES') ?? '')
+  const allowed = new Set(
+    (optionalEnv('ALLOWED_TERRAFORM_DESTROY_ADDRESSES') ?? '')
       .split('\n')
       .map((line) => line.trim())
       .filter(Boolean),
-  ]);
+  );
 
   const destroyed = [
     ...new Set(

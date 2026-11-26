@@ -186,6 +186,4 @@ because `preinstall_disabled` also disables explicitly configured synchronous pr
 That flag keeps the other default plugins from being downloaded. The plugin requires
 VictoriaLogs 1.54.0 or newer. Keep the log store compatible when updating the plugin.
 VictoriaLogs has no public hostname. Grafana and the API query it over Docker networking;
-fleet writes use the private ingest listener. The Terraform deletion guard temporarily
-allowlists the retired `logs.nibrun.com` DNS record and its Access app; remove those exceptions
-after the retirement deploys.
+fleet writes use the private ingest listener.
