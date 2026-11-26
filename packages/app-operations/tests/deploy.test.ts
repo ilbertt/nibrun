@@ -169,7 +169,7 @@ test('an unchanged local binary reuses this app artifact and still releases the 
     {
       what: 'app patch',
       body: {
-        config: { access: { kind: 'public' }, args: ['serve'], environment: { MODE: 'updated' } },
+        config: { args: ['serve'], environment: { MODE: 'updated' } },
       },
     },
     { what: 'list artifacts', body: APP_ID },
@@ -382,7 +382,7 @@ test('config is written before the deployment that snapshots it', async () => {
 
   expect(sent[0]).toEqual({
     what: 'app patch',
-    body: { config: { access: { kind: 'public' }, args: ['serve'], httpPort: PORT } },
+    body: { config: { args: ['serve'], httpPort: PORT } },
   });
   expect(sent.at(-1)?.what).toBe('deployment');
 });

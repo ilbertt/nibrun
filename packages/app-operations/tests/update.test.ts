@@ -4,24 +4,14 @@ import { APP_ID, SLUG } from '#tests/support/app.ts';
 import { updateApp } from '#update.ts';
 
 const HTTP_BAD_REQUEST = 400;
-const JWT_ACCESS = {
-  kind: 'jwt',
-  issuer: 'https://id.example',
-  audiences: ['reports'],
-  token: { header: 'Authorization', format: 'bearer' },
-  publicKeys: { url: 'https://id.example/keys' },
-} as const;
-
 type Sent = { appId: string; body: unknown };
 
 function apiRecording(sent: Sent[]) {
   return apiHolding({
     underApp: ({ appId }) => ({
-      get: answering({
-        config: {
-          access: JWT_ACCESS,
-        },
-      }),
+      get: () => {
+        throw new Error('A partial update must not read and resend the current config.');
+      },
       patch: (body: { name?: string }) => {
         sent.push({ appId, body });
         if (body.name === '') {
@@ -58,7 +48,6 @@ test('config and name travel in one patch', async () => {
   expect(sent[0]?.body).toEqual({
     name: 'Loud Badger',
     config: {
-      access: JWT_ACCESS,
       httpPort: 8080,
     },
   });
