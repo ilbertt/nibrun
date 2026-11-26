@@ -46,6 +46,7 @@ services:
       # The security group admits only the fleet's control and log sources.
       - "${INTERNAL_PORT}:${INTERNAL_PORT}"
       - "${LOG_INGEST_PORT}:${LOG_INGEST_PORT}"
+      - "${METRICS_INGEST_PORT}:${METRICS_INGEST_PORT}"
     healthcheck:
       test:
         ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:2019/config/ || exit 1"]
@@ -58,6 +59,7 @@ services:
       - DOZZLE_HOSTNAME
       - VICTORIALOGS_HOSTNAME
       - UMAMI_HOSTNAME
+      - GRAFANA_HOSTNAME
       - UMAMI_MCP_API_KEY=${UMAMI_MCP_API_KEY:?}
       - INTERNAL_PORT
       # Without this the Caddyfile's `:{$LOG_INGEST_PORT}` site address expands
@@ -65,6 +67,7 @@ services:
       # listener simply does not exist and every shipper on the fleet gets a
       # connection refused.
       - LOG_INGEST_PORT
+      - METRICS_INGEST_PORT
     volumes:
       - ./caddy:/etc/caddy:ro
       - umami-mcp-socket:/run/umami-mcp
@@ -73,7 +76,7 @@ services:
 
   # The named Tunnel reaches Caddy without publishing a public host port.
   cloudflared:
-    image: cloudflare/cloudflared:2026.10.5
+    image: cloudflare/cloudflared:latest
     container_name: cloudflared
     restart: always
     read_only: true
@@ -99,6 +102,16 @@ services:
       start_period: 30s
     networks:
       - nibrun
+
+  prometheus:
+    ports: !reset []
+
+  grafana:
+    ports: !reset []
+    environment:
+      - GF_SERVER_ROOT_URL=https://${GRAFANA_HOSTNAME}
+      - GF_SECURITY_COOKIE_SECURE=true
+      - GF_SECURITY_COOKIE_SAMESITE=strict
 
   # Host port-forwards must not bypass the Tunnel's Access validation.
   victorialogs:
@@ -177,3 +190,15 @@ volumes:
       type: none
       o: bind
       device: /data/volumes/victorialogs-data
+
+  prometheus-data:
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/volumes/prometheus-data
+
+  grafana-data:
+    driver_opts:
+      type: none
+      o: bind
+      device: /data/volumes/grafana-data

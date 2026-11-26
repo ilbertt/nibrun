@@ -6,7 +6,9 @@
         "$TURBO_DEFAULT$",
         "$TURBO_ROOT$/infra/nibrunner-host/deploy/prune_agent_versions.sh",
         "$TURBO_ROOT$/infra/nibrunner-host/deploy/install_tunnel.sh",
-        "$TURBO_ROOT$/infra/nibrunner-host/systemd/nibrun-nibrunner-tunnel.service"
+        "$TURBO_ROOT$/infra/nibrunner-host/systemd/nibrun-nibrunner-tunnel.service",
+        "$TURBO_ROOT$/infra/nibrunner-host/deploy/install_metrics.sh",
+        "$TURBO_ROOT$/infra/nibrunner-host/systemd/nibrun-nibrunner-metrics.service"
       ]
     }
   }
