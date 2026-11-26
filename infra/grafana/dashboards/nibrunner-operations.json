@@ -12,6 +12,14 @@
     "from": "now-24h",
     "to": "now"
   },
+  "links": [
+    {
+      "title": "Logs",
+      "type": "link",
+      "url": "/d/nibrunner-logs",
+      "keepTime": true
+    }
+  ],
   "templating": {
     "list": []
   },

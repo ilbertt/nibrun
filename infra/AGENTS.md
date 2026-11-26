@@ -200,3 +200,6 @@ plugin. Its version is pinned in the container entrypoint and installed before G
 because `preinstall_disabled` also disables explicitly configured synchronous preinstalls.
 That flag keeps the other default plugins from being downloaded. The plugin requires
 VictoriaLogs 1.54.0 or newer. Keep the log store compatible when updating the plugin.
+The operations dashboard links to `nibrunner logs`, which provides a LogsQL search box and
+log details for the anonymous Viewer role. That role can query data sources but cannot open
+Explore, so a data source alone does not provide a usable log viewer.
