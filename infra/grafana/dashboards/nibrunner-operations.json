@@ -504,8 +504,9 @@
       }
     },
     {
-      "title": "Host convergence",
-      "type": "timeseries",
+      "title": "App convergence",
+      "description": "Whether every app matches its requested deployment and state at the end of the selected time range. Missing samples or samples older than two minutes show Unknown.",
+      "type": "stat",
       "datasource": {
         "type": "prometheus",
         "uid": "nibrunner-prometheus"
@@ -513,35 +514,170 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "nibrunner_host_converged{job=\"nibrunner\"}",
-          "legendFormat": "{{instance}} converged"
-        },
-        {
-          "refId": "B",
-          "expr": "nibrunner_host_isolated{job=\"nibrunner\"}",
-          "legendFormat": "{{instance}} isolated"
+          "expr": "nibrunner_host_converged{job=\"nibrunner\"} and (time() - timestamp(nibrunner_host_converged{job=\"nibrunner\"}) <= 120)",
+          "legendFormat": "{{instance}}",
+          "instant": true,
+          "range": false
         }
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "short",
-          "custom": {
-            "spanNulls": false
-          }
+          "unit": "none",
+          "noValue": "Unknown",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "Pending", "color": "yellow" },
+                "1": { "text": "Converged", "color": "green" }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": { "text": "Unknown", "color": "gray" }
+              }
+            }
+          ]
         }
       },
       "options": {
-        "tooltip": {
-          "mode": "multi"
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "wideLayout": false,
+        "text": { "valueSize": 20, "titleSize": 12 },
+        "reduceOptions": {
+          "calcs": ["last"],
+          "fields": "",
+          "values": false
         }
       },
       "id": 14,
       "gridPos": {
-        "h": 8,
-        "w": 12,
+        "h": 3,
+        "w": 6,
         "x": 12,
         "y": 48
       }
+    },
+    {
+      "id": 15,
+      "title": "Host isolation",
+      "description": "Whether the host isolation ruleset is applied. When it is not, nibrunner blocks app starts and wakes. Missing samples or samples older than two minutes show Unknown.",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "nibrunner_host_isolated{job=\"nibrunner\"} and (time() - timestamp(nibrunner_host_isolated{job=\"nibrunner\"}) <= 120)",
+          "legendFormat": "{{instance}}",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "none",
+          "noValue": "Unknown",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": { "text": "Not applied", "color": "red" },
+                "1": { "text": "Applied", "color": "green" }
+              }
+            },
+            {
+              "type": "special",
+              "options": {
+                "match": "null",
+                "result": { "text": "Unknown", "color": "gray" }
+              }
+            }
+          ]
+        }
+      },
+      "options": {
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "textMode": "value_and_name",
+        "wideLayout": false,
+        "text": { "valueSize": 20, "titleSize": 12 },
+        "reduceOptions": {
+          "calcs": ["last"],
+          "fields": "",
+          "values": false
+        }
+      },
+      "gridPos": { "h": 3, "w": 6, "x": 18, "y": 48 }
+    },
+    {
+      "id": 16,
+      "title": "Apps not converged",
+      "description": "Apps whose deployment or state differs from the requested one. Select an app to view its logs. Only samples from the last two minutes are shown; check host status to distinguish all apps converged from missing telemetry.",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "nibrunner-prometheus"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "(nibrunner_app_converged{job=\"nibrunner\"} == 0) and (time() - timestamp(nibrunner_app_converged{job=\"nibrunner\"}) <= 120)",
+          "format": "table",
+          "instant": true,
+          "range": false
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true,
+              "job": true,
+              "__name__": true
+            },
+            "indexByName": { "app": 0, "instance": 1 },
+            "renameByName": { "app": "App", "instance": "Host" }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "custom": { "filterable": true } },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "App" },
+            "properties": [
+              { "id": "custom.width", "value": 270 },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "View app logs",
+                    "url": "/d/nibrunner-logs?var-query=appId%3A%3D%22${__value.raw:percentencode}%22&from=${__from}&to=${__to}",
+                    "targetBlank": false
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [{ "displayName": "App", "desc": false }]
+      },
+      "gridPos": { "h": 5, "w": 12, "x": 12, "y": 51 }
     }
   ]
 }
