@@ -90,6 +90,14 @@ http://{$API_HOSTNAME} {
 	}
 }
 
+http://{$GRAFANA_HOSTNAME} {
+	reverse_proxy grafana:3000 {
+		header_up X-Forwarded-Proto https
+		lb_try_duration 30s
+		lb_try_interval 250ms
+	}
+}
+
 http://{$DOZZLE_HOSTNAME} {
 	# Log streaming is a websocket; reverse_proxy upgrades it as-is, and the
 	# retries below sit before the upgrade, where a dial that never connected is
