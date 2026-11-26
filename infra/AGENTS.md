@@ -84,7 +84,7 @@ derives the Tunnel's Access team name from the existing organization's auth doma
 protected route's accepted audience from its Access application. `cloudflared` rejects requests
 without a valid token before forwarding them to Caddy. Production publishes no host ports for
 these dashboards; local development keeps the loopback bindings.
-Access is the only login for Dozzle and VictoriaLogs. Deployments no longer generate or read
+Access is the only login for Grafana, Dozzle and VictoriaLogs. Deployments no longer generate or read
 their former password credentials. Terraform deletes the former SSM parameters and password
 generators when they are removed from configuration. The API's private log queries and the
 fleet's VPC log-ingest listener do not pass through Access.
@@ -175,6 +175,7 @@ the persistent data volume; WAL and head chunks need additional disk space.
 
 Grafana queries Prometheus over Docker networking and has its own persistent volume and
 512 MiB memory limit. `GRAFANA_HOSTNAME` is a repository variable passed through Terraform.
-The hostname requires Cloudflare Access and Grafana login; the initial `admin` password is
-the `grafana_admin_password` SSM parameter. Production publishes no Grafana host port.
+Cloudflare Access is the only login. Grafana grants anonymous Viewer access inside the trusted
+proxy boundary, disables its login form and basic authentication, and creates no initial admin
+user. Production publishes no Grafana host port.
 The operations dashboard and data source are file-provisioned under `infra/grafana/`.

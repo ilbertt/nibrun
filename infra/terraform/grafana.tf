@@ -8,17 +8,6 @@ variable "grafana_hostname" {
   }
 }
 
-resource "random_password" "grafana_admin_password" {
-  length  = 32
-  special = false
-}
-
-resource "aws_ssm_parameter" "grafana_admin_password" {
-  name  = "${var.ssm_secret_prefix}/grafana_admin_password"
-  type  = "SecureString"
-  value = random_password.grafana_admin_password.result
-}
-
 output "grafana_hostname" {
   value = var.grafana_hostname
 }
