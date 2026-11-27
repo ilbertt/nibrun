@@ -145,7 +145,8 @@ export const DesiredExportSchema = Type.Object({
   appId: AppIdSchema,
   volumeId: VolumeIdSchema,
   objectKey: ObjectKeySchema,
-  artifact: DesiredArtifactSchema,
+  artifact: DesiredRuntimeArtifactSchema,
+  config: Type.Optional(Type.Pick(AppConfigSchema, ['httpPort', 'args'])),
   environment: Type.Optional(TenantEnvironmentSchema),
   desiredState: DesiredPresenceSchema,
 });
