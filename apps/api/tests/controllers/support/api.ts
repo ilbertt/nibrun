@@ -16,6 +16,8 @@ Object.assign(process.env, {
   BETTER_AUTH_SECRET: 'x'.repeat(BETTER_AUTH_SECRET_LENGTH),
   GITHUB_CLIENT_ID: 'test',
   GITHUB_CLIENT_SECRET: 'test',
+  GOOGLE_CLIENT_ID: 'test',
+  GOOGLE_CLIENT_SECRET: 'test',
   S3_ENDPOINT: 'http://127.0.0.1:1',
   VICTORIALOGS_ENDPOINT: 'http://127.0.0.1:1',
   ARTIFACTS_BUCKET: 'test',

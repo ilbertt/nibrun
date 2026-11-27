@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { bunSqlAdapter } from '@ilbertt/better-auth-bun-sql';
+import { SignInProvider } from '@repo/api-constants';
 import { SQL } from 'bun';
 import { StatusMap } from 'elysia';
+import { exportJWK, generateKeyPair, SignJWT } from 'jose';
 import { TEST_SECRETS_KEY_BASE64 } from '#tests/support/secrets.ts';
 
 const ORIGIN = 'http://localhost:3000';
@@ -21,6 +23,8 @@ Object.assign(process.env, {
   ),
   GITHUB_CLIENT_ID: 'test',
   GITHUB_CLIENT_SECRET: 'test',
+  GOOGLE_CLIENT_ID: 'test',
+  GOOGLE_CLIENT_SECRET: 'test',
   S3_ENDPOINT: 'http://127.0.0.1:1',
   VICTORIALOGS_ENDPOINT: 'http://127.0.0.1:1',
   ARTIFACTS_BUCKET: 'test',
@@ -33,11 +37,42 @@ Object.assign(process.env, {
   TENANT_SECRETS_KEY: TEST_SECRETS_KEY_BASE64,
 });
 
+const googleKeys = await generateKeyPair('RS256');
+const googleJwk = {
+  ...(await exportJWK(googleKeys.publicKey)),
+  kid: 'test-google-key',
+  alg: 'RS256',
+};
+const googleProfile = {
+  sub: 'google-owner',
+  email: 'new-owner@gmail.com',
+  name: 'Google owner',
+  email_verified: true,
+  hd: undefined as string | undefined,
+};
+let googleNonce: string | null = null;
 let githubId = NEW_GITHUB_ID;
 const originalFetch = globalThis.fetch;
 globalThis.fetch = Object.assign(
-  function githubResponse(input: string | URL | Request) {
+  async function providerResponse(input: string | URL | Request) {
     const url = String(input instanceof Request ? input.url : input);
+    if (url === 'https://www.googleapis.com/oauth2/v3/certs') {
+      return Response.json({ keys: [googleJwk] });
+    }
+    if (url === 'https://oauth2.googleapis.com/token') {
+      const idToken = await new SignJWT({ ...googleProfile, nonce: googleNonce })
+        .setProtectedHeader({ alg: 'RS256', kid: googleJwk.kid })
+        .setIssuer('https://accounts.google.com')
+        .setAudience('test')
+        .setIssuedAt()
+        .setExpirationTime('5m')
+        .sign(googleKeys.privateKey);
+      return Response.json({
+        id_token: idToken,
+        access_token: 'test-google-token',
+        token_type: 'Bearer',
+      });
+    }
     if (url === 'https://github.com/login/oauth/access_token') {
       return Promise.resolve(
         Response.json({
@@ -91,13 +126,19 @@ function cookies(headers: Headers) {
     .join('; ');
 }
 
-async function githubLogin(cookie: string) {
+async function socialLogin({
+  provider,
+  cookie = '',
+}: {
+  provider: SignInProvider;
+  cookie?: string;
+}) {
   const started = await auth.handler(
     new Request(`${ORIGIN}/api/auth/sign-in/social`, {
       method: 'POST',
       headers: { 'content-type': 'application/json', origin: ORIGIN, cookie },
       body: JSON.stringify({
-        provider: 'github',
+        provider,
         callbackURL: `${ORIGIN}/signed-in`,
         disableRedirect: true,
       }),
@@ -105,11 +146,25 @@ async function githubLogin(cookie: string) {
   );
   assert.equal(started.status, StatusMap.OK, await started.clone().text());
   const { url } = (await started.json()) as { url: string };
-  const state = new URL(url).searchParams.get('state');
+  const authorization = new URL(url);
+  if (provider === SignInProvider.Google) {
+    assert.equal(authorization.origin, 'https://accounts.google.com');
+    assert.equal(
+      authorization.searchParams.get('redirect_uri'),
+      `${ORIGIN}/api/auth/callback/google`,
+    );
+    assert.deepEqual(authorization.searchParams.get('scope')?.split(' ').sort(), [
+      'email',
+      'openid',
+      'profile',
+    ]);
+    googleNonce = authorization.searchParams.get('nonce');
+  }
+  const state = authorization.searchParams.get('state');
   assert.ok(state);
   const callback = await auth.handler(
     new Request(
-      `${ORIGIN}/api/auth/callback/github?code=test-code&state=${encodeURIComponent(state)}`,
+      `${ORIGIN}/api/auth/callback/${provider}?code=test-code&state=${encodeURIComponent(state)}`,
       {
         headers: { cookie: [cookie, cookies(started.headers)].filter(Boolean).join('; ') },
       },
@@ -125,7 +180,7 @@ async function githubLogin(cookie: string) {
 }
 
 try {
-  const signup = await githubLogin('');
+  const signup = await socialLogin({ provider: SignInProvider.GitHub });
   assert.equal(signup.session.user.email, `github-${NEW_GITHUB_ID}@example.test`);
   const [newAccount] =
     await sql`SELECT "providerId", "accountId", issuer FROM auth.account WHERE "userId" = ${signup.session.user.id}`;
@@ -136,7 +191,7 @@ try {
   await sql`INSERT INTO auth."user" (id,name,email,"emailVerified") VALUES (${LEGACY_USER_ID}, 'Existing owner', ${`github-${LEGACY_GITHUB_ID}@example.test`}, true)`;
   await sql`INSERT INTO auth.account (id,"accountId","providerId","userId",issuer,"updatedAt") VALUES (${LEGACY_ACCOUNT_ID},${String(LEGACY_GITHUB_ID)},'github',${LEGACY_USER_ID},'local:oauth:github',now())`;
   githubId = LEGACY_GITHUB_ID;
-  const returning = await githubLogin('');
+  const returning = await socialLogin({ provider: SignInProvider.GitHub });
   assert.equal(returning.session.user.id, LEGACY_USER_ID);
   const [legacyAccount] =
     await sql`SELECT id,issuer FROM auth.account WHERE "userId" = ${LEGACY_USER_ID}`;
@@ -145,12 +200,40 @@ try {
 
   const anonymous = await auth.api.signInAnonymous({ returnHeaders: true });
   githubId = ANONYMOUS_GITHUB_ID;
-  const upgraded = await githubLogin(cookies(anonymous.headers));
+  const upgraded = await socialLogin({
+    provider: SignInProvider.GitHub,
+    cookie: cookies(anonymous.headers),
+  });
   assert.notEqual(upgraded.session.user.isAnonymous, true);
   assert.deepEqual(claims, [{ from: anonymous.response.user.id, to: upgraded.session.user.id }]);
   const [deletedAnonymous] =
     await sql`SELECT count(*)::integer AS count FROM auth."user" WHERE id=${anonymous.response.user.id}`;
   assert.equal(deletedAnonymous.count, 0);
+  const googleAnonymous = await auth.api.signInAnonymous({ returnHeaders: true });
+  const googleSignup = await socialLogin({
+    provider: SignInProvider.Google,
+    cookie: cookies(googleAnonymous.headers),
+  });
+  assert.equal(googleSignup.session.user.emailVerified, true);
+  assert.deepEqual(claims.at(-1), {
+    from: googleAnonymous.response.user.id,
+    to: googleSignup.session.user.id,
+  });
+  const googleReturn = await socialLogin({ provider: SignInProvider.Google });
+  assert.equal(googleReturn.session.user.id, googleSignup.session.user.id);
+
+  googleProfile.sub = 'workspace-owner';
+  googleProfile.email = returning.session.user.email;
+  googleProfile.hd = 'example.test';
+  const linked = await socialLogin({ provider: SignInProvider.Google });
+  assert.equal(linked.session.user.id, LEGACY_USER_ID);
+
+  googleProfile.sub = 'external-owner';
+  googleProfile.email = 'external@other.test';
+  googleProfile.hd = undefined;
+  const external = await socialLogin({ provider: SignInProvider.Google });
+  assert.equal(external.session.user.emailVerified, false);
+
   const existingSession = await auth.api.getSession({
     headers: new Headers({ cookie: signup.cookie }),
   });

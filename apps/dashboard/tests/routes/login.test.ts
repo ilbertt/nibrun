@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { SignInProvider } from '@repo/api-constants';
 import { isRedirect } from '@tanstack/react-router';
 import { setupBrowserLocation } from '#tests/support/browser.ts';
 
@@ -25,14 +26,14 @@ const SIGNED_QUERY = new URLSearchParams([
   ['sig', 'server-issued-signature'],
 ]);
 
-async function socialSignInBody(): Promise<Record<string, unknown>> {
+async function socialSignInBody(provider: SignInProvider): Promise<Record<string, unknown>> {
   let body: Record<string, unknown> = {};
   const result = await authClient.signIn.social(
-    { provider: 'github', callbackURL: '/apps', disableRedirect: true },
+    { provider, callbackURL: '/apps', disableRedirect: true },
     {
       async customFetchImpl(...args: Parameters<typeof fetch>) {
         body = await new Request(...args).json();
-        return Response.json({ url: 'https://github.com/login/oauth/authorize', redirect: false });
+        return Response.json({ url: 'https://provider.example/authorize', redirect: false });
       },
     },
   );
@@ -54,17 +55,20 @@ function visitLogin({
   } as BeforeLoadContext);
 }
 
-test('GitHub sign-in carries the signed authorization query with repeated resources intact', async () => {
-  location.search = `?${SIGNED_QUERY}&redirect=%2Fapps&unrelated=ignored`;
-  const body = await socialSignInBody();
+test.each(Object.values(SignInProvider))(
+  '%s sign-in carries the signed authorization query with repeated resources intact',
+  async (provider) => {
+    location.search = `?${SIGNED_QUERY}&redirect=%2Fapps&unrelated=ignored`;
+    const body = await socialSignInBody(provider);
 
-  expect(body).toMatchObject({ provider: 'github', callbackURL: '/apps' });
-  expect(body.oauth_query).toBe(SIGNED_QUERY.toString());
-});
+    expect(body).toMatchObject({ provider, callbackURL: '/apps' });
+    expect(body.oauth_query).toBe(SIGNED_QUERY.toString());
+  },
+);
 
 test('ordinary sign-in does not send an unsigned page query as OAuth context', async () => {
   location.search = '?redirect=%2Fapps&client_id=untrusted&scope=mcp';
-  expect((await socialSignInBody()).oauth_query).toBeUndefined();
+  expect((await socialSignInBody(SignInProvider.Google)).oauth_query).toBeUndefined();
 });
 
 test('password sign-in preserves the same signed OAuth query as GitHub sign-in', async () => {

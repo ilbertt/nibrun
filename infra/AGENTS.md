@@ -90,7 +90,9 @@ generators when they are removed from configuration. The API's private log queri
 fleet's VPC log-ingest listener do not pass through Access.
 
 Sign-in needs a GitHub OAuth App whose callback URL is
-`https://<api_hostname>/api/auth/callback/github`.
+`https://<api_hostname>/api/auth/callback/github`. Configure an External web application in Google Auth
+Platform with the redirect URI `https://<api_hostname>/api/auth/callback/google`.
+Set the Actions variable `API_GOOGLE_CLIENT_ID` and secret `API_GOOGLE_CLIENT_SECRET` before deploying.
 
 Umami uses the `UMAMI_HOSTNAME` repository variable (`umami.nibrun.com` for this deployment).
 Its admin credentials are seeded before the public proxy starts. Umami keeps its own login

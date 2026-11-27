@@ -20,3 +20,4 @@ export {
   MIN_PAID_APPS_REQUEST,
   MIN_PAID_PORTS_REQUEST,
 } from '#paid-requests.ts';
+export { SignInProvider } from '#sign-in-provider.ts';

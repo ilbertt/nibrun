@@ -27,6 +27,11 @@ output "api_github_client_id" {
   value       = var.api_github_client_id
 }
 
+output "api_google_client_id" {
+  description = "Public half of the Google OAuth web client credentials; the secret half is read from SSM on the box."
+  value       = var.api_google_client_id
+}
+
 output "api_cloudflare_zone_id" {
   description = "Zone custom hostnames are registered in; the token used against it is read from SSM on the box."
   value       = data.cloudflare_zone.app_host.id

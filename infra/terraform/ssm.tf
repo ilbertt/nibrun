@@ -50,10 +50,8 @@ resource "aws_ssm_parameter" "api_tenant_secrets_key" {
   }
 }
 
-# The one secret Terraform cannot generate: it belongs to a GitHub OAuth App
-# created by hand, so it enters from the repository secret of the same name.
-# Landing it here rather than in the deploy's environment is deliberate — SSM
-# RunCommand keeps its parameters in command history, in the clear, for 30 days.
+# Hosts read OAuth secrets directly from Parameter Store because RunCommand retains
+# its parameters in plaintext in command history.
 resource "aws_ssm_parameter" "api_github_client_secret" {
   name  = "${var.ssm_secret_prefix}/api_github_client_secret"
   type  = "SecureString"
@@ -61,6 +59,16 @@ resource "aws_ssm_parameter" "api_github_client_secret" {
 
   tags = {
     Name = "${local.resource_name_prefix}-api-github-client-secret"
+  }
+}
+
+resource "aws_ssm_parameter" "api_google_client_secret" {
+  name  = "${var.ssm_secret_prefix}/api_google_client_secret"
+  type  = "SecureString"
+  value = var.api_google_client_secret
+
+  tags = {
+    Name = "${local.resource_name_prefix}-api-google-client-secret"
   }
 }
 

@@ -14,10 +14,10 @@ afterAll(async function stopDatabase() {
 });
 
 test(
-  'GitHub signup, returning accounts and anonymous upgrades work against the migrated Postgres schema',
-  async function authenticatesThroughGithubCallback() {
+  'Google and GitHub sign-in, account linking and anonymous upgrades work against the migrated Postgres schema',
+  async function authenticatesThroughProviderCallbacks() {
     // Controller suites replace the auth factory with a memory adapter in this process.
-    const child = Bun.spawn([process.execPath, 'run', 'tests/support/github-signup.ts'], {
+    const child = Bun.spawn([process.execPath, 'run', 'tests/support/social-sign-in.ts'], {
       cwd: new URL('../..', import.meta.url).pathname,
       stdout: 'pipe',
       stderr: 'pipe',
