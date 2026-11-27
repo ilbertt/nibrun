@@ -7,6 +7,8 @@ interface CustomProcessEnv {
   readonly TENANT_SECRETS_KEY: string;
   readonly GITHUB_CLIENT_ID: string;
   readonly GITHUB_CLIENT_SECRET: string;
+  readonly GOOGLE_CLIENT_ID: string;
+  readonly GOOGLE_CLIENT_SECRET: string;
   readonly S3_ENDPOINT: string;
   readonly VICTORIALOGS_ENDPOINT: string;
   readonly ARTIFACTS_BUCKET: string;
@@ -55,6 +57,8 @@ type Env = {
   TENANT_SECRETS_KEY: string;
   GITHUB_CLIENT_ID: string;
   GITHUB_CLIENT_SECRET: string;
+  GOOGLE_CLIENT_ID: string;
+  GOOGLE_CLIENT_SECRET: string;
   S3_ENDPOINT: URL;
   VICTORIALOGS_ENDPOINT: URL;
   ARTIFACTS_BUCKET: string;
@@ -78,6 +82,8 @@ function loadEnv(): Env {
     TENANT_SECRETS_KEY: required('TENANT_SECRETS_KEY'),
     GITHUB_CLIENT_ID: required('GITHUB_CLIENT_ID'),
     GITHUB_CLIENT_SECRET: required('GITHUB_CLIENT_SECRET'),
+    GOOGLE_CLIENT_ID: required('GOOGLE_CLIENT_ID'),
+    GOOGLE_CLIENT_SECRET: required('GOOGLE_CLIENT_SECRET'),
     S3_ENDPOINT: new URL(required('S3_ENDPOINT')),
     VICTORIALOGS_ENDPOINT: new URL(required('VICTORIALOGS_ENDPOINT')),
     ARTIFACTS_BUCKET: required('ARTIFACTS_BUCKET'),

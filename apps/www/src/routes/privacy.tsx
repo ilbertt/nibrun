@@ -18,7 +18,7 @@ function PrivacyPage() {
   return (
     <ContentPage title={TITLE} description={DESCRIPTION}>
       <p>
-        Last updated: <time dateTime="2026-10-20">20 October 2026</time>.
+        Last updated: <time dateTime="2026-11-27">27 November 2026</time>.
       </p>
       <p>
         In this policy, “nibrun”, “we”, “us”, and “our” refer to the operator of the nibrun service.
@@ -31,11 +31,11 @@ function PrivacyPage() {
       <h2>Information we process</h2>
       <ul>
         <li>
-          <strong>Account and sign-in information.</strong> When you sign in with GitHub, we receive
-          account identifiers, your name, email address, and profile image. We store authentication
-          records, sessions, tokens, and connection information, which can include IP addresses and
-          browser details. For pre-provisioned demo accounts, we also store a password hash.
-          Anonymous sessions let us associate a temporary app with its creator before sign-in.
+          <strong>Account and sign-in information.</strong> When you sign in with GitHub or Google,
+          we receive account identifiers, your name, email address, and profile image. We store
+          authentication records, sessions, tokens, and connection information, which can include IP
+          addresses and browser details. For pre-provisioned demo accounts, we also store a password
+          hash. Anonymous sessions let us associate a temporary app with its creator before sign-in.
         </li>
         <li>
           <strong>Your apps.</strong> We process uploaded executables, app settings, environment
@@ -93,15 +93,15 @@ function PrivacyPage() {
       <h2>Service providers and connected services</h2>
       <p>
         nibrun uses Amazon Web Services for application hosting and storage, Cloudflare for website
-        delivery, HTTPS traffic, and domain services, and GitHub for sign-in. Support messages are
-        processed through email. These providers process information needed for their role in
-        delivering the service.
+        delivery, HTTPS traffic, and domain services, and GitHub and Google for sign-in. Support
+        messages are processed through email. These providers process information needed for their
+        role in delivering the service.
       </p>
       <p>
         Application hosting and persistent storage are based in Frankfurt, Germany. Requests can
-        pass through Cloudflare’s global network. GitHub and any AI provider you connect handle
-        information under their own terms and privacy policies; their processing may take place in
-        other countries.
+        pass through Cloudflare’s global network. GitHub, Google, and any AI provider you connect
+        handle information under their own terms and privacy policies; their processing may take
+        place in other countries.
       </p>
       <p>
         Connecting an AI client authorizes it to request information and perform supported actions

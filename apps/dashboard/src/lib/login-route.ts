@@ -3,10 +3,13 @@ import type { Session } from '#lib/auth.ts';
 import { sameOriginPath } from '#lib/same-origin-path.ts';
 import { Route as IndexRoute } from '#routes/(dashboard)/index.tsx';
 
-type LoginSearch = { redirect?: string };
+type LoginSearch = { redirect?: string; reason?: 'keep-app' };
 
 export function validateLoginSearch(search: Record<string, unknown>): LoginSearch {
-  return { redirect: sameOriginPath(search.redirect) };
+  return {
+    redirect: sameOriginPath(search.redirect),
+    reason: search.reason === 'keep-app' ? search.reason : undefined,
+  };
 }
 
 export function beforeLogin({

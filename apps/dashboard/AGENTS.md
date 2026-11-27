@@ -6,7 +6,7 @@ to the api in development, so it is same-origin either way.
 ## Components
 
 `src/components/` holds one component per file, named after the component it
-exports — `github-sign-in-button.tsx` exports `GithubSignInButton`. Components
+exports — `login-form.tsx` exports `LoginForm`. Components
 belonging to the same group live together in a subfolder of it.
 
 shadcn components and the theme live in `@repo/ui`, which owns the only

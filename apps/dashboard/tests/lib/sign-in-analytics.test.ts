@@ -1,4 +1,5 @@
 import { expect, test } from 'bun:test';
+import { SignInProvider } from '@repo/api-constants';
 import { SessionIdentity } from '#lib/session-identity.ts';
 import { consumeSignIn, verifiedClaims } from '#lib/sign-in-analytics.ts';
 
@@ -22,6 +23,7 @@ test('a sign-in return is consumed once and accepts only app identifiers', () =>
     },
   };
   expect(consumeSignIn(storage)).toMatchObject({
+    provider: SignInProvider.GitHub,
     previous_identity_state: SessionIdentity.Anonymous,
     anonymous_app_ids: [APP_ID],
   });
@@ -64,6 +66,7 @@ test('visitor sign-ins and records created before identity tracking are not anon
 
 test('a claim requires the same anonymous app to become permanent under the account', () => {
   const pending = {
+    provider: SignInProvider.Google,
     reason: 'keep-app' as const,
     previous_identity_state: SessionIdentity.Anonymous,
     expires_at: Date.now() + SIGN_IN_WINDOW_MS,
@@ -81,6 +84,7 @@ test('a claim requires the same anonymous app to become permanent under the acco
 
 test('MCP attribution survives the OAuth redirect without implying a new account', () => {
   const stored = JSON.stringify({
+    provider: SignInProvider.Google,
     reason: 'mcp',
     previous_identity_state: SessionIdentity.Anonymous,
     expires_at: Date.now() + SIGN_IN_WINDOW_MS,
@@ -88,6 +92,7 @@ test('MCP attribution survives the OAuth redirect without implying a new account
   });
   const pending = consumeSignIn({ getItem: () => stored, removeItem() {} });
   expect(pending).toMatchObject({
+    provider: SignInProvider.Google,
     reason: 'mcp',
     previous_identity_state: SessionIdentity.Anonymous,
     anonymous_app_ids: [APP_ID],

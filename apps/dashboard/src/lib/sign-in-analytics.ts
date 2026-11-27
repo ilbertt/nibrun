@@ -1,10 +1,12 @@
 import { type AnalyticsEventData, SIGN_IN_REASONS } from '@repo/analytics';
+import { SignInProvider } from '@repo/api-constants';
 import type { QueryClient } from '@tanstack/react-query';
 import { SessionIdentity } from '#lib/session-identity.ts';
 import type { AppSummary } from '#queries/apps.ts';
 
 export type SignInReason = AnalyticsEventData['sign_in_started']['reason'];
 export type PendingSignIn = {
+  provider: SignInProvider;
   reason: SignInReason;
   previous_identity_state: SessionIdentity | undefined;
   anonymous_app_ids: string[];
@@ -23,10 +25,12 @@ export function cachedAnonymousApps(queryClient: QueryClient): string[] {
 }
 
 export function rememberSignIn({
+  provider,
   reason,
   identity,
   anonymousAppIds,
 }: {
+  provider: SignInProvider;
   reason: SignInReason;
   identity: SessionIdentity;
   anonymousAppIds: string[];
@@ -35,6 +39,7 @@ export function rememberSignIn({
     window.sessionStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
+        provider,
         reason,
         previous_identity_state: identity,
         anonymous_app_ids: anonymousAppIds,
@@ -72,7 +77,9 @@ export function consumeSignIn(
       return undefined;
     }
     const pending = JSON.parse(stored);
+    const provider = pending.provider === undefined ? SignInProvider.GitHub : pending.provider;
     if (
+      !Object.values(SignInProvider).includes(provider) ||
       !SIGN_IN_REASONS.includes(pending.reason) ||
       (pending.previous_identity_state !== undefined &&
         !Object.values(SessionIdentity).includes(pending.previous_identity_state)) ||
@@ -83,6 +90,7 @@ export function consumeSignIn(
       return undefined;
     }
     return {
+      provider,
       reason: pending.reason,
       previous_identity_state: pending.previous_identity_state,
       expires_at: pending.expires_at,

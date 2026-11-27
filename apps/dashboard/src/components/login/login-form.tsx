@@ -5,7 +5,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@repo/ui/components/card';
-import { GithubSignInButton } from '#components/login/github-sign-in-button.tsx';
+import { SocialSignInButtons } from '#components/login/social-sign-in-buttons.tsx';
 import { useMcpLoginAnalytics } from '#lib/hooks/use-mcp-login-analytics.ts';
 
 export function LoginForm() {
@@ -17,7 +17,7 @@ export function LoginForm() {
         <CardDescription>Sign in to continue.</CardDescription>
       </CardHeader>
       <CardContent>
-        <GithubSignInButton />
+        <SocialSignInButtons />
       </CardContent>
     </Card>
   );

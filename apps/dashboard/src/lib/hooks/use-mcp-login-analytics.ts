@@ -15,13 +15,14 @@ export function useMcpLoginAnalytics(): void {
     }
     previous.current = query;
     trackEvent({ name: 'mcp_login_viewed', data: { identity_state: identity } });
-    if (new URLSearchParams(query).has('error') && takeSignIn()?.reason === 'mcp') {
+    const pending = new URLSearchParams(query).has('error') ? takeSignIn() : undefined;
+    if (pending?.reason === 'mcp') {
       trackEvent({
         name: 'sign_in_failed',
         data: {
           identity_state: identity,
           reason: 'mcp',
-          provider: 'github',
+          provider: pending.provider,
           phase: 'callback',
           error_code: mcpLoginErrorCode(query),
           http_status: undefined,

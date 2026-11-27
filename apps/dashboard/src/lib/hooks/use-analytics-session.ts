@@ -45,7 +45,7 @@ export function useAnalyticsSession(): void {
         identity_state: identity,
         previous_identity_state: pending.previous_identity_state,
         reason: pending.reason,
-        provider: 'github',
+        provider: pending.provider,
       },
     });
     if (pending.anonymous_app_ids.length === 0) {

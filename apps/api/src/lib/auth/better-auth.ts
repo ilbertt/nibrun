@@ -1,6 +1,7 @@
 import { apiKey } from '@better-auth/api-key';
 import { cimd } from '@better-auth/cimd';
 import { mcp } from '@better-auth/mcp';
+import { SignInProvider } from '@repo/api-constants';
 import { Value } from '@sinclair/typebox/value';
 import { type BetterAuthOptions, betterAuth } from 'better-auth';
 import { anonymous, bearer, deviceAuthorization, jwt } from 'better-auth/plugins';
@@ -50,9 +51,21 @@ export function createAuth({
     hooks: { before: protectShortLivedDeploymentTokens },
     emailAndPassword: { enabled: true, disableSignUp: true },
     socialProviders: {
-      github: {
+      [SignInProvider.GitHub]: {
         clientId: env.GITHUB_CLIENT_ID,
         clientSecret: env.GITHUB_CLIENT_SECRET,
+      },
+      [SignInProvider.Google]: {
+        clientId: env.GOOGLE_CLIENT_ID,
+        clientSecret: env.GOOGLE_CLIENT_SECRET,
+        // Google only vouches for current mailbox ownership on Gmail and Workspace accounts.
+        mapProfileToUser(profile) {
+          return {
+            emailVerified:
+              profile.email_verified === true &&
+              (profile.email.toLowerCase().endsWith('@gmail.com') || Boolean(profile.hd)),
+          };
+        },
       },
     },
     plugins: [

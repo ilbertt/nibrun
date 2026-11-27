@@ -113,8 +113,7 @@ variable "app_host_domain" {
 
 # The GitHub OAuth App users sign in with. Its callback URL is tied to
 # api_hostname, so an app is per-deployment — GitHub allows one callback URL per
-# OAuth App. Both halves are created by hand, so unlike every other credential
-# here they enter from outside rather than being generated.
+# OAuth App.
 variable "api_github_client_id" {
   type        = string
   description = "Client ID of the GitHub OAuth App. CI passes the API_GITHUB_CLIENT_ID repository variable through."
@@ -135,6 +134,27 @@ variable "api_github_client_secret" {
   validation {
     condition     = trimspace(var.api_github_client_secret) != ""
     error_message = "api_github_client_secret must not be empty."
+  }
+}
+
+variable "api_google_client_id" {
+  type        = string
+  description = "Client ID of the Google OAuth web client. CI passes the API_GOOGLE_CLIENT_ID repository variable through."
+
+  validation {
+    condition     = trimspace(var.api_google_client_id) != ""
+    error_message = "api_google_client_id must not be empty."
+  }
+}
+
+variable "api_google_client_secret" {
+  type        = string
+  sensitive   = true
+  description = "Client secret of the Google OAuth web client. CI passes the API_GOOGLE_CLIENT_SECRET repository secret through."
+
+  validation {
+    condition     = trimspace(var.api_google_client_secret) != ""
+    error_message = "api_google_client_secret must not be empty."
   }
 }
 

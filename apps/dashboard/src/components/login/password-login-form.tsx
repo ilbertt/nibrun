@@ -72,7 +72,7 @@ export function PasswordLoginForm() {
             href={`${LoginRoute.to}${query}`}
             className="text-center text-muted-foreground text-sm underline underline-offset-4"
           >
-            Continue with GitHub
+            Other sign-in options
           </a>
         </form>
       </CardContent>
