@@ -3,7 +3,7 @@ import type { App, TenantArguments, TenantEnvironmentPatch } from '@repo/api-cli
 import {
   awaitDeploymentSettled,
   type DeployableArchive,
-  type DeployableBinary,
+  type DeployableArtifact,
   type Deployed,
   type DeployStep,
   deploy,
@@ -28,7 +28,7 @@ type Configured = {
 };
 
 export type DeployRequest = Configured & {
-  binary: DeployableBinary;
+  binary: DeployableArtifact;
   appId: string | undefined;
   name: string | undefined;
   initialData: DeployableArchive | undefined;
@@ -52,7 +52,7 @@ export type BinaryDelivery = 'upload' | 'fetch' | 'none';
 
 /** Who moves the bytes, which decides whether there is anything to put a meter on. */
 export function binaryDelivery(request: ReleaseRequest): BinaryDelivery {
-  if (!carriesBinary(request)) {
+  if (!carriesBinary(request) || 'kind' in request.binary) {
     return 'none';
   }
   return 'body' in request.binary ? 'upload' : 'fetch';

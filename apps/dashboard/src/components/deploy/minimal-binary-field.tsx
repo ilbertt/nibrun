@@ -4,6 +4,7 @@ import { BinaryDropTarget } from '@repo/ui/custom/binary-drop-target';
 import { FileTerminalIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { BINARY_INPUT_ID } from '#components/deploy/binary-drop-zone.tsx';
+import { isImageSource } from '#lib/app-source.ts';
 import { fetchedUrl, pickedFile } from '#lib/file-source.ts';
 import { type DeployFormState, validateBinary } from '#lib/hooks/use-deploy-form.ts';
 
@@ -31,8 +32,9 @@ export function MinimalBinaryField({
     >
       {(field) => {
         const rejected = field.state.value !== undefined && field.state.meta.errors.length > 0;
-        const file = pickedFile(field.state.value);
-        const fetching = file === undefined ? fetchedUrl(field.state.value) : undefined;
+        const source = isImageSource(field.state.value) ? undefined : field.state.value;
+        const file = pickedFile(source);
+        const fetching = file === undefined ? fetchedUrl(source) : undefined;
         return (
           <Field data-invalid={rejected || undefined}>
             {fetching === undefined ? (

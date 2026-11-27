@@ -18,7 +18,7 @@ export function DeploymentsTable({
         <TableRow>
           <TableHead>Deployment</TableHead>
           <TableHead>State</TableHead>
-          <TableHead>Binary</TableHead>
+          <TableHead>App source</TableHead>
           <TableHead>Activated</TableHead>
         </TableRow>
       </TableHeader>

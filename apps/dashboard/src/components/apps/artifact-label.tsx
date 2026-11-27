@@ -1,6 +1,7 @@
 import { artifactName } from '@repo/app-ui';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui/components/tooltip';
 import { useClipboardCopy } from '@repo/ui/hooks/use-clipboard-copy';
+import { ContainerIcon } from 'lucide-react';
 import { BinaryOrigin } from '#components/apps/binary-origin.tsx';
 import { GitHubDeploymentOrigin } from '#components/apps/github-deployment-origin.tsx';
 import { McpDeploymentOrigin } from '#components/apps/mcp-deployment-origin.tsx';
@@ -11,7 +12,7 @@ import type { DeploymentSummary } from '#queries/deployments.ts';
 // to sit beside the name. The whole digest is a hover away, and a click is what hands it over.
 const SHORT_DIGEST_LENGTH = 12;
 
-export function BinaryLabel({
+export function ArtifactLabel({
   artifact,
   github,
   mcp,
@@ -41,6 +42,12 @@ export function BinaryLabel({
       </span>
       {showProvenance && (
         <>
+          {'kind' in artifact && (
+            <ContainerIcon
+              className="ml-2 inline size-3 text-muted-foreground"
+              aria-label="Container image"
+            />
+          )}
           {!('kind' in artifact) && <BinaryOrigin originalFileUrl={artifact.originalFileUrl} />}
           {mcp !== undefined && <McpDeploymentOrigin mcp={mcp} />}
           {github !== undefined && <GitHubDeploymentOrigin github={github} />}
