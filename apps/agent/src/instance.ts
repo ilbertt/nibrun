@@ -16,7 +16,7 @@ import {
 } from '#paths.ts';
 
 function layersFor(artifact: DesiredInstance['artifact']): NibrunnerInstance['layers'] {
-  return 'kind' in artifact
+  return artifact.kind === 'oci'
     ? [{ kind: artifact.kind, repository: artifact.repository, digest: artifact.digest }]
     : [
         {
@@ -78,10 +78,10 @@ export function nibrunnerInstance(instance: DesiredInstance): NibrunnerInstance 
       httpPort: instance.config.httpPort,
       command: {
         program:
-          'kind' in instance.artifact ? instance.artifact.program : NIBRUNNER_EXECUTABLE_PATH,
+          instance.artifact.kind === 'oci' ? instance.artifact.program : NIBRUNNER_EXECUTABLE_PATH,
         args: instance.config.args,
         workingDirectory:
-          'kind' in instance.artifact
+          instance.artifact.kind === 'oci'
             ? instance.artifact.workingDirectory
             : NIBRUNNER_APP_DIRECTORY,
         environment: environmentFor(instance),

@@ -18,6 +18,7 @@ export {
   DesiredArtifactSchema,
   type DesiredCheckpoint,
   DesiredCheckpointSchema,
+  DesiredExecutableArtifactSchema,
   type DesiredExport,
   DesiredExportSchema,
   type DesiredInstance,

@@ -53,7 +53,17 @@ export const DesiredArtifactSchema = Type.Object({
 
 export type DesiredArtifact = typeof DesiredArtifactSchema.static;
 
-export const DesiredRuntimeArtifactSchema = Type.Union([DesiredArtifactSchema, OciImageSchema]);
+const EXECUTABLE_ARTIFACT_KIND = 'executable';
+
+export const DesiredExecutableArtifactSchema = Type.Object({
+  ...DesiredArtifactSchema.properties,
+  kind: Type.Literal(EXECUTABLE_ARTIFACT_KIND, { default: EXECUTABLE_ARTIFACT_KIND }),
+});
+
+export const DesiredRuntimeArtifactSchema = Type.Union([
+  DesiredExecutableArtifactSchema,
+  OciImageSchema,
+]);
 export type DesiredRuntimeArtifact = typeof DesiredRuntimeArtifactSchema.static;
 
 export const DesiredInstanceSchema = Type.Object({

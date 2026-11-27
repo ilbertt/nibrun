@@ -20,6 +20,7 @@ import {
   SqliteQueryResponseSchema,
   type SqliteQueryResult,
 } from '@repo/protocol';
+import { Value } from '@sinclair/typebox/value';
 import { Data, Effect } from 'effect';
 import { decode } from '#lib/protocol.ts';
 
@@ -146,7 +147,13 @@ export const makeControlPlaneClient = ({ baseUrl }: { baseUrl: string }) => {
         send: () => api.internal.agent['desired-state'].post(request, options({ sessionToken })),
       }).pipe(
         Effect.flatMap((value) =>
-          decode(() => parseMessage({ schema: DesiredStateResponseSchema, value })),
+          decode(() =>
+            parseMessage({
+              schema: DesiredStateResponseSchema,
+              // Older control planes send executable artifacts without a kind.
+              value: Value.Default(DesiredStateResponseSchema, value),
+            }),
+          ),
         ),
       ),
 

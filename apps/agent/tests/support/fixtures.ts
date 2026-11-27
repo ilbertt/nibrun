@@ -97,7 +97,7 @@ export function desiredInstance(overrides: Partial<DesiredInstance> = {}): Desir
     deploymentId: DEPLOYMENT_ID,
     volumeId: VOLUME_ID,
     desiredState: 'running',
-    artifact: artifact(),
+    artifact: { ...artifact(), kind: 'executable' },
     config: {
       access: { kind: 'public' },
       httpPort: HTTP_PORT_FIXTURE,

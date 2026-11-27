@@ -12,6 +12,7 @@ import {
 import { Value } from '@sinclair/typebox/value';
 import { type Duration, Effect, Exit, Fiber } from 'effect';
 import { ControlPlaneError, makeControlPlaneClient } from '#lib/control/client.ts';
+import { artifact, desiredInstance } from '#tests/support/fixtures.ts';
 import { runScoped } from '#tests/support/run.ts';
 import {
   HTTP_NO_CONTENT,
@@ -98,6 +99,19 @@ describe('every request identifies the protocol it speaks', () => {
     expect(call?.method).toBe('POST');
     expect(call?.headers[PROTOCOL_VERSION_HEADER]).toBe(String(PROTOCOL_VERSION));
     expect(call?.headers.authorization).toBe(`Bearer ${SESSION_TOKEN}`);
+  });
+
+  test('a binary from an older control plane gets an explicit executable kind', async () => {
+    const binary = artifact();
+    const body = {
+      ...VALID_DESIRED_STATE,
+      instances: [{ ...desiredInstance(), artifact: binary }],
+    };
+    const state = await runScoped(
+      Effect.flatMap(controlPlane({ body }), ({ client }) => desiredState(client)),
+    );
+
+    expect(state.instances[0]?.artifact).toEqual({ ...binary, kind: 'executable' });
   });
 
   test('the session route is reached without a session', async () => {
