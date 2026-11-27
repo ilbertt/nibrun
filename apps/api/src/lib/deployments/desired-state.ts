@@ -112,6 +112,7 @@ export function toDesiredInstance({
     // timeout it would be wrong to act on.
     ...(desiredState === 'on-request' ? { idleTimeoutMs: row.idle_timeout_ms } : {}),
     artifact: {
+      kind: 'executable',
       digest: row.digest,
       sizeBytes: Number(row.size_bytes),
       objectKey: row.object_key,

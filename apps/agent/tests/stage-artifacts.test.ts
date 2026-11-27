@@ -8,6 +8,7 @@ import { ArtifactStore } from '#services/artifact-store.service.ts';
 import { stageNibrunnerArtifacts } from '#stage-artifacts.ts';
 import { ARTIFACT_BYTES, ARTIFACT_DIGEST, artifactStore } from '#tests/support/artifacts.ts';
 import { artifact, desiredInstance, desiredState, desiredVolume } from '#tests/support/fixtures.ts';
+import { ociImage } from '#tests/support/oci-image.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
 const run = provided(platform);
@@ -53,7 +54,7 @@ test('binaries and imported archives are verified into one digest-addressed stor
       );
       expect(requests).toEqual([
         { bucket: BUCKETS.importBucket, objectKey: seed.objectKey },
-        { bucket: BUCKETS.artifactBucket, objectKey: desired.instances[0]!.artifact.objectKey },
+        { bucket: BUCKETS.artifactBucket, objectKey: artifact().objectKey },
       ]);
       yield* stage;
       expect(requests).toHaveLength(2);
@@ -139,6 +140,28 @@ test('interrupting an unfinished transfer removes its temporary file', async () 
       expect(yield* fs.exists(`${directory}/${ARTIFACT_DIGEST}`)).toBe(false);
       yield* Fiber.interrupt(transfer);
       expect(yield* fs.readDirectory(directory)).toEqual([]);
+    }),
+  );
+});
+
+test('registry images are pulled by nibrunner without reading the binary store', async () => {
+  await run(
+    Effect.gen(function* () {
+      const directory = yield* temporaryDirectory;
+      const store = Layer.succeed(
+        ArtifactStore,
+        ArtifactStore.make({
+          open() {
+            throw new Error('A registry image must not read an object-store binary.');
+          },
+        }),
+      );
+      yield* stageNibrunnerArtifacts({
+        desired: desiredState({ instances: [desiredInstance({ artifact: ociImage() })] }),
+        directory,
+        ...BUCKETS,
+      }).pipe(Effect.provide(store));
+      expect(yield* (yield* FileSystem.FileSystem).readDirectory(directory)).toEqual([]);
     }),
   );
 });

@@ -77,7 +77,7 @@ export const stageNibrunnerArtifacts = Effect.fn('nibrunner.stageArtifacts')(fun
     }
   }
   for (const instance of desired.instances) {
-    if (instance.desiredState !== 'stopped') {
+    if (instance.desiredState !== 'stopped' && instance.artifact.kind === 'executable') {
       yield* stageObject({ artifact: instance.artifact, directory, bucket: artifactBucket });
     }
   }

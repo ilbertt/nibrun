@@ -18,6 +18,7 @@ export {
   DesiredArtifactSchema,
   type DesiredCheckpoint,
   DesiredCheckpointSchema,
+  DesiredExecutableArtifactSchema,
   type DesiredExport,
   DesiredExportSchema,
   type DesiredInstance,
@@ -26,6 +27,8 @@ export {
   DesiredInstanceStateSchema,
   type DesiredPresence,
   DesiredPresenceSchema,
+  type DesiredRuntimeArtifact,
+  DesiredRuntimeArtifactSchema,
   type DesiredVolume,
   DesiredVolumeSchema,
   type HostDesiredState,
@@ -239,4 +242,5 @@ export {
   type RestartPolicy,
   RestartPolicySchema,
 } from '#schemas/instance.ts';
+export { type OciImage, OciImageSchema } from '#schemas/oci-image.ts';
 export { VOLUME_STATES, type VolumeState, VolumeStateSchema } from '#schemas/volume.ts';

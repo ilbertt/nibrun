@@ -48,6 +48,7 @@ function desiredState(): HostDesiredState {
         volumeId: Value.Parse(VolumeIdSchema, 'vol_1'),
         desiredState: 'running',
         artifact: {
+          kind: 'executable',
           digest: Value.Parse(Sha256DigestSchema, hexDigest()),
           sizeBytes: 2048,
           objectKey: Value.Parse(ObjectKeySchema, 'artifacts/app_1/a'),

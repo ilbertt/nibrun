@@ -15,6 +15,18 @@ import {
   NIBRUNNER_EXECUTABLE_PATH,
 } from '#paths.ts';
 
+function layersFor(artifact: DesiredInstance['artifact']): NibrunnerInstance['layers'] {
+  return artifact.kind === 'oci'
+    ? [{ kind: artifact.kind, repository: artifact.repository, digest: artifact.digest }]
+    : [
+        {
+          kind: 'executable',
+          destinationPath: NIBRUNNER_EXECUTABLE_PATH,
+          ...localArtifactReference(artifact),
+        },
+      ];
+}
+
 function environmentFor(
   instance: DesiredInstance,
 ): NibrunnerInstance['config']['command']['environment'] {
@@ -61,19 +73,17 @@ export function nibrunnerInstance(instance: DesiredInstance): NibrunnerInstance 
     volumeId: instance.volumeId,
     desiredState: instance.desiredState,
     ...(instance.idleTimeoutMs === undefined ? {} : { idleTimeoutMs: instance.idleTimeoutMs }),
-    layers: [
-      {
-        kind: 'executable',
-        destinationPath: NIBRUNNER_EXECUTABLE_PATH,
-        ...localArtifactReference(instance.artifact),
-      },
-    ],
+    layers: layersFor(instance.artifact),
     config: {
       httpPort: instance.config.httpPort,
       command: {
-        program: NIBRUNNER_EXECUTABLE_PATH,
+        program:
+          instance.artifact.kind === 'oci' ? instance.artifact.program : NIBRUNNER_EXECUTABLE_PATH,
         args: instance.config.args,
-        workingDirectory: NIBRUNNER_APP_DIRECTORY,
+        workingDirectory:
+          instance.artifact.kind === 'oci'
+            ? instance.artifact.workingDirectory
+            : NIBRUNNER_APP_DIRECTORY,
         environment: environmentFor(instance),
       },
       resources: instance.config.resources,
