@@ -15,6 +15,7 @@ import type { AppsService } from '#services/apps.service.ts';
 import type { ArtifactsService } from '#services/artifacts.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
 import type { FilesystemService } from '#services/filesystem.service.ts';
+import type { ImageArtifactsService } from '#services/image-artifacts.service.ts';
 import type { LogsService } from '#services/logs.service.ts';
 import type { SqliteService } from '#services/sqlite.service.ts';
 
@@ -23,6 +24,7 @@ const logger = createLogger('mcp');
 export function createMcpServerHandler({
   appsService,
   artifactsService,
+  imageArtifactsService,
   deploymentsService,
   logsService,
   filesystemService,
@@ -30,6 +32,7 @@ export function createMcpServerHandler({
 }: {
   appsService: AppsService;
   artifactsService: ArtifactsService;
+  imageArtifactsService: ImageArtifactsService;
   deploymentsService: DeploymentsService;
   logsService: LogsService;
   filesystemService: FilesystemService;
@@ -48,6 +51,7 @@ export function createMcpServerHandler({
         server,
         appsService,
         artifactsService,
+        imageArtifactsService,
         deploymentsService,
         ownerId,
         clientId,

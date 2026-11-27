@@ -1,7 +1,7 @@
 import type { McpServer, StandardSchemaWithJSON, ToolCallback } from '@modelcontextprotocol/server';
 import { MCP_TOOL_NAMES } from '@repo/api-constants';
 import { appUrl } from '@repo/app-ui';
-import { FilenameSchema } from '@repo/protocol';
+import { type AppId, FilenameSchema } from '@repo/protocol';
 import { Type } from '@sinclair/typebox';
 import { Value } from '@sinclair/typebox/value';
 import { McpDeploymentSchema } from '#lib/api/deployment.ts';
@@ -21,11 +21,16 @@ import { AppResponseSchema } from '#routes/api/apps/model.ts';
 import type { AppsService } from '#services/apps.service.ts';
 import type { ArtifactsService } from '#services/artifacts.service.ts';
 import type { DeploymentsService } from '#services/deployments.service.ts';
+import type { ImageArtifactsService } from '#services/image-artifacts.service.ts';
 
 const FetchedBinarySchema = Type.Extract(
   CreateArtifactBodySchema,
   Type.Object({ url: Type.String() }),
 );
+const ImageSourceSchema = Type.Extract(
+  CreateArtifactBodySchema,
+  Type.Object({ image: Type.Unknown() }),
+).properties.image;
 const ChatGptFileInputSchema = Type.Object(
   {
     download_url: FetchedBinarySchema.properties.url,
@@ -43,15 +48,24 @@ const DeployAppInputSchema = Type.Object(
     artifactId: Type.Optional(ArtifactIdSchema),
     url: Type.Optional(FetchedBinarySchema.properties.url),
     binary: Type.Optional(ChatGptFileInputSchema),
+    image: Type.Optional(
+      Type.Object(ImageSourceSchema.properties, { additionalProperties: false }),
+    ),
     sha256: FetchedBinarySchema.properties.sha256,
   },
   {
     additionalProperties: false,
-    oneOf: [{ required: ['url'] }, { required: ['binary'] }, { required: ['artifactId'] }],
+    oneOf: [
+      { required: ['url'] },
+      { required: ['binary'] },
+      { required: ['artifactId'] },
+      { required: ['image'] },
+    ],
     allOf: [
       ...DeploymentTargetSchema.allOf,
       { not: { required: ['name', 'artifactId'] } },
       { not: { required: ['sha256', 'artifactId'] } },
+      { not: { required: ['sha256', 'image'] } },
     ],
   },
 );
@@ -74,6 +88,7 @@ export function registerDeployAppTool({
   server,
   appsService,
   artifactsService,
+  imageArtifactsService,
   deploymentsService,
   ownerId,
   clientId,
@@ -81,6 +96,7 @@ export function registerDeployAppTool({
   server: McpServer;
   appsService: AppsService;
   artifactsService: ArtifactsService;
+  imageArtifactsService: ImageArtifactsService;
   deploymentsService: DeploymentsService;
   ownerId: OwnerId;
   clientId: OAuthClientId;
@@ -90,7 +106,7 @@ export function registerDeployAppTool({
     name: MCP_TOOL_NAMES.deployApp,
     config: {
       title: 'Deploy nibrun app',
-      description: `Create or redeploy an app from a Linux x86_64 binary. Redeploying replaces its current release. Include chatId if your current chat ID is available; omit it rather than guessing. For local files without native file binding, call ${MCP_TOOL_NAMES.prepareDeploy} first. Read ${DEPLOY_TO_NIBRUN_SKILL_URI} via resources/read for the workflow.`,
+      description: `Create or redeploy an app from a Linux x86_64 binary or a public digest-pinned OCI image. For image, supply repository, digest, program and workingDirectory with kind oci; startup defaults are explicit. Redeploying replaces its current release. Include chatId if your current chat ID is available; omit it rather than guessing. For local files without native file binding, call ${MCP_TOOL_NAMES.prepareDeploy} first. Read ${DEPLOY_TO_NIBRUN_SKILL_URI} via resources/read for the workflow.`,
       inputSchema,
       outputSchema,
       annotations: {
@@ -104,26 +120,15 @@ export function registerDeployAppTool({
     callback: handleToolResult(async function deployApp(
       ...[input, { mcpReq }]: Parameters<ToolCallback<typeof inputSchema>>
     ): Promise<DeployAppOutput> {
-      const { artifactId, url, binary, sha256 } = input;
       const sessionId = mcpReq._meta?.['openai/session'];
       const app = await appForDeployment({ appsService, ownerId, target: input });
-      const artifact =
-        artifactId === undefined
-          ? await artifactsService.createFromUrl({
-              appId: app.id,
-              ownerId,
-              deploymentGrant: null,
-              isAnonymous: false,
-              url: Value.Parse(FetchedBinarySchema.properties.url, binary?.download_url ?? url),
-              filename:
-                binary === undefined
-                  ? undefined
-                  : Value.Check(FilenameSchema, binary.file_name)
-                    ? binary.file_name
-                    : DEFAULT_BINARY_FILENAME,
-              sha256,
-            })
-          : await artifactsService.completeUpload({ appId: app.id, ownerId, artifactId });
+      const artifact = await artifactForDeployment({
+        input,
+        appId: app.id,
+        ownerId,
+        artifactsService,
+        imageArtifactsService,
+      });
       const deployment = await deploymentsService.createWithMcpClient({
         appId: app.id,
         ownerId,
@@ -133,5 +138,50 @@ export function registerDeployAppTool({
       });
       return { app, deployment, url: appUrl(app.hostnames) };
     }),
+  });
+}
+
+async function artifactForDeployment({
+  input,
+  appId,
+  ownerId,
+  artifactsService,
+  imageArtifactsService,
+}: {
+  input: typeof DeployAppInputSchema.static;
+  appId: AppId;
+  ownerId: OwnerId;
+  artifactsService: ArtifactsService;
+  imageArtifactsService: ImageArtifactsService;
+}) {
+  const { artifactId, url, binary, sha256, image } = input;
+  if (image !== undefined) {
+    return await imageArtifactsService.create({
+      appId,
+      ownerId,
+      image,
+      isAnonymous: false,
+      deploymentGrant: null,
+    });
+  }
+  if (artifactId !== undefined) {
+    return (
+      (await imageArtifactsService.find({ appId, ownerId, artifactId })) ??
+      (await artifactsService.completeUpload({ appId, ownerId, artifactId }))
+    );
+  }
+  return await artifactsService.createFromUrl({
+    appId,
+    ownerId,
+    deploymentGrant: null,
+    isAnonymous: false,
+    url: Value.Parse(FetchedBinarySchema.properties.url, binary?.download_url ?? url),
+    filename:
+      binary === undefined
+        ? undefined
+        : Value.Check(FilenameSchema, binary.file_name)
+          ? binary.file_name
+          : DEFAULT_BINARY_FILENAME,
+    sha256,
   });
 }
