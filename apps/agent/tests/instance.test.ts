@@ -10,6 +10,8 @@ import {
   tenantEnvironment,
 } from '#tests/support/fixtures.ts';
 
+import { ociImage } from '#tests/support/oci-image.ts';
+
 const DATA_REFERENCE = interpolableRuntimeValue(RUNTIME_VALUES.DATA_DIR.name);
 const HOSTNAME_REFERENCE = interpolableRuntimeValue(RUNTIME_VALUES.HOSTNAME.name);
 const HTTP_REFERENCE = interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name);
@@ -103,4 +105,19 @@ test('JWT access follows the app across all its HTTP hostnames', () => {
   const instance = desiredInstance();
   instance.config.access = JWT_ACCESS;
   expect(nibrunnerInstance(instance).access).toEqual(instance.config.access);
+});
+
+test('a registry image supplies the filesystem and explicit command without a binary layer', () => {
+  const image = ociImage();
+  const instance = desiredInstance({ artifact: image });
+  instance.config.args = ['httpd', '-f', '-p', '3000'];
+  const converted = nibrunnerInstance(instance);
+  expect(converted.layers).toEqual([
+    { kind: image.kind, repository: image.repository, digest: image.digest },
+  ]);
+  expect(converted.config.command).toMatchObject({
+    program: image.program,
+    workingDirectory: image.workingDirectory,
+    args: instance.config.args,
+  });
 });

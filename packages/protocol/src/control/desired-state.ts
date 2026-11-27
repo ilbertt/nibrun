@@ -16,6 +16,7 @@ import {
   HostIdSchema,
   VolumeIdSchema,
 } from '#schemas/identifiers.ts';
+import { OciImageSchema } from '#schemas/oci-image.ts';
 
 /**
  * `on-request` is `running` with the microVM left out until something asks for it: the app is
@@ -52,6 +53,9 @@ export const DesiredArtifactSchema = Type.Object({
 
 export type DesiredArtifact = typeof DesiredArtifactSchema.static;
 
+export const DesiredRuntimeArtifactSchema = Type.Union([DesiredArtifactSchema, OciImageSchema]);
+export type DesiredRuntimeArtifact = typeof DesiredRuntimeArtifactSchema.static;
+
 export const DesiredInstanceSchema = Type.Object({
   appId: AppIdSchema,
   deploymentId: DeploymentIdSchema,
@@ -61,7 +65,7 @@ export const DesiredInstanceSchema = Type.Object({
   // one it cannot act on — and so an api that predates this leaves a host on its own default
   // rather than stopping it converging.
   idleTimeoutMs: Type.Optional(IdleTimeoutMsSchema),
-  artifact: DesiredArtifactSchema,
+  artifact: DesiredRuntimeArtifactSchema,
   config: AppConfigSchema,
   // Carried down so the host can render its own routing config from the same state it boots
   // VMs with. The process that knows what is running is the process that writes the routing
