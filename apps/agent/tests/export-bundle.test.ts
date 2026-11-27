@@ -32,7 +32,7 @@ const fixture = Effect.gen(function* () {
     data,
     input: {
       preparedDirectory,
-      artifact: artifact(),
+      artifact: { ...artifact(), kind: 'executable' as const },
       config: undefined,
       artifactBucket: 'binaries',
       stagingDir: `${directory}/work`,
@@ -144,7 +144,7 @@ test.each(['data', 'bundle.tar.gz', 'crontab'])(
         yield* fs.writeFileString(`${input.preparedDirectory}/crontab`, '@hourly app\n');
         const bundle = yield* writeNibrunnerExportBundle({
           ...input,
-          artifact: artifact({ filename: Value.Parse(FilenameSchema, filename) }),
+          artifact: { ...input.artifact, filename: Value.Parse(FilenameSchema, filename) },
         });
         const entries = yield* Effect.sync(() => contents(bundle.path));
         expect(entries.get(`${filename}.binary`)?.body).toEqual(ARTIFACT_BYTES);

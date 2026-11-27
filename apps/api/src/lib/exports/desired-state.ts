@@ -43,6 +43,7 @@ export function toDesiredExport({
     volumeId: volumeIdOf(row.app_id),
     objectKey: row.object_key,
     artifact: {
+      kind: 'executable',
       digest: row.digest,
       sizeBytes: Number(row.size_bytes),
       objectKey: row.artifact_object_key,

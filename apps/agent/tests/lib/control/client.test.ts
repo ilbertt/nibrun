@@ -12,7 +12,7 @@ import {
 import { Value } from '@sinclair/typebox/value';
 import { type Duration, Effect, Exit, Fiber } from 'effect';
 import { ControlPlaneError, makeControlPlaneClient } from '#lib/control/client.ts';
-import { artifact, desiredInstance } from '#tests/support/fixtures.ts';
+import { artifact, desiredExport, desiredInstance } from '#tests/support/fixtures.ts';
 import { runScoped } from '#tests/support/run.ts';
 import {
   HTTP_NO_CONTENT,
@@ -106,12 +106,14 @@ describe('every request identifies the protocol it speaks', () => {
     const body = {
       ...VALID_DESIRED_STATE,
       instances: [{ ...desiredInstance(), artifact: binary }],
+      exports: [{ ...desiredExport(), artifact: binary }],
     };
     const state = await runScoped(
       Effect.flatMap(controlPlane({ body }), ({ client }) => desiredState(client)),
     );
 
     expect(state.instances[0]?.artifact).toEqual({ ...binary, kind: 'executable' });
+    expect(state.exports[0]?.artifact).toEqual({ ...binary, kind: 'executable' });
   });
 
   test('the session route is reached without a session', async () => {

@@ -47,7 +47,7 @@ export const writeNibrunnerExportBundle = Effect.fn('writeNibrunnerExportBundle'
   }
 
   let dataPath = preparedDirectory;
-  const parts = 'kind' in artifact ? [] : NIBRUNNER_DATA_DIRECTORY.split('/').filter(Boolean);
+  const parts = artifact.kind === 'oci' ? [] : NIBRUNNER_DATA_DIRECTORY.split('/').filter(Boolean);
   for (const part of ['', DATA_DIRECTORY, ...parts]) {
     dataPath = path.join(dataPath, part);
     yield* requireType({ file: dataPath, type: 'Directory' });
@@ -103,7 +103,7 @@ const writeRuntimeArtifact = Effect.fn('writeRuntimeArtifact')(function* ({
 }) {
   const fs = yield* FileSystem.FileSystem;
   const path = yield* Path.Path;
-  if ('kind' in artifact) {
+  if (artifact.kind === 'oci') {
     const filename = 'image.json';
     yield* fs.writeFileString(
       path.join(stagingDir, filename),

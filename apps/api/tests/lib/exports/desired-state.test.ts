@@ -107,6 +107,7 @@ describe('what a host is told to do about an export', () => {
   // A stopped app has no instance to take a binary from, so the artifact rides along.
   test('carries the binary that belongs in the bundle', () => {
     expect(desired({ state: 'pending' }).artifact).toEqual({
+      kind: 'executable',
       digest: ARTIFACT_DIGEST,
       sizeBytes: ARTIFACT_SIZE_BYTES,
       objectKey: ARTIFACT_OBJECT_KEY,

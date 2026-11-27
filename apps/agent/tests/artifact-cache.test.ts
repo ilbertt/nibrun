@@ -53,7 +53,9 @@ test('current, previous, running, import, empty-volume and export bytes are all 
   const desired = {
     ...retainedDesired(),
     volumes: [desiredVolume(), desiredVolume({ seed: artifact({ digest: SEEDED_DIGEST }) })],
-    exports: [desiredExport({ artifact: artifact({ digest: EXPORTED_DIGEST }) })],
+    exports: [
+      desiredExport({ artifact: { ...artifact({ digest: EXPORTED_DIGEST }), kind: 'executable' } }),
+    ],
   };
   const instance = desired.instances[0]!;
   const reported = report({

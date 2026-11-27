@@ -124,6 +124,7 @@ function desiredExport() {
     volumeId: Value.Parse(VolumeIdSchema, 'vol_1'),
     objectKey: Value.Parse(ObjectKeySchema, 'exports/app_1/exp_1.tar.gz'),
     artifact: {
+      kind: 'executable',
       digest: hexDigest(),
       sizeBytes: 2048,
       objectKey: Value.Parse(ObjectKeySchema, 'artifacts/app_1/a'),
