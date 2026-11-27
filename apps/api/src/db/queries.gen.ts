@@ -149,13 +149,18 @@ export interface ISelectDesiredExportsResult {
     /** Absent until the api has hashed the uploaded object; its presence is what makes the row an artifact. */
     digest: NonNullable<IArtifactsColumns["digest"]>;
     /** Counted off the uploaded bytes, so absent until they are there. A Postgres bigint, so it arrives as a string; the wire type is a number. */
-    size_bytes: NonNullable<IArtifactsColumns["size_bytes"]>;
+    size_bytes: IArtifactsColumns["size_bytes"];
     /** Where the verified bytes came to rest, so absent while they are still in a staging slot. Key within ARTIFACTS_BUCKET; which bucket is deploy configuration. */
-    artifact_object_key: NonNullable<IArtifactsColumns["object_key"]>;
+    artifact_object_key: IArtifactsColumns["object_key"];
     /** The name the binary was uploaded under; a content-addressed key carries none. */
-    original_file_name: NonNullable<IArtifactsColumns["original_file_name"]>;
+    original_file_name: IArtifactsColumns["original_file_name"];
     /** The config version whose environment belongs in the bundle, pinned when the export was asked for. */
     config_id: IExportsColumns["config_id"];
+    image_repository: IArtifactsColumns["image_repository"];
+    image_program: IArtifactsColumns["image_program"];
+    image_working_directory: IArtifactsColumns["image_working_directory"];
+    http_port: IAppConfigsColumns["http_port"] | null;
+    args: IAppConfigsColumns["args"] | null;
 }
 
 /** Result of query `SelectDesiredExportEnvironment`. */
@@ -1100,11 +1105,6 @@ export interface ISelectExportVolumeStorageResult {
     volume_storage_endpoint: IAppConfigsColumns["volume_storage_endpoint"];
 }
 
-/** Result of query `SelectLatestExportArtifact`. */
-export interface ISelectLatestExportArtifactResult {
-    image_repository: IArtifactsColumns["image_repository"];
-}
-
 /** Result of query `InsertExport`. */
 export interface IInsertExportResult {
     id: IExportsColumns["id"];
@@ -1576,7 +1576,6 @@ export interface Queries {
     SelectUsableImport: ISelectUsableImportResult;
     SelectDeploymentGrantToUse: ISelectDeploymentGrantToUseResult;
     SelectExportVolumeStorage: ISelectExportVolumeStorageResult;
-    SelectLatestExportArtifact: ISelectLatestExportArtifactResult;
     InsertExport: IInsertExportResult;
     SelectExportsByApp: ISelectExportsByAppResult;
     SelectExportById: ISelectExportByIdResult;
@@ -2071,6 +2070,9 @@ export interface IDesiredExportsColumns {
     original_file_name: import("@repo/protocol").Filename | null;
     /** The config version whose environment belongs in the bundle, pinned when the export was asked for. */
     config_id: string | null;
+    image_repository: string | null;
+    image_program: string | null;
+    image_working_directory: string | null;
 }
 
 /** Schema of `desired_exports`. */
@@ -2895,7 +2897,10 @@ export const schema = {
             size_bytes: { _columnName: "size_bytes", _foreignKeys: {} },
             artifact_object_key: { _columnName: "artifact_object_key", _foreignKeys: {} },
             original_file_name: { _columnName: "original_file_name", _foreignKeys: {} },
-            config_id: { _columnName: "config_id", _foreignKeys: {} }
+            config_id: { _columnName: "config_id", _foreignKeys: {} },
+            image_repository: { _columnName: "image_repository", _foreignKeys: {} },
+            image_program: { _columnName: "image_program", _foreignKeys: {} },
+            image_working_directory: { _columnName: "image_working_directory", _foreignKeys: {} }
         },
         _indexes: {},
         _constraints: {}

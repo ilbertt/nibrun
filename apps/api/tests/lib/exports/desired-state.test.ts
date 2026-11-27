@@ -74,6 +74,11 @@ function desiredExportRow(state: ExportState): DesiredExportRow {
     size_bytes: String(ARTIFACT_SIZE_BYTES),
     artifact_object_key: ARTIFACT_OBJECT_KEY,
     original_file_name: ARTIFACT_FILENAME,
+    image_repository: null,
+    image_program: null,
+    image_working_directory: null,
+    http_port: null,
+    args: null,
     config_id: CONFIG_ID,
   };
 }
