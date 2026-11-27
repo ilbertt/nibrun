@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
+import type { BinaryArtifact } from '@repo/api-client/models';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { BinaryLabel } from '#components/apps/binary-label.tsx';
-import type { ArtifactSummary } from '#queries/artifacts.ts';
 import type { DeploymentSummary } from '#queries/deployments.ts';
 
 const SOURCE_URL = 'https://releases.example.com/v1/my-server.tar.gz';
@@ -14,7 +14,7 @@ const GITHUB: NonNullable<DeploymentSummary['github']> = {
   runAttempt: '2',
 };
 
-function artifact(originalFileUrl: ArtifactSummary['originalFileUrl']): ArtifactSummary {
+function artifact(originalFileUrl: BinaryArtifact['originalFileUrl']): BinaryArtifact {
   return {
     id: '0199c0de-0000-7000-8000-000000000002',
     appId: '0199c0de-0000-7000-8000-000000000001',

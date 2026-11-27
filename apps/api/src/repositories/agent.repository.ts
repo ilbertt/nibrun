@@ -195,10 +195,8 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
         `,
       sql.SelectDesiredDeployments`
           /* @notNull digest */
-          /* @notNull size_bytes */
-          /* @notNull object_key */
           SELECT id, app_id, state,
-                 digest, size_bytes, object_key, original_file_name,
+                 digest, size_bytes, object_key, original_file_name, image_repository, image_program, image_working_directory,
                  http_port, has_extra_public_port, args, vcpu_count, memory_mib,
                  health_check_path, health_check_interval_ms, health_check_timeout_ms,
                  health_check_grace_period_ms, health_check_healthy_threshold,
@@ -246,6 +244,7 @@ export class AgentRepository extends Repository implements AgentRepositoryContra
         `,
       sql.SelectDesiredExports`
           /* @notNull artifact_object_key */
+          /* @notNull original_file_name */
           /* @notNull digest */
           /* @notNull size_bytes */
           SELECT id, app_id, object_key, state,

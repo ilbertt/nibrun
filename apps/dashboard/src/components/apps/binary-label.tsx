@@ -1,3 +1,4 @@
+import { artifactName } from '@repo/app-ui';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@repo/ui/components/tooltip';
 import { useClipboardCopy } from '@repo/ui/hooks/use-clipboard-copy';
 import { BinaryOrigin } from '#components/apps/binary-origin.tsx';
@@ -25,7 +26,7 @@ export function BinaryLabel({
 
   return (
     <>
-      {artifact.originalFileName}{' '}
+      {artifactName(artifact)}{' '}
       <span className="text-muted-foreground">
         (
         <Tooltip>
@@ -40,7 +41,7 @@ export function BinaryLabel({
       </span>
       {showProvenance && (
         <>
-          <BinaryOrigin originalFileUrl={artifact.originalFileUrl} />
+          {!('kind' in artifact) && <BinaryOrigin originalFileUrl={artifact.originalFileUrl} />}
           {mcp !== undefined && <McpDeploymentOrigin mcp={mcp} />}
           {github !== undefined && <GitHubDeploymentOrigin github={github} />}
         </>

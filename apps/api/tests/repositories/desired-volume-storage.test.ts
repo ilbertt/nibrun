@@ -287,7 +287,7 @@ test.each([
     const previous = await deployApp(slug);
     await sql.unsafe(
       `INSERT INTO nibrun.artifacts (app_id, digest, size_bytes, object_key, original_file_name)
-     SELECT id, 'sha256:new', 1, 'artifacts/new', 'new-app'
+     SELECT id, 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 1, 'artifacts/new', 'new-app'
      FROM nibrun.apps WHERE id = $1 AND owner_id = $2`,
       [appId, OWNER_ID],
     );
@@ -523,7 +523,7 @@ async function createApp(slug: string) {
   );
   await sql.unsafe(
     `INSERT INTO nibrun.artifacts (app_id, digest, size_bytes, object_key, original_file_name)
-     VALUES ($1, 'sha256:artifact', 1, 'artifacts/test', 'app')`,
+     VALUES ($1, 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa', 1, 'artifacts/test', 'app')`,
     [app.id],
   );
   return app.id;
