@@ -76,17 +76,6 @@ export class ExportsRepository extends Repository implements ExportsRepositoryCo
       if (volume?.volume_storage_endpoint != null) {
         throw new ConflictError('Host exports are unavailable for apps using a customer bucket.');
       }
-      const [source] = await tx.SelectLatestExportArtifact`
-        SELECT ar.image_repository
-        FROM nibrun.latest_app_deployments latest
-        JOIN nibrun.deployments d ON d.id = latest.deployment_id
-        JOIN nibrun.artifacts ar ON ar.id = d.artifact_id
-        JOIN nibrun.live_apps a ON a.id = latest.app_id
-        WHERE a.id = ${appId} AND a.owner_id = ${ownerId}
-      `;
-      if (source?.image_repository != null) {
-        throw new ConflictError('Exports are not available for OCI image deployments yet.');
-      }
       return tx.InsertExport`
         INSERT INTO nibrun.exports (app_id, artifact_id, config_id, expires_at)
         SELECT a.id, d.artifact_id, d.config_id, ${expiresAt}

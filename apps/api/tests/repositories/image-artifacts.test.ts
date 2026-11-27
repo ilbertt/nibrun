@@ -18,6 +18,7 @@ import { refusedBy } from '#tests/support/postgres.ts';
 import { TEST_SECRETS_KEY } from '#tests/support/secrets.ts';
 
 const DATABASE_TIMEOUT_MS = 180_000;
+const HTTP_PORT = 3000;
 let sql: SQL;
 
 beforeAll(async function startDatabase() {
@@ -102,12 +103,12 @@ test('a registered host receives the image command and digest in desired state',
     ociImage(),
   );
   expect((await deployments.findById(app))?.state).toBe('superseded');
-  const exports = new ExportsRepository(withTypes<Queries>(sql));
   const expiresAt = new Date(Date.now() + DATABASE_TIMEOUT_MS);
-  await expect(exports.request({ ...app, expiresAt })).rejects.toThrow(
-    'Exports are not available for OCI image deployments yet.',
-  );
-  expect((await agent.desiredState({ hostId, retainedDeploymentsPerApp: 2 })).exports).toEqual([]);
+  await new ExportsRepository(withTypes<Queries>(sql)).request({ ...app, expiresAt });
+  const exported = (await agent.desiredState({ hostId, retainedDeploymentsPerApp: 2 })).exports[0];
+  expect(exported?.artifact).toEqual(ociImage());
+  expect(Number(exported?.config?.httpPort)).toBe(HTTP_PORT);
+  expect(exported?.config?.args).toEqual([]);
 });
 
 test('new image deployments select a ready host', async () => {
@@ -134,7 +135,7 @@ test('new image deployments select a ready host', async () => {
   expect(placed.host_id).toBe(hostId);
 });
 
-test('host registration renewals preserve image deployments and rollbacks', async () => {
+test('host registration renewals preserve image deployments, exports and rollbacks', async () => {
   const { images, deployments, agent } = repositories();
   const originId = 'renewed-image-host';
   const hostId = await registerHost({ sql, originId });
@@ -151,12 +152,17 @@ test('host registration renewals preserve image deployments and rollbacks', asyn
     throw new Error('The image deployment was not created.');
   }
   const binaryApp = await createDeployedApp({ sql, name: 'renewal-binary-app', hostId });
+  await new ExportsRepository(withTypes<Queries>(sql)).request({
+    ...app,
+    expiresAt: new Date(Date.now() + DATABASE_TIMEOUT_MS),
+  });
   expect(await agent.registerHost({ originId })).toBe(hostId);
   const desired = await agent.desiredState({ hostId, retainedDeploymentsPerApp: 2 });
   expect(desired.instances.find((instance) => instance.appId === app.appId)?.artifact).toEqual(
     ociImage(),
   );
   expect(desired.instances.map((instance) => instance.appId)).toContain(binaryApp.appId);
+  expect(desired.exports[0]?.artifact).toEqual(ociImage());
   expect(desired.volumes.map((volume) => volume.appId)).toContain(app.appId);
   expect((await deployments.findById({ ...app, deploymentId: image.row.id }))?.state).toBe(
     'pending',

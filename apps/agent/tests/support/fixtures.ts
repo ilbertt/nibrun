@@ -138,7 +138,7 @@ export function desiredExport(overrides: Partial<DesiredExport> = {}): DesiredEx
     appId: APP_ID,
     volumeId: VOLUME_ID,
     objectKey: Value.Parse(ObjectKeySchema, 'exports/app-1/exp-1.tar.gz'),
-    artifact: artifact(),
+    artifact: { ...artifact(), kind: 'executable' },
     environment: {},
     desiredState: 'present',
     ...overrides,

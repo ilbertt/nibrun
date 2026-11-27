@@ -12,6 +12,7 @@ import { CommandRunner } from '#services/command-runner.service.ts';
 import { ARTIFACT_BYTES, artifactStore } from '#tests/support/artifacts.ts';
 import { artifact } from '#tests/support/fixtures.ts';
 import { preparedNibrunnerExport } from '#tests/support/nibrunner.ts';
+import { ociImage } from '#tests/support/oci-image.ts';
 import { platform, provided, temporaryDirectory } from '#tests/support/run.ts';
 
 const run = provided(
@@ -31,7 +32,8 @@ const fixture = Effect.gen(function* () {
     data,
     input: {
       preparedDirectory,
-      artifact: artifact(),
+      artifact: { ...artifact(), kind: 'executable' as const },
+      config: undefined,
       artifactBucket: 'binaries',
       stagingDir: `${directory}/work`,
     },
@@ -142,7 +144,7 @@ test.each(['data', 'bundle.tar.gz', 'crontab'])(
         yield* fs.writeFileString(`${input.preparedDirectory}/crontab`, '@hourly app\n');
         const bundle = yield* writeNibrunnerExportBundle({
           ...input,
-          artifact: artifact({ filename: Value.Parse(FilenameSchema, filename) }),
+          artifact: { ...input.artifact, filename: Value.Parse(FilenameSchema, filename) },
         });
         const entries = yield* Effect.sync(() => contents(bundle.path));
         expect(entries.get(`${filename}.binary`)?.body).toEqual(ARTIFACT_BYTES);
@@ -151,3 +153,22 @@ test.each(['data', 'bundle.tar.gz', 'crontab'])(
     );
   },
 );
+
+test('image exports retain the entire writable overlay and pinned image metadata', async () => {
+  await run(
+    Effect.gen(function* () {
+      const { fs, input } = yield* fixture;
+      yield* fs.makeDirectory(`${input.preparedDirectory}/data/var/lib`, { recursive: true });
+      yield* fs.writeFileString(`${input.preparedDirectory}/data/var/lib/state`, 'image state');
+      const image = ociImage();
+      const bundle = yield* writeNibrunnerExportBundle({ ...input, artifact: image });
+      const entries = contents(bundle.path);
+      expect(new TextDecoder().decode(entries.get('data/var/lib/state')?.body)).toBe('image state');
+      expect(entries.has('data/app/data/app.db')).toBe(true);
+      expect(JSON.parse(new TextDecoder().decode(entries.get('image.json')?.body))).toEqual({
+        image,
+      });
+      expect(entries.has(input.artifact.filename)).toBe(false);
+    }),
+  );
+});

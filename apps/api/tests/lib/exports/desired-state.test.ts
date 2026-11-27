@@ -74,6 +74,11 @@ function desiredExportRow(state: ExportState): DesiredExportRow {
     size_bytes: String(ARTIFACT_SIZE_BYTES),
     artifact_object_key: ARTIFACT_OBJECT_KEY,
     original_file_name: ARTIFACT_FILENAME,
+    image_repository: null,
+    image_program: null,
+    image_working_directory: null,
+    http_port: null,
+    args: null,
     config_id: CONFIG_ID,
   };
 }
@@ -107,6 +112,7 @@ describe('what a host is told to do about an export', () => {
   // A stopped app has no instance to take a binary from, so the artifact rides along.
   test('carries the binary that belongs in the bundle', () => {
     expect(desired({ state: 'pending' }).artifact).toEqual({
+      kind: 'executable',
       digest: ARTIFACT_DIGEST,
       sizeBytes: ARTIFACT_SIZE_BYTES,
       objectKey: ARTIFACT_OBJECT_KEY,
