@@ -143,15 +143,15 @@ export const DEPLOY_PRESETS = {
   sharkord: {
     isRecommended: false,
     projectUrl: 'https://github.com/sharkord/sharkord',
-    version: 'v0.0.32',
+    version: 'v0.0.33',
     markdownContent: sharkordPage,
     category: DeployCategory.Communication,
     title: 'Sharkord',
     subtitle: 'A self-hosted chat server with voice, video and screen sharing.',
     deployLink: {
       name: 'sharkord',
-      binary: 'https://github.com/Sharkord/sharkord/releases/download/v0.0.32/sharkord-linux-x64',
-      sha256: '6cc6d2448b5eeeb23f459d2b4d80763652ea0520ef16019c26f9474bcace5e3c',
+      binary: 'https://github.com/Sharkord/sharkord/releases/download/v0.0.33/sharkord-linux-x64',
+      sha256: '858ec4173babc99fe9bc669c9812f3aafd66936a1d95d6791b5f61ef03f2e7b2',
       port: 4991,
       env: ['SHARKORD_DATA_PATH=data', 'SHARKORD_AUTOUPDATE=false'],
       minimal: true,
@@ -257,7 +257,7 @@ export const DEPLOY_PRESETS = {
   'open-connector': {
     isRecommended: false,
     projectUrl: 'https://github.com/oomol-lab/open-connector',
-    version: 'v1.10.1',
+    version: 'v1.11.0',
     markdownContent: openConnectorPage,
     category: DeployCategory.DeveloperTools,
     title: 'OpenConnector',
@@ -265,8 +265,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'open-connector',
       binary:
-        'https://github.com/oomol-lab/open-connector/releases/download/v1.10.1/open-connector-linux-x64',
-      sha256: '6bfa45fa88a645b0f86d18d344e71870773c5cf566764c45d1ed6e295ba464b6',
+        'https://github.com/oomol-lab/open-connector/releases/download/v1.11.0/open-connector-linux-x64',
+      sha256: 'a90507a98ccdc08be458bc0904f11397daeda339e5841cc8058d852b0175bb41',
       port: 3000,
       env: [
         'HOST=0.0.0.0',
@@ -345,7 +345,7 @@ export const DEPLOY_PRESETS = {
   memos: {
     isRecommended: false,
     projectUrl: 'https://github.com/usememos/memos',
-    version: '26.11.2',
+    version: '26.11.3',
     markdownContent: memosPage,
     category: DeployCategory.NotesAndKnowledge,
     title: 'Memos',
@@ -353,8 +353,8 @@ export const DEPLOY_PRESETS = {
     deployLink: {
       name: 'memos',
       binary:
-        'https://github.com/usememos/memos/releases/download/26.11.2/memos_26.11.2_linux_amd64.tar.gz',
-      sha256: '2ad926ccd237e516f61097316c44f856a0b667f3e0de9b388982f39900c2e7ab',
+        'https://github.com/usememos/memos/releases/download/26.11.3/memos_26.11.3_linux_amd64.tar.gz',
+      sha256: '971f68a2ecd5ab97a42d058deec8b2e91a52eb43de7d3128b16b7b04fa5b5590',
       port: 5230,
       env: [
         `MEMOS_PORT=${interpolableRuntimeValue(RUNTIME_VALUES.HTTP_PORT.name)}`,
